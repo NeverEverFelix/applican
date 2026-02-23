@@ -143,6 +143,20 @@
   box-shadow: none;
 }
 
+.password {
+  width: 403px;
+  height: 48px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background-color: #151515;
+  box-sizing: border-box;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  color: rgba(255, 255, 255, 0.5);
+  caret-color: rgba(255, 255, 255, 0.5);
+}
+
 .email:focus,
 .email:focus-visible,
 .email:active,
@@ -151,7 +165,10 @@
 .name:active,
 .jobrole:focus,
 .jobrole:focus-visible,
-.jobrole:active {
+.jobrole:active,
+.password:focus,
+.password:focus-visible,
+.password:active {
   border: none;
   outline: none;
   box-shadow: none;
@@ -218,6 +235,24 @@
   cursor: not-allowed;
 }
 
+.formMessageError {
+  width: 403px;
+  margin: 12px 0 0;
+  color: #ec2542;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.formMessageSuccess {
+  width: 403px;
+  margin: 12px 0 0;
+  color: rgba(49, 197, 108, 0.9);
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: left;
+}
+
 .orText {
   margin: 24px 0 0;
   color: #8c8c8c;
@@ -256,4 +291,21 @@
   color: rgba(255, 255, 255, 0.42);
   font-size: 14px;
   text-decoration: none;
+}
+
+.passwordStepActions {
+  width: 100%;
+  margin-top: auto;
+  padding-bottom: 108px;
+  display: flex;
+  justify-content: center;
+}
+
+.secondaryLink {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 14px;
+  text-decoration: underline;
+  cursor: pointer;
 }

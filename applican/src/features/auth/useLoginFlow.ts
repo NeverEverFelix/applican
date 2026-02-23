@@ -4,9 +4,9 @@ import { validateEmail } from "./validateEmail";
 export type LoginStep = "email" | "password";
 
 export type ContinueResult =
-  | "advanced_to_password"
-  | "invalid_email"
-  | "already_in_password_step";
+  | { status: "advanced_to_password"; normalizedEmail: string }
+  | { status: "invalid_email" }
+  | { status: "already_in_password_step" };
 
 export type UseLoginFlow = {
   step: LoginStep;
@@ -27,12 +27,15 @@ export function useLoginFlow(): UseLoginFlow {
   const [password, setPassword] = useState("");
   const [isEmailValid, setIsEmailValid] = useState(false);
   const [isEmailInvalid, setIsEmailInvalid] = useState(false);
+  const [emailAttempted, setEmailAttempted] = useState(false);
 
   const onEmailChange = (value: string) => {
     setEmail(value);
     const validation = validateEmail(value);
     setIsEmailValid(validation.isValid);
-    setIsEmailInvalid(!validation.isValid && value.trim().length > 0);
+    setIsEmailInvalid(
+      !validation.isValid && (value.trim().length > 0 || emailAttempted),
+    );
   };
 
   const onPasswordChange = (value: string) => {
@@ -41,20 +44,21 @@ export function useLoginFlow(): UseLoginFlow {
 
   const onContinue = (): ContinueResult => {
     if (step === "password") {
-      return "already_in_password_step";
+      return { status: "already_in_password_step" };
     }
 
+    setEmailAttempted(true);
     const validation = validateEmail(email);
     setIsEmailValid(validation.isValid);
     setIsEmailInvalid(!validation.isValid);
 
     if (!validation.isValid) {
-      return "invalid_email";
+      return { status: "invalid_email" };
     }
 
     setEmail(validation.value);
     setStep("password");
-    return "advanced_to_password";
+    return { status: "advanced_to_password", normalizedEmail: validation.value };
   };
 
   const goToEmailStep = () => {
@@ -68,6 +72,7 @@ export function useLoginFlow(): UseLoginFlow {
     setPassword("");
     setIsEmailValid(false);
     setIsEmailInvalid(false);
+    setEmailAttempted(false);
   };
 
   return {

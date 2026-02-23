@@ -1,0 +1,32 @@
+.container{
+    min-height: 100vh;
+    display: grid;
+    background: #151515;
+    grid-template-columns: 588px 840px;
+    gap: 36px;
+    padding: 24px;
+    justify-content: start;
+}
+
+.studio-container{
+    width:1152px;
+    height:976px;
+    border-radius: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.job-description-input{
+    width:638px;
+    height:48px; 
+    margin-top: 320px; /* zone */ /*24*/
+    background-color:#222222;
+    border-radius: 12px;
+
+}
+.generate-result{
+    width:638px;
+    height:48px; 
+    background-color:#0068F4;
+    border-radius: 12px;
+}

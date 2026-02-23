@@ -195,6 +195,15 @@
   cursor: not-allowed;
 }
 
+.formMessageError {
+  width: 403px;
+  margin: 12px 0 0;
+  color: #ec2542;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: left;
+}
+
 .orText {
   margin: 24px 0 0;
   color: #8c8c8c;

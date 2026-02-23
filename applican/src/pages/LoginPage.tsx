@@ -4,13 +4,60 @@ import logo from "../assets/logo.png";
 import googleIcon from "../assets/GoogleIcon.png";
 import LoginForm from "../features/auth/LoginForm";
 import { useLoginFlow } from "../features/auth/useLoginFlow";
+import { getAuthErrorMessage, signInWithGoogle, signInWithPassword } from "../features/auth/auth";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function LoginPage() {
   const flow = useLoginFlow();
+  const navigate = useNavigate();
+  const [authError, setAuthError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handlePasswordSubmit = async ({
+    email,
+    password,
+  }: {
+    email: string;
+    password: string;
+  }) => {
+    setAuthError("");
+    setIsSubmitting(true);
+
+    const { error } = await signInWithPassword({ email, password });
+
+    setIsSubmitting(false);
+    if (error) {
+      setAuthError(getAuthErrorMessage(error));
+      return;
+    }
+
+    navigate("/app", { replace: true });
+  };
+
+  const handleGoogleSignIn = async () => {
+    setAuthError("");
+    setIsSubmitting(true);
+
+    const { error } = await signInWithGoogle();
+    if (error) {
+      setAuthError(getAuthErrorMessage(error));
+      setIsSubmitting(false);
+      return;
+    }
+  };
 
   return (
     <div className={styles.container}>
-      <LoginForm flow={flow} logoSrc={logo} googleIconSrc={googleIcon} />
+      <LoginForm
+        flow={flow}
+        logoSrc={logo}
+        googleIconSrc={googleIcon}
+        onPasswordSubmit={handlePasswordSubmit}
+        onGoogleSignIn={handleGoogleSignIn}
+        authError={authError}
+        isSubmitting={isSubmitting}
+      />
 
       <div className={styles.assetContainer}>
         <img src={pageImage} alt="Page visual" />

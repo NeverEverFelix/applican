@@ -9,6 +9,8 @@ type LoginFormProps = {
   googleIconSrc: string;
   onPasswordSubmit?: (payload: { email: string; password: string }) => void;
   onGoogleSignIn?: () => void;
+  authError?: string;
+  isSubmitting?: boolean;
 };
 
 export default function LoginForm({
@@ -17,6 +19,8 @@ export default function LoginForm({
   googleIconSrc,
   onPasswordSubmit,
   onGoogleSignIn,
+  authError,
+  isSubmitting = false,
 }: LoginFormProps) {
   const isPasswordStep = flow.step === "password";
   const canSubmit = isPasswordStep
@@ -68,9 +72,14 @@ export default function LoginForm({
           }}
           autoComplete={isPasswordStep ? "current-password" : "email"}
         />
-        <button type="submit" className={styles.continue} disabled={!canSubmit}>
-          Continue
+        <button
+          type="submit"
+          className={styles.continue}
+          disabled={!canSubmit || isSubmitting}
+        >
+          {isSubmitting ? "Continuing..." : "Continue"}
         </button>
+        {authError ? <p className={styles.formMessageError}>{authError}</p> : null}
       </div>
 
       {!isPasswordStep && (

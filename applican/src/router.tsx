@@ -1,5 +1,4 @@
 // src/router.tsx
-import React from "react";
 import {
   createBrowserRouter,
   Navigate,
