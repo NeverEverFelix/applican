@@ -1,0 +1,204 @@
+/* src/pages/SignupPage.module.css */
+
+.container {
+  min-height: 100vh;
+  display: grid;
+
+  /* FIX: column sizes match visual layout */
+  grid-template-columns: 840px 588px;
+
+  /* REQUIRED 16px gap */
+  gap: 16px;
+
+  align-items: center;
+  justify-content: center;
+
+  padding: 24px;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+/* =========================
+   LEFT IMAGE CARD
+   ========================= */
+.assetContainer {
+  height: 992px;
+  border-radius: 62px;
+  background: #000;
+  overflow: hidden;
+
+  /* FIX: grid owns width */
+  width: 100%;
+}
+
+.assetContainer img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* =========================
+   RIGHT FORM CARD
+   ========================= */
+.form {
+  height: 992px;
+  border-radius: 62px;
+  background: #0D0D0D;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  padding: 48px;
+  box-sizing: border-box;
+
+  /* FIX: grid owns width */
+  width: 100%;
+}
+
+/* =========================
+   ZONES
+   ========================= */
+.header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 108px;
+}
+
+.main {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 48px;
+}
+
+.footer {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: auto;
+  padding-bottom: 108px;
+}
+
+/* =========================
+   INPUT GROUP
+   ========================= */
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 48px;
+  width: 100%;
+}
+
+/* =========================
+   TEXT
+   ========================= */
+.logo {
+  width: 64px;
+  height: 64px;
+  display: block;
+}
+
+.mainText {
+  margin: 24px 0 0;
+  text-align: center;
+  color: #fff;
+  font-size: 64px;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.subText {
+  margin: 16px 0 0;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 16px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.subText a {
+  color: #0068f4;
+  text-decoration: underline;
+}
+
+/* =========================
+   INPUTS
+   ========================= */
+.email,
+.name,
+.jobrole {
+  width: 403px;
+  height: 48px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background-color: #151515;
+  box-sizing: border-box;
+
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.email::placeholder,
+.name::placeholder,
+.jobrole::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+  opacity: 1;
+}
+
+/* =========================
+   BUTTONS
+   ========================= */
+.continue {
+  margin-top: 24px;
+  width: 403px;
+  height: 48px;
+  background: #0068f4;
+  color: #0d0d0d;
+  border: none;
+  border-radius: 12px;
+}
+
+.orText {
+  margin: 24px 0 0;
+  color: #8c8c8c;
+  font-size: 14px;
+  line-height: 14px;
+  text-align: center;
+}
+
+.AltLogin {
+  width: 403px;
+  height: 48px;
+  background-color: #151515;
+  border-radius: 12px;
+  box-sizing: border-box;
+
+  margin-top: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.AltLogin img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  display: block;
+  flex-shrink: 0;
+}
+
+.forgotPassword {
+  margin-top: 24px;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 14px;
+  text-decoration: none;
+}
