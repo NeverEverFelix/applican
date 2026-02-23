@@ -7,7 +7,7 @@ import {
   RouterProvider,
 } from "react-router-dom";
 
-import RequireAuth from "./auth/RequireAuth";
+import RequireAuth from "./features/auth/RequireAuth";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SIgnupPage";
 import HomePage from "./pages/HomePage";
