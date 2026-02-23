@@ -18,21 +18,25 @@ export default function LoginForm({
   onPasswordSubmit,
   onGoogleSignIn,
 }: LoginFormProps) {
+  const isPasswordStep = flow.step === "password";
+  const canSubmit = isPasswordStep
+    ? flow.password.trim().length > 0
+    : flow.isEmailValid;
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!canSubmit) {
+      return;
+    }
 
     if (flow.step === "email") {
-      const result = flow.onContinue();
-      if (result === "advanced_to_password") {
-        console.log("Email validation successful:", flow.email.trim().toLowerCase());
-      }
+      flow.onContinue();
       return;
     }
 
     onPasswordSubmit?.({ email: flow.email, password: flow.password });
   };
 
-  const isPasswordStep = flow.step === "password";
   const emailClassName = `${styles.email} ${
     flow.isEmailValid ? styles.emailValidated : flow.isEmailInvalid ? styles.emailInvalid : ""
   }`;
@@ -64,7 +68,7 @@ export default function LoginForm({
           }}
           autoComplete={isPasswordStep ? "current-password" : "email"}
         />
-        <button type="submit" className={styles.continue}>
+        <button type="submit" className={styles.continue} disabled={!canSubmit}>
           Continue
         </button>
       </div>
@@ -83,6 +87,18 @@ export default function LoginForm({
           <a href="/forgot-password" className={styles.forgotPassword}>
             Forgot password?
           </a>
+        </div>
+      )}
+
+      {isPasswordStep && (
+        <div className={styles.passwordStepActions}>
+          <button
+            type="button"
+            className={styles.secondaryLink}
+            onClick={flow.goToEmailStep}
+          >
+            Change email
+          </button>
         </div>
       )}
     </form>

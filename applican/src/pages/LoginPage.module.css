@@ -190,6 +190,11 @@
   border-radius: 12px;
 }
 
+.continue:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .orText {
   margin: 24px 0 0;
   color: #8c8c8c;
@@ -228,6 +233,23 @@
   color: rgba(255, 255, 255, 0.42);
   font-size: 14px;
   text-decoration: none;
+}
+
+.passwordStepActions {
+  width: 100%;
+  margin-top: auto;
+  padding-bottom: 242px;
+  display: flex;
+  justify-content: center;
+}
+
+.secondaryLink {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 14px;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 /* Right-side asset */

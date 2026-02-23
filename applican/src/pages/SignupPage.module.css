@@ -213,6 +213,11 @@
   border-radius: 12px;
 }
 
+.continue:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .orText {
   margin: 24px 0 0;
   color: #8c8c8c;

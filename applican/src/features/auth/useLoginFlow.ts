@@ -59,6 +59,7 @@ export function useLoginFlow(): UseLoginFlow {
 
   const goToEmailStep = () => {
     setStep("email");
+    setPassword("");
   };
 
   const reset = () => {

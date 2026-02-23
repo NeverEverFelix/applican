@@ -17,6 +17,11 @@ export default function SignupForm({
   onSubmit,
   onGoogleSignIn,
 }: SignupFormProps) {
+  const canSubmit =
+    flow.isEmailValid &&
+    flow.name.trim().length > 0 &&
+    flow.jobRole.trim().length > 0;
+
   const emailClassName = `${styles.email} ${
     flow.isEmailValid ? styles.emailValidated : flow.isEmailInvalid ? styles.emailInvalid : ""
   }`;
@@ -24,6 +29,9 @@ export default function SignupForm({
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!canSubmit) {
+      return;
+    }
     onSubmit?.({ email: flow.email, name: flow.name, jobRole: flow.jobRole });
   };
 
@@ -71,7 +79,7 @@ export default function SignupForm({
           />
         </div>
 
-        <button type="submit" className={styles.continue}>
+        <button type="submit" className={styles.continue} disabled={!canSubmit}>
           Sign Up
         </button>
       </div>
