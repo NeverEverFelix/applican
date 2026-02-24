@@ -23,27 +23,34 @@ export default function LoginPage() {
   }) => {
     setAuthError("");
     setIsSubmitting(true);
+    try {
+      const { error } = await signInWithPassword({ email, password });
+      if (error) {
+        setAuthError(getAuthErrorMessage(error));
+        return;
+      }
 
-    const { error } = await signInWithPassword({ email, password });
-
-    setIsSubmitting(false);
-    if (error) {
+      navigate("/app", { replace: true });
+    } catch (error) {
       setAuthError(getAuthErrorMessage(error));
-      return;
+    } finally {
+      setIsSubmitting(false);
     }
-
-    navigate("/app", { replace: true });
   };
 
   const handleGoogleSignIn = async () => {
     setAuthError("");
     setIsSubmitting(true);
-
-    const { error } = await signInWithGoogle();
-    if (error) {
+    try {
+      const { error } = await signInWithGoogle();
+      if (error) {
+        setAuthError(getAuthErrorMessage(error));
+        return;
+      }
+    } catch (error) {
       setAuthError(getAuthErrorMessage(error));
+    } finally {
       setIsSubmitting(false);
-      return;
     }
   };
 

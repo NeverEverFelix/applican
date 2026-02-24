@@ -69,9 +69,21 @@ export async function signInWithGoogle() {
   });
 }
 
-export function getAuthErrorMessage(error: AuthError | null) {
+export function getAuthErrorMessage(error: AuthError | null | unknown) {
   if (!error) {
     return "";
   }
-  return error.message;
+
+  if (error instanceof TypeError && error.message.toLowerCase().includes("failed to fetch")) {
+    return "Network error reaching Supabase. Check VITE_SUPABASE_URL, key, project status, and your browser/network settings.";
+  }
+
+  if (typeof error === "object" && error && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string") {
+      return message;
+    }
+  }
+
+  return "Authentication failed. Please try again.";
 }
