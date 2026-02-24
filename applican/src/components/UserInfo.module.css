@@ -1,0 +1,78 @@
+.userInfoCard {
+  width: 216px;
+  height: 56px;
+  border-radius: 12px;
+  background-color: transparent;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  box-sizing: border-box;
+}
+
+.initialBadge {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.65);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: uppercase;
+}
+
+.userName {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stateControlStack {
+  width: 216px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stateControlItem {
+  width: 216px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  color: #ffffff;
+  text-decoration: none;
+  background-color: transparent;
+}
+
+.stateControlItemActive {
+  height: 42px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #292929 0%, #1f1f1f 100%);
+}
+
+.stateControlIcon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  opacity: 0.95;
+}
+
+.stateControlLabel {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+}

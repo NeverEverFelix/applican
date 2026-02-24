@@ -6,9 +6,11 @@ import SignupForm from "../features/auth/SignupForm";
 import { useSignupFlow } from "../features/auth/useSignupFlow";
 import { useState } from "react";
 import { getAuthErrorMessage, signInWithGoogle, signUpWithPassword } from "../features/auth/auth";
+import { useNavigate } from "react-router-dom";
 
 export default function SignupPage() {
   const flow = useSignupFlow();
+  const navigate = useNavigate();
   const [authError, setAuthError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -36,8 +38,7 @@ export default function SignupPage() {
       return;
     }
 
-    setSuccessMessage("Account created. Check your email to confirm your account.");
-    flow.reset();
+    navigate("/app", { replace: true });
   };
 
   const handleGoogleSignIn = async () => {
