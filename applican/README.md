@@ -71,3 +71,30 @@ export default defineConfig([
   },
 ])
 ```
+
+## Supabase Edge Function: `generate-bullets`
+
+This project includes an edge function at:
+
+- `supabase/functions/generate-bullets/index.ts`
+
+### Deploy
+
+```bash
+supabase functions deploy generate-bullets --project-ref gvfiiqggcxpitswxloqb
+```
+
+### Required function secrets
+
+```bash
+supabase secrets set \
+  OPENAI_API_KEY=your_openai_api_key \
+  SUPABASE_SERVICE_ROLE_KEY=your_service_role_key \
+  --project-ref gvfiiqggcxpitswxloqb
+```
+
+Optional:
+
+```bash
+supabase secrets set OPENAI_MODEL=gpt-4.1-mini --project-ref gvfiiqggcxpitswxloqb
+```

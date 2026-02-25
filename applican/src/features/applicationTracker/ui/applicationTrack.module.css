@@ -1,0 +1,277 @@
+.studioContainer {
+  width: 1152px;
+  height: 976px;
+  grid-column: 2;
+  justify-self: end;
+  border-radius: 24px;
+  background-color: #0b0b0b;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  align-items: center;
+  padding: 96px 32px 32px;
+  gap: 24px;
+  box-sizing: border-box;
+}
+
+.resumeStudio {
+  border: 1px solid #202020;
+}
+
+.applicationTracker {
+  border: 1px solid #1f2d3b;
+}
+
+.careerPath {
+  border: 1px solid #1f3b29;
+}
+
+.resources {
+  border: 1px solid #3a2f19;
+}
+
+.content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  margin-top: 224px;
+}
+
+.jobInputWrapper {
+  width: 638px;
+  height: 48px;
+  position: relative;
+}
+
+.jobInputIcon {
+  width: 16px;
+  height: 16px;
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.jobDescriptionInput {
+  width: 100%;
+  height: 48px;
+  margin-top: 0;
+  background-color: #222222;
+  color: #ffffff;
+  border: 1px solid transparent;
+  outline: none;
+  border-radius: 12px;
+  padding: 0 14px 0 40px;
+  box-sizing: border-box;
+  font-size: 14px;
+}
+
+.jobDescriptionInput::placeholder {
+  color: #9a9a9a;
+}
+
+.jobDescriptionInput:focus {
+  border-color: #3a3a3a;
+}
+
+.generateResultButton {
+  width: 638px;
+  height: 48px;
+  background-color: #0068f4;
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.generateResultButtonIcon {
+  width: 16px;
+  height: 16px;
+}
+
+.generateResultButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.uploadBox {
+  width: 638px;
+  height: 192px;
+  border-radius: 12px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background-color: transparent;
+  cursor: pointer;
+  transition: none;
+}
+
+.uploadBox::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='638' height='192' viewBox='0 0 638 192' fill='none'%3E%3Crect x='1' y='1' width='636' height='190' rx='12' ry='12' stroke='rgb(255,255,255)' stroke-opacity='0.5' stroke-width='.5' stroke-dasharray='12 12' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
+
+.uploadText {
+  color: #9a9a9a;
+  font-size: 14px;
+  line-height: 1.4;
+  font-family: "Hero Section Font", sans-serif;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+}
+
+.arrowIcon {
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+}
+
+.fileUploaded .uploadText {
+  color: #0068f4;
+}
+
+.dragging {
+  background-color: transparent;
+}
+
+.statusError {
+  width: 638px;
+  margin: 0;
+  color: #ff7b7b;
+  font-size: 13px;
+  text-align: left;
+}
+
+.statusSuccess {
+  width: 638px;
+  margin: 0;
+  color: #72d88a;
+  font-size: 13px;
+  text-align: left;
+}
+
+.outputPanel {
+  width: 638px;
+  margin: 0;
+  padding: 14px;
+  border-radius: 12px;
+  background: #151a1f;
+  border: 1px solid #2a313b;
+  color: #d9e2ef;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  box-sizing: border-box;
+}
+
+.placeholderPanel {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.placeholderTitle {
+  margin: 0;
+  color: #ffffff;
+  font-size: 24px;
+}
+
+.placeholderCopy {
+  margin: 0;
+  color: #9a9a9a;
+  font-size: 14px;
+}
+
+/* Application Tracker Header */
+.trackerView {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+  padding-top: 98px;
+}
+
+.trackerHeader {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.statusPillGroup {
+  width: 976px;
+  height: 126px;
+  border: none;
+  border-radius: 24px;
+  background: transparent;
+  padding: 0;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  align-content: start;
+}
+
+.statusPill {
+  appearance: none;
+  min-height: 44px;
+  border: 1px solid #222222;
+  border-radius: 12px;
+  background: transparent;
+  color: #f3f3f3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 14px;
+  font-size: 16px;
+  line-height: 1;
+  gap: 12px;
+  outline: none;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.statusPill:focus,
+.statusPill:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.statusPillSelected {
+  border-color: #0068f4;
+  color: #0068f4;
+}
+
+.statusCount {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+}

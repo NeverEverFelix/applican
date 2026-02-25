@@ -1,185 +1,21 @@
-/* HomePage.module.css */
-
 .container {
-    min-height: 100vh;
-    display: grid;
-    grid-template-columns: 216px auto;
-    column-gap: 36px;
-    background: #151515;
-    padding: 24px 24px 24px 12px;
-    align-items: start;
-    box-sizing: border-box;
-  }
-  
-  /* Main card */
-  .studioContainer {
-    width: 1152px;
-    height: 976px;
-    grid-column: 2;
-    justify-self: end;
-  
-    border-radius: 24px;
-    background-color: #0b0b0b;
-   
-  
-    display: flex;
-    flex-direction: column;
-    position: relative;
-  
-    /* Key fix: center the fixed-width children like your design */
-    align-items: center;
-  
-    /* Key fix: create the “floating in space” look */
-    padding: 96px 32px 32px;
-  
-    /* More natural spacing between vertical blocks */
-    gap: 24px;
-  
-    box-sizing: border-box;
-  }
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 216px auto;
+  column-gap: 36px;
+  background: #151515;
+  padding: 24px 24px 24px 12px;
+  align-items: start;
+  box-sizing: border-box;
+}
 
 .userInfoContainer {
-    width: 216px;
-    height: auto;
-    grid-column: 1;
-    justify-self: start;
-    align-self: start;
-    display: flex;
-    flex-direction: column;
-    gap: 84px;
-}
-  
-  /* Optional wrapper (recommended if you add the upload box next) */
-.content {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 24px;
-    margin-top: 224px;
-  }
-  
-/* Input */
-.jobInputWrapper {
-    width: 638px;
-    height: 48px;
-    position: relative;
-}
-
-.jobInputIcon {
-    width: 16px;
-    height: 16px;
-    position: absolute;
-    left: 14px;
-    top: 50%;
-    transform: translateY(-50%);
-    pointer-events: none;
-}
-
-.jobDescriptionInput {
-    width: 100%;
-    height: 48px;
-    margin-top: 0;
-  
-    background-color: #222222;
-    color: #ffffff;
-  
-    border: 1px solid transparent;
-    outline: none;
-    border-radius: 12px;
-  
-    padding: 0 14px 0 40px;
-    box-sizing: border-box;
-  
-    font-size: 14px;
-  }
-  
-  .jobDescriptionInput::placeholder {
-    color: #9a9a9a;
-  }
-  
-  /* Better focus treatment (so it feels “real”) */
-  .jobDescriptionInput:focus {
-    border-color: #3a3a3a;
-  }
-  
-  /* Button */
-.generateResultButton {
-    width: 638px;
-    height: 48px;
-  
-    background-color: #0068f4;
-    color: #ffffff;
-  
-    border: none;
-    border-radius: 12px;
-  
-    font-size: 14px;
-    font-weight: 600;
-  
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-  
-    cursor: pointer;
-  }
-
-.generateResultButtonIcon {
-    width: 16px;
-    height: 16px;
-}
-  
-  .generateResultButton:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-.uploadBox {
-    width: 638px;
-    height: 192px;
-    border-radius: 12px; /* Rounded corners */
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    background-color: transparent;
-    cursor: pointer;
-    transition: none;
-}
-
-.uploadBox::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: 12px;
-    pointer-events: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='638' height='192' viewBox='0 0 638 192' fill='none'%3E%3Crect x='1' y='1' width='636' height='190' rx='12' ry='12' stroke='rgb(255,255,255)' stroke-opacity='0.5' stroke-width='.5' stroke-dasharray='12 12' stroke-linecap='round'/%3E%3C/svg%3E");
-    background-size: 100% 100%;
-    background-repeat: no-repeat;
-}
-
-.uploadText {
-    color: #9a9a9a;
-    font-size: 14px;
-    line-height: 1.4;
-    font-family: "Hero Section Font", sans-serif;
-    font-weight: 500;
-    display: inline-flex;
-    align-items: center;
-}
-
-.arrowIcon {
-width: 10px;
-height: 10px;
-margin-right: 6px;
-}
-
-.uploadBox.fileUploaded .uploadText {
-    color: #0068F4; /* Blue text */
-}
-
-.uploadBox.dragging {
-    background-color: transparent;
+  width: 216px;
+  height: auto;
+  grid-column: 1;
+  justify-self: start;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 84px;
 }
