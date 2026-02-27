@@ -24,6 +24,11 @@
 
 .careerPath {
   border: 1px solid #1f3b29;
+  padding: 0;
+  --pointer-x: 50%;
+  --pointer-y: 35%;
+  --dot-offset-x: 0px;
+  --dot-offset-y: 0px;
   background-color: #0b0b0b;
   background-image:
     radial-gradient(rgba(255, 255, 255, 0.075) 1px, transparent 1px),
@@ -43,6 +48,20 @@
     center,
     top;
   background-repeat: repeat, no-repeat, no-repeat;
+  overflow: hidden;
+}
+
+.careerPath::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: var(--dot-offset-x) var(--dot-offset-y);
+  background-repeat: repeat;
+  -webkit-mask-image: radial-gradient(110px circle at var(--pointer-x) var(--pointer-y), rgba(0, 0, 0, 0.9), transparent 80%);
+  mask-image: radial-gradient(110px circle at var(--pointer-x) var(--pointer-y), rgba(0, 0, 0, 0.9), transparent 80%);
 }
 
 .resources {
@@ -56,6 +75,15 @@
   align-items: center;
   gap: 24px;
   margin-top: 224px;
+}
+
+.resultsContent {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 0;
 }
 
 .jobInputWrapper {
@@ -202,6 +230,179 @@
   box-sizing: border-box;
 }
 
+.resumeAnalysisContainer {
+  width: 995px;
+  height: auto;
+  margin-top: var(--resume-analysis-top-gap, 2px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--resume-analysis-stack-gap, 0px);
+  box-sizing: border-box;
+}
+
+.resumeAnalysisBottomSeparator {
+  width: 955px;
+  border-top: 1px dashed #151515;
+  align-self: center;
+  margin-top: 16px;
+  box-sizing: border-box;
+}
+
+.resumeOptimizationsContainer,
+.resumeAnalysisScrollContainer {
+  width: 955px;
+  height: 504px;
+  flex: 0 0 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  font-size: 16px;
+  margin-top: 42px;
+  box-sizing: border-box;
+}
+
+.resumeOptimizationsTitle {
+  margin: 0 0 24px;
+  color: #ffffff;
+  font-size: 48px;
+  line-height: 1;
+  text-align: center;
+}
+
+.resumeScorePill {
+  width: 199.15px;
+  height: 48px;
+  margin-top: 24px;
+  border-radius: 100px;
+  background: #31c56c;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #000000;
+  box-sizing: border-box;
+}
+
+.resumeScoreIcon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.resumeScoreValue {
+  margin: 0;
+  color: #000000;
+}
+
+.resumeRoleContainer {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.resumeRoleText {
+  margin: 0;
+  color: #ffffff;
+  font-size: 64px;
+  line-height: 1;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.resumeVirtuesContainer {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  margin-top: 42px;
+  gap: 12px;
+  box-sizing: border-box;
+}
+
+.resumeVirtuePill {
+  min-height: 48px;
+  height: 48px;
+  border-radius: 100px;
+  background: #022d28;
+  color: #31c56c;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 18px;
+  box-sizing: border-box;
+}
+
+.resumeVirtueIcon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.resumeVirtueText {
+  margin: 0;
+  color: #31c56c;
+  font-size: 16px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.resumeNegativesContainer {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  margin-top: 12px;
+  box-sizing: border-box;
+}
+
+.resumeNegativePill {
+  min-height: 48px;
+  height: 48px;
+  border-radius: 100px;
+  background: #4a0719;
+  color: #fe5e67;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 18px;
+  box-sizing: border-box;
+}
+
+.resumeNegativeIcon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.resumeNegativeText {
+  margin: 0;
+  color: #fe5e67;
+  font-size: 16px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .placeholderPanel {
   width: 100%;
   height: 100%;
@@ -222,6 +423,50 @@
   margin: 0;
   color: #9a9a9a;
   font-size: 14px;
+}
+
+.careerPathView {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-top: 456px;
+  padding-bottom: 468px;
+  box-sizing: border-box;
+}
+
+.careerPathInputWrapper {
+  width: 634px;
+  height: 48px;
+  position: relative;
+}
+
+.careerPathInput {
+  width: 634px;
+  height: 48px;
+  border: 2.5px solid #0068f4;
+  border-radius: 14px;
+  background: #222222;
+  color: #ffffff;
+  font-size: 16px;
+  padding: 0 52px 0 14px;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.careerPathInput::placeholder {
+  color: #9a9a9a;
+}
+
+.careerPathStarIcon {
+  width: 14px;
+  height: 14px;
+  position: absolute;
+  right: 17px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 
 /* Application Tracker Header */
@@ -300,7 +545,7 @@
   width: 976px;
   height: 1px;
   background: #222222;
-  margin-top: 8px;
+  margin-top: 0;
 }
 
 .trackerHeaderDivider {
@@ -312,7 +557,7 @@
 /* Application Tracker Columns */
 .trackerColumns {
   width: 976px;
-  margin-top: 20px;
+  margin-top: 0;
 }
 
 .trackerColumnHeader {
@@ -324,9 +569,9 @@
 }
 
 .trackerColumnLabel {
-  color: #c6c6c6;
-  font-size: 13px;
-  font-weight: 600;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 500;
   line-height: 1;
   white-space: nowrap;
 }

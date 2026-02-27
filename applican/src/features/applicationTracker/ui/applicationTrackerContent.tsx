@@ -13,6 +13,7 @@ import styles from "./applicationTrack.module.css";
 import type { PickerView } from "./studioContainerView";
 import { ResumeStudioView } from "./views/ResumeStudioView";
 import downloadIcon from "../../../assets/Download Icon.png";
+import starIcon from "../../../assets/Star.png";
 
 export type ApplicationTrackerStatus = ApplicationFilter;
 
@@ -21,6 +22,22 @@ function PlaceholderView({ title }: { title: string }) {
     <section className={styles.placeholderPanel}>
       <h2 className={styles.placeholderTitle}>{title}</h2>
       <p className={styles.placeholderCopy}>This view will be built inside the studio container.</p>
+    </section>
+  );
+}
+
+function CareerPathView() {
+  return (
+    <section className={styles.careerPathView}>
+      <div className={styles.careerPathInputWrapper}>
+        <input
+          type="text"
+          className={styles.careerPathInput}
+          placeholder="Enter your target role"
+          aria-label="Career path target role"
+        />
+        <img src={starIcon} alt="" aria-hidden="true" className={styles.careerPathStarIcon} />
+      </div>
     </section>
   );
 }
@@ -120,7 +137,7 @@ function ApplicationTrackerView({
         <div className={styles.trackerHeaderDivider} aria-hidden="true" />
         <div className={styles.trackerGridBody}>
           {errorMessage ? <p className={styles.trackerError}>{errorMessage}</p> : null}
-          {applicationRows.map((row, index) => (
+          {applicationRows.map((row) => (
             <div key={row.id}>
               <div className={styles.trackerRow}>
                 <span className={styles.trackerColumnCheckbox}>
@@ -155,7 +172,7 @@ function ApplicationTrackerView({
                   </span>
                 </span>
               </div>
-              {index < applicationRows.length - 1 ? <div className={styles.trackerRowDivider} aria-hidden="true" /> : null}
+              <div className={styles.trackerRowDivider} aria-hidden="true" />
             </div>
           ))}
         </div>
@@ -166,7 +183,7 @@ function ApplicationTrackerView({
 
 const STUDIO_CONTENT_BY_VIEW: Record<Exclude<PickerView, "Application Tracker">, ComponentType> = {
   "Resume Studio": ResumeStudioView,
-  "Career Path": () => <PlaceholderView title="Career Path" />,
+  "Career Path": CareerPathView,
   Resources: () => <PlaceholderView title="Resources" />,
 };
 
