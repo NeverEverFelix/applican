@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "../../../lib/supabaseClient";
 import {
@@ -13,16 +13,29 @@ type UseApplicationsResult = {
   applications: ApplicationRow[];
   counts: Record<ApplicationFilter, number>;
   isLoading: boolean;
+  isFetchingMore: boolean;
+  hasMore: boolean;
   errorMessage: string | null;
+  retryLoad: () => void;
+  loadMore: () => void;
   updateApplicationStatus: (applicationId: string, nextStatus: ApplicationStatus) => Promise<void>;
   isUpdating: (applicationId: string) => boolean;
 };
 
+const APPLICATIONS_PAGE_SIZE = 25;
+
 export function useApplications(): UseApplicationsResult {
   const [applications, setApplications] = useState<ApplicationRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [updatingById, setUpdatingById] = useState<Record<string, boolean>>({});
+  const [reloadNonce, setReloadNonce] = useState(0);
+  const nextFromRef = useRef(0);
+  const userIdRef = useRef<string | null>(null);
+  const isRequestInFlightRef = useRef(false);
+  const hasMoreRef = useRef(true);
 
   const isMissingAppliedDate = (value: string | null) => {
     if (!value) return true;
@@ -31,59 +44,99 @@ export function useApplications(): UseApplicationsResult {
     return parsed.getUTCFullYear() <= 1970;
   };
 
+  const loadPage = useCallback(async (reset: boolean) => {
+    if (isRequestInFlightRef.current) {
+      return;
+    }
+
+    if (!reset && !hasMoreRef.current) {
+      return;
+    }
+
+    isRequestInFlightRef.current = true;
+    if (reset) {
+      setIsLoading(true);
+      setErrorMessage(null);
+      setHasMore(true);
+      hasMoreRef.current = true;
+      nextFromRef.current = 0;
+    } else {
+      setIsFetchingMore(true);
+    }
+
+    try {
+      let userId = userIdRef.current;
+      if (reset || !userId) {
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
+
+        if (userError) {
+          setErrorMessage(`Failed to load user: ${userError.message}`);
+          setApplications([]);
+          setHasMore(false);
+          hasMoreRef.current = false;
+          return;
+        }
+
+        if (!user) {
+          userIdRef.current = null;
+          setApplications([]);
+          setHasMore(false);
+          hasMoreRef.current = false;
+          return;
+        }
+
+        userId = user.id;
+        userIdRef.current = user.id;
+      }
+
+      const from = nextFromRef.current;
+      const to = from + APPLICATIONS_PAGE_SIZE - 1;
+      const { data, error } = await supabase
+        .from("applications")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .range(from, to);
+
+      if (error) {
+        setErrorMessage(`Failed to load applications: ${error.message}`);
+        if (reset) {
+          setApplications([]);
+        }
+        return;
+      }
+
+      const rows = (data ?? []) as ApplicationRow[];
+      setApplications((prev) => (reset ? rows : [...prev, ...rows]));
+      nextFromRef.current = from + rows.length;
+      const nextHasMore = rows.length === APPLICATIONS_PAGE_SIZE;
+      setHasMore(nextHasMore);
+      hasMoreRef.current = nextHasMore;
+    } finally {
+      isRequestInFlightRef.current = false;
+      setIsLoading(false);
+      setIsFetchingMore(false);
+    }
+  }, []);
+
   useEffect(() => {
     let active = true;
     let channel: RealtimeChannel | null = null;
 
-    const load = async () => {
-      setIsLoading(true);
-      setErrorMessage(null);
-
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
+    const loadInitial = async () => {
       if (!active) return;
-
-      if (userError) {
-        setErrorMessage(`Failed to load user: ${userError.message}`);
-        setApplications([]);
-        setIsLoading(false);
-        return;
-      }
-
-      if (!user) {
-        setApplications([]);
-        setIsLoading(false);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("applications")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (!active) return;
-
-      if (error) {
-        setErrorMessage(`Failed to load applications: ${error.message}`);
-        setApplications([]);
-        setIsLoading(false);
-        return;
-      }
-
-      setApplications((data ?? []) as ApplicationRow[]);
-      setIsLoading(false);
+      await loadPage(true);
     };
 
-    void load();
+    void loadInitial();
 
     channel = supabase
       .channel("applications-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "applications" }, () => {
-        void load();
+        void loadInitial();
       })
       .subscribe();
 
@@ -93,7 +146,7 @@ export function useApplications(): UseApplicationsResult {
         void supabase.removeChannel(channel);
       }
     };
-  }, []);
+  }, [loadPage, reloadNonce]);
 
   const counts = useMemo<Record<ApplicationFilter, number>>(() => {
     const applied = applications.filter((item) => getApplicationFilterBucket(item.status) === "applied").length;
@@ -159,5 +212,24 @@ export function useApplications(): UseApplicationsResult {
     [updatingById],
   );
 
-  return { applications, counts, isLoading, errorMessage, updateApplicationStatus, isUpdating };
+  const retryLoad = useCallback(() => {
+    setReloadNonce((value) => value + 1);
+  }, []);
+
+  const loadMore = useCallback(() => {
+    void loadPage(false);
+  }, [loadPage]);
+
+  return {
+    applications,
+    counts,
+    isLoading,
+    isFetchingMore,
+    hasMore,
+    errorMessage,
+    retryLoad,
+    loadMore,
+    updateApplicationStatus,
+    isUpdating,
+  };
 }

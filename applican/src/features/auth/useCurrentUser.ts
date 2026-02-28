@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { supabase } from "../../lib/supabaseClient";
+import { useAuthSession } from "./AuthSessionContext";
 
 function getDisplayName(user: User | null) {
   if (!user) {
@@ -26,33 +25,6 @@ function getDisplayName(user: User | null) {
 }
 
 export function useCurrentUserName() {
-  const [name, setName] = useState("User");
-
-  useEffect(() => {
-    let active = true;
-
-    const syncUser = (user: User | null) => {
-      if (!active) {
-        return;
-      }
-      setName(getDisplayName(user));
-    };
-
-    supabase.auth.getUser().then(({ data }) => {
-      syncUser(data.user);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      syncUser(session?.user ?? null);
-    });
-
-    return () => {
-      active = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  return name;
+  const { session } = useAuthSession();
+  return getDisplayName(session?.user ?? null);
 }

@@ -39,6 +39,19 @@ function getEnv(name: string) {
   return value;
 }
 
+function parseBearerToken(authHeader: string | null) {
+  if (!authHeader) {
+    throw new HttpError(401, "MISSING_AUTH", "Missing Authorization header.");
+  }
+
+  const [scheme, token] = authHeader.trim().split(/\s+/);
+  if (scheme?.toLowerCase() !== "bearer" || !token) {
+    throw new HttpError(401, "INVALID_AUTH_HEADER", "Authorization header must be a Bearer token.");
+  }
+
+  return token;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -53,10 +66,7 @@ serve(async (req) => {
     const supabaseAnonKey = getEnv("SUPABASE_ANON_KEY");
     const serviceRoleKey = getEnv("SUPABASE_SERVICE_ROLE_KEY");
     const authHeader = req.headers.get("Authorization");
-
-    if (!authHeader) {
-      throw new HttpError(401, "MISSING_AUTH", "Missing Authorization header.");
-    }
+    const accessToken = parseBearerToken(authHeader);
 
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
@@ -73,7 +83,7 @@ serve(async (req) => {
     const {
       data: { user },
       error: userError,
-    } = await userClient.auth.getUser();
+    } = await adminClient.auth.getUser(accessToken);
 
     if (userError || !user) {
       throw new HttpError(401, "UNAUTHORIZED", "Invalid or expired user token.");

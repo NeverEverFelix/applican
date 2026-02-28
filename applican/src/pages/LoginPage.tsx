@@ -7,12 +7,15 @@ import { useLoginFlow } from "../features/auth/useLoginFlow";
 import { getAuthErrorMessage, signInWithGoogle, signInWithPassword } from "../features/auth/auth";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import AuthLoadingScreen from "../features/auth/AuthLoadingScreen";
+import { ensureMinimumLoadingDuration, useMinimumLoading } from "../features/auth/useMinimumLoading";
 
 export default function LoginPage() {
   const flow = useLoginFlow();
   const navigate = useNavigate();
   const [authError, setAuthError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const showLoading = useMinimumLoading(isSubmitting);
 
   const handlePasswordSubmit = async ({
     email,
@@ -21,6 +24,7 @@ export default function LoginPage() {
     email: string;
     password: string;
   }) => {
+    const startedAt = Date.now();
     setAuthError("");
     setIsSubmitting(true);
     try {
@@ -30,6 +34,7 @@ export default function LoginPage() {
         return;
       }
 
+      await ensureMinimumLoadingDuration(startedAt);
       navigate("/app", { replace: true });
     } catch (error) {
       setAuthError(getAuthErrorMessage(error));
@@ -53,6 +58,10 @@ export default function LoginPage() {
       setIsSubmitting(false);
     }
   };
+
+  if (showLoading) {
+    return <AuthLoadingScreen />;
+  }
 
   return (
     <div className={styles.container}>

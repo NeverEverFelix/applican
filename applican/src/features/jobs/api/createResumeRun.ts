@@ -56,7 +56,7 @@ export async function createResumeRun(
     resume_path: upload.path,
     resume_filename: upload.filename,
     job_description: normalizedJobDescription,
-    status: RESUME_RUN_STATUS.PROCESSING,
+    status: RESUME_RUN_STATUS.QUEUED,
     error_code: null,
     error_message: null,
     output: null,

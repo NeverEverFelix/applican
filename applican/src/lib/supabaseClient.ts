@@ -11,4 +11,11 @@ if (!url || !publishableKey) {
   );
 }
 
-export const supabase = createClient(url, publishableKey);
+export const supabase = createClient(url, publishableKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storageKey: "applican-auth",
+  },
+});

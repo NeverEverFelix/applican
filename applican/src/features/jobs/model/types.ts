@@ -44,8 +44,7 @@ export type CreateResumeRunResult = {
 
 export type GenerateBulletsInput = {
   runId: string;
-  resumePath: string;
-  jobDescription: string;
+  requestId: string;
 };
 
 export type GenerateBulletsResponse = {

@@ -4,16 +4,27 @@ import starIcon from "../../../../assets/Star.png";
 import blackStarIcon from "../../../../assets/Black star.png";
 import arrowIcon from "../../../../assets/Arrow.png";
 import jobDescriptionIcon from "../../../../assets/Job Description Icon.png";
-import { useCreateResumeRun } from "../../../jobs/hooks/useCreateResumeRun";
+import checkIcon from "../../../../assets/Check.png";
+import { useLocalStorageState } from "../../../../hooks/useLocalStorageState";
 
 export function ResumeStudioView() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [jobDescription, setJobDescription] = useState("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadedFileName, setUploadedFileName] = useState<string>("");
+  const [jobDescription, setJobDescription] = useLocalStorageState<string>(
+    "applican:resume-studio:job-description",
+    "",
+  );
+  const [uploadedFileName, setUploadedFileName] = useLocalStorageState<string>(
+    "applican:resume-studio:uploaded-file-name",
+    "",
+  );
   const [isDragging, setIsDragging] = useState(false);
-  const [showComputedResults, setShowComputedResults] = useState(false);
-  const { isSubmitting, errorMessage, createdRun, submitResumeRun } = useCreateResumeRun();
+  const [showComputedResults, setShowComputedResults] = useLocalStorageState<boolean>(
+    "applican:resume-studio:show-results",
+    false,
+  );
+
+  const mockTitle = "Senior Product Designer";
+  const mockScore = 92;
   const mockVirtues = [
     "You clearly quantify impact across content and growth work, which makes your accomplishments easy to evaluate quickly.",
     "Your bullets consistently use strong action verbs and ownership language that signals execution depth and leadership.",
@@ -26,13 +37,11 @@ export function ResumeStudioView() {
 
   const selectFile = (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    setSelectedFile(files[0]);
     setUploadedFileName(files[0].name);
   };
 
   const onGenerateResult = () => {
     setShowComputedResults(true);
-    void submitResumeRun({ file: selectedFile, jobDescription });
   };
 
   return (
@@ -94,56 +103,48 @@ export function ResumeStudioView() {
             />
           </div>
 
-          <button type="button" className={styles.generateResultButton} disabled={isSubmitting} onClick={onGenerateResult}>
+          <button type="button" className={styles.generateResultButton} onClick={onGenerateResult}>
             <img src={starIcon} alt="" aria-hidden="true" className={styles.generateResultButtonIcon} />
-            <span>{isSubmitting ? "Generating..." : "Generate Result"}</span>
+            <span>Generate Result</span>
           </button>
-
-          {errorMessage ? <p className={styles.statusError}>{errorMessage}</p> : null}
-          {createdRun ? <p className={styles.statusSuccess}>Generation complete.</p> : null}
-          {createdRun?.row.output ? (
-            <pre className={styles.outputPanel}>{JSON.stringify(createdRun.row.output, null, 2)}</pre>
-          ) : null}
         </>
       ) : (
         <section className={styles.resumeAnalysisContainer}>
           <div className={styles.resumeRoleContainer}>
-            <h2 className={styles.resumeRoleText}>Senior Product Designer</h2>
+            <h2 className={styles.resumeRoleText}>{mockTitle}</h2>
           </div>
 
           <div className={styles.resumeScorePill}>
             <img src={blackStarIcon} alt="" aria-hidden="true" className={styles.resumeScoreIcon} />
-            <p className={styles.resumeScoreValue}>92 Resume Score</p>
+            <p className={styles.resumeScoreValue}>{mockScore} Resume Score</p>
           </div>
 
           <div className={styles.resumeVirtuesContainer}>
             {mockVirtues.map((virtue) => (
               <span key={virtue} className={styles.resumeVirtuePill}>
-                <span className={styles.resumeVirtueIcon} aria-hidden="true">
-                  ✓
-                </span>
+                <img src={checkIcon} alt="" aria-hidden="true" className={styles.resumeVirtueIcon} />
                 <span className={styles.resumeVirtueText}>{virtue}</span>
               </span>
             ))}
           </div>
 
-        <div className={styles.resumeNegativesContainer}>
-          {mockNegatives.map((negative) => (
-            <span key={negative} className={styles.resumeNegativePill}>
-              <span className={styles.resumeNegativeIcon} aria-hidden="true">
-                ×
+          <div className={styles.resumeNegativesContainer}>
+            {mockNegatives.map((negative) => (
+              <span key={negative} className={styles.resumeNegativePill}>
+                <span className={styles.resumeNegativeIcon} aria-hidden="true">
+                  ×
+                </span>
+                <span className={styles.resumeNegativeText}>{negative}</span>
               </span>
-              <span className={styles.resumeNegativeText}>{negative}</span>
-            </span>
-          ))}
-        </div>
+            ))}
+          </div>
 
-        <div className={styles.resumeAnalysisBottomSeparator} aria-hidden="true" />
+          <div className={styles.resumeAnalysisBottomSeparator} aria-hidden="true" />
 
-        <div className={styles.resumeOptimizationsContainer}>
-          <h3 className={styles.resumeOptimizationsTitle}>Resume Optimization</h3>
-        </div>
-      </section>
+          <div className={styles.resumeOptimizationsContainer}>
+            <h3 className={styles.resumeOptimizationsTitle}>Resume Optimization</h3>
+          </div>
+        </section>
       )}
     </div>
   );

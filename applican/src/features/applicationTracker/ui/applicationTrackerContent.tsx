@@ -1,4 +1,4 @@
-import { type ComponentType, useMemo, useState } from "react";
+import { type ComponentType, type UIEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   APPLICATION_STATUS,
   formatAppliedDate,
@@ -49,8 +49,14 @@ function ApplicationTrackerView({
   selectedStatus: ApplicationTrackerStatus;
   onSelectStatus: (status: ApplicationTrackerStatus) => void;
 }) {
-  const { applications, counts, errorMessage, updateApplicationStatus, isUpdating } = useApplications();
+  const { applications, counts, isLoading, isFetchingMore, hasMore, errorMessage, retryLoad, loadMore, updateApplicationStatus, isUpdating } =
+    useApplications();
   const [downloadingById, setDownloadingById] = useState<Record<string, boolean>>({});
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [showTrailingLoadState, setShowTrailingLoadState] = useState(false);
+  const wasFetchingMoreRef = useRef(false);
+  const trailingLoadTimeoutRef = useRef<number | null>(null);
+  const skeletonRows = 6;
   const applicationRows = useMemo(() => {
     if (selectedStatus === "all") {
       return applications;
@@ -67,20 +73,70 @@ function ApplicationTrackerView({
 
   const downloadResume = async (applicationId: string, fallbackFilename: string) => {
     setDownloadingById((prev) => ({ ...prev, [applicationId]: true }));
+    setDownloadError(null);
     try {
       const data = await getResumeDownloadUrl(applicationId);
+      const response = await fetch(data.signed_url);
+      if (!response.ok) {
+        throw new Error(`Download request failed with status ${response.status}.`);
+      }
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.href = data.signed_url;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
+      link.href = objectUrl;
       link.download = data.filename || fallbackFilename;
       document.body.appendChild(link);
       link.click();
       link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not download resume.";
+      setDownloadError(message);
     } finally {
       setDownloadingById((prev) => ({ ...prev, [applicationId]: false }));
     }
   };
+
+  const onGridScroll = (event: UIEvent<HTMLDivElement>) => {
+    if (isLoading || isFetchingMore || !hasMore) {
+      return;
+    }
+
+    const target = event.currentTarget;
+    const distanceToBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
+    if (distanceToBottom <= 120) {
+      loadMore();
+    }
+  };
+
+  useEffect(() => {
+    if (isFetchingMore) {
+      wasFetchingMoreRef.current = true;
+      return;
+    }
+
+    if (wasFetchingMoreRef.current && !hasMore) {
+      setShowTrailingLoadState(true);
+      if (trailingLoadTimeoutRef.current !== null) {
+        window.clearTimeout(trailingLoadTimeoutRef.current);
+      }
+      trailingLoadTimeoutRef.current = window.setTimeout(() => {
+        setShowTrailingLoadState(false);
+        trailingLoadTimeoutRef.current = null;
+      }, 900);
+    }
+
+    wasFetchingMoreRef.current = false;
+  }, [hasMore, isFetchingMore]);
+
+  useEffect(() => {
+    return () => {
+      if (trailingLoadTimeoutRef.current !== null) {
+        window.clearTimeout(trailingLoadTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <section className={styles.trackerView}>
@@ -135,46 +191,80 @@ function ApplicationTrackerView({
           <span className={styles.trackerColumnLabel}>Resume</span>
         </div>
         <div className={styles.trackerHeaderDivider} aria-hidden="true" />
-        <div className={styles.trackerGridBody}>
-          {errorMessage ? <p className={styles.trackerError}>{errorMessage}</p> : null}
-          {applicationRows.map((row) => (
-            <div key={row.id}>
-              <div className={styles.trackerRow}>
-                <span className={styles.trackerColumnCheckbox}>
-                  <input type="checkbox" className={styles.trackerRowCheckbox} aria-label={`Select ${row.company}`} />
-                </span>
-                <span className={styles.trackerRowText}>{row.company}</span>
-                <span className={styles.trackerRowText}>{formatAppliedDate(row.date_applied)}</span>
-                <span className={styles.trackerStatusCell}>
-                  <button
-                    type="button"
-                    className={[styles.trackerStatusButton, getStatusButtonClassName(row.status)].join(" ")}
-                    disabled={isUpdating(row.id)}
-                    onClick={() => void updateApplicationStatus(row.id, getNextApplicationStatus(row.status))}
-                  >
-                    {row.status}
-                  </button>
-                </span>
-                <span className={styles.trackerRowText}>{row.position}</span>
-                <span className={styles.trackerRowText}>{row.location}</span>
-                <span className={styles.trackerResumeCell}>
-                  <span className={styles.trackerResumeChip}>
-                    <span className={styles.trackerResumeName}>{row.resume_filename ?? "---"}</span>
-                    <button
-                      type="button"
-                      className={styles.trackerResumeDownloadButton}
-                      onClick={() => void downloadResume(row.id, row.resume_filename ?? "resume")}
-                      disabled={!row.resume_path || Boolean(downloadingById[row.id])}
-                      aria-label={`Download ${row.resume_filename ?? "resume"}`}
-                    >
-                      <img src={downloadIcon} alt="" aria-hidden="true" className={styles.trackerResumeDownloadIcon} />
-                    </button>
-                  </span>
-                </span>
-              </div>
-              <div className={styles.trackerRowDivider} aria-hidden="true" />
+        <div className={styles.trackerGridBody} onScroll={onGridScroll}>
+          {errorMessage ? (
+            <div className={styles.trackerErrorPanel}>
+              <p className={styles.trackerError}>{errorMessage}</p>
+              <button type="button" className={styles.trackerRetryButton} onClick={retryLoad}>
+                Retry
+              </button>
             </div>
-          ))}
+          ) : null}
+          {downloadError ? <p className={styles.trackerError}>{downloadError}</p> : null}
+          {isLoading
+            ? Array.from({ length: skeletonRows }).map((_, index) => (
+                <div key={`skeleton-${index}`}>
+                  <div className={styles.trackerRow}>
+                    <span className={styles.trackerColumnCheckbox}>
+                      <span className={[styles.trackerSkeleton, styles.trackerSkeletonCheckbox].join(" ")} />
+                    </span>
+                    <span className={[styles.trackerSkeleton, styles.trackerSkeletonTextLong].join(" ")} />
+                    <span className={[styles.trackerSkeleton, styles.trackerSkeletonTextMedium].join(" ")} />
+                    <span className={[styles.trackerSkeleton, styles.trackerSkeletonStatus].join(" ")} />
+                    <span className={[styles.trackerSkeleton, styles.trackerSkeletonTextLong].join(" ")} />
+                    <span className={[styles.trackerSkeleton, styles.trackerSkeletonTextMedium].join(" ")} />
+                    <span className={[styles.trackerSkeleton, styles.trackerSkeletonResume].join(" ")} />
+                  </div>
+                  <div className={styles.trackerRowDivider} aria-hidden="true" />
+                </div>
+              ))
+            : null}
+          {!isLoading && !errorMessage && applicationRows.length === 0 ? (
+            <p className={styles.trackerEmptyMessage}>No applications yet for this filter.</p>
+          ) : null}
+          {!isLoading && !errorMessage
+            ? applicationRows.map((row) => (
+                <div key={row.id}>
+                  <div className={styles.trackerRow}>
+                    <span className={styles.trackerColumnCheckbox}>
+                      <input type="checkbox" className={styles.trackerRowCheckbox} aria-label={`Select ${row.company}`} />
+                    </span>
+                    <span className={styles.trackerRowText}>{row.company}</span>
+                    <span className={styles.trackerRowText}>{formatAppliedDate(row.date_applied)}</span>
+                    <span className={styles.trackerStatusCell}>
+                      <button
+                        type="button"
+                        className={[styles.trackerStatusButton, getStatusButtonClassName(row.status)].join(" ")}
+                        disabled={isUpdating(row.id)}
+                        onClick={() => void updateApplicationStatus(row.id, getNextApplicationStatus(row.status))}
+                      >
+                        {row.status}
+                      </button>
+                    </span>
+                    <span className={styles.trackerRowText}>{row.position}</span>
+                    <span className={styles.trackerRowText}>{row.location}</span>
+                    <span className={styles.trackerResumeCell}>
+                      <span className={styles.trackerResumeChip}>
+                        <span className={styles.trackerResumeName}>{row.resume_filename ?? "---"}</span>
+                        <button
+                          type="button"
+                          className={styles.trackerResumeDownloadButton}
+                          onClick={() => void downloadResume(row.id, row.resume_filename ?? "resume")}
+                          disabled={!row.resume_path || Boolean(downloadingById[row.id])}
+                          aria-label={`Download ${row.resume_filename ?? "resume"}`}
+                        >
+                          <img src={downloadIcon} alt="" aria-hidden="true" className={styles.trackerResumeDownloadIcon} />
+                        </button>
+                      </span>
+                    </span>
+                  </div>
+                  <div className={styles.trackerRowDivider} aria-hidden="true" />
+                </div>
+              ))
+            : null}
+          {!isLoading && (isFetchingMore || showTrailingLoadState) ? (
+            <p className={styles.trackerLoadState}>Loading more applications...</p>
+          ) : null}
         </div>
       </section>
     </section>

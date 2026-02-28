@@ -76,3 +76,22 @@
   letter-spacing: -0.01em;
   color: #ffffff;
 }
+
+.logoutButton {
+  width: 216px;
+  height: 44px;
+  margin-top: 503px;
+  border: none;
+  border-radius: 10px;
+  background: #4a0719;
+  color: #fe5e67;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.logoutButton:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}

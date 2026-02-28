@@ -4,11 +4,16 @@ import type { GenerateBulletsInput, GenerateBulletsResponse } from "../model/typ
 export async function invokeGenerateBullets(
   payload: GenerateBulletsInput,
 ): Promise<GenerateBulletsResponse> {
+  const runId = payload.runId.trim();
+  const requestId = payload.requestId.trim();
+  if (!runId || !requestId) {
+    throw new Error("Failed to generate bullets: run_id and request_id are required.");
+  }
+
   const { data, error } = await supabase.functions.invoke("generate-bullets", {
     body: {
-      run_id: payload.runId,
-      resume_path: payload.resumePath,
-      job_description: payload.jobDescription,
+      run_id: runId,
+      request_id: requestId,
     },
   });
 

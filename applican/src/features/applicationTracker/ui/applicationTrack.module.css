@@ -15,15 +15,15 @@
 }
 
 .resumeStudio {
-  border: 1px solid #202020;
+  border: none;
 }
 
 .applicationTracker {
-  border: 1px solid #1f2d3b;
+  border: none;
 }
 
 .careerPath {
-  border: 1px solid #1f3b29;
+  border: none;
   padding: 0;
   --pointer-x: 50%;
   --pointer-y: 35%;
@@ -65,7 +65,7 @@
 }
 
 .resources {
-  border: 1px solid #3a2f19;
+  border: none;
 }
 
 .content {
@@ -179,7 +179,6 @@
   color: #9a9a9a;
   font-size: 14px;
   line-height: 1.4;
-  font-family: "Hero Section Font", sans-serif;
   font-weight: 500;
   display: inline-flex;
   align-items: center;
@@ -596,6 +595,10 @@
 
 .trackerGridBody {
   min-height: 420px;
+  max-height: 560px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
 }
 
 .trackerRow {
@@ -738,4 +741,86 @@
   margin: 12px 0;
   color: #ff7b7b;
   font-size: 13px;
+}
+
+.trackerErrorPanel {
+  margin: 12px 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.trackerRetryButton {
+  height: 30px;
+  border: 1px solid #2a313b;
+  border-radius: 8px;
+  background: #151a1f;
+  color: #d9e2ef;
+  font-size: 13px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.trackerRetryButton:hover {
+  border-color: #3b4654;
+}
+
+.trackerRetryButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.trackerEmptyMessage {
+  margin: 16px 0;
+  color: #9aa7ba;
+  font-size: 14px;
+}
+
+.trackerLoadState {
+  margin: 14px 0;
+  color: #9aa7ba;
+  font-size: 13px;
+}
+
+.trackerSkeleton {
+  border-radius: 8px;
+  background: linear-gradient(90deg, #1a1a1a 0%, #242424 50%, #1a1a1a 100%);
+  background-size: 200% 100%;
+  animation: trackerSkeletonPulse 1.2s ease-in-out infinite;
+}
+
+.trackerSkeletonCheckbox {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+}
+
+.trackerSkeletonTextLong {
+  width: 82%;
+  height: 14px;
+}
+
+.trackerSkeletonTextMedium {
+  width: 70%;
+  height: 14px;
+}
+
+.trackerSkeletonStatus {
+  width: 84px;
+  height: 25px;
+}
+
+.trackerSkeletonResume {
+  width: 181.5px;
+  height: 25px;
+}
+
+@keyframes trackerSkeletonPulse {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
 }

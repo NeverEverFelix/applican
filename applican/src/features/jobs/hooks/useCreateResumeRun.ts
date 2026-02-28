@@ -7,8 +7,12 @@ type UseCreateResumeRunResult = {
   isSubmitting: boolean;
   errorMessage: string;
   createdRun: CreateResumeRunResult | null;
-  submitResumeRun: (params: { file: File | null; jobDescription: string }) => Promise<void>;
+  submitResumeRun: (params: { file: File | null; jobDescription: string }) => Promise<SubmitResumeRunResult>;
 };
+
+type SubmitResumeRunResult =
+  | { ok: true; createdRun: CreateResumeRunResult }
+  | { ok: false; errorMessage: string };
 
 function toErrorMessage(error: unknown) {
   if (typeof error === "object" && error && "message" in error) {
@@ -35,15 +39,18 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
         const created = await createResumeRun({ file, jobDescription });
         const generated = await invokeGenerateBullets({
           runId: created.row.id,
-          resumePath: created.row.resume_path,
-          jobDescription,
+          requestId: created.requestId,
         });
-        setCreatedRun({
+        const nextRun = {
           requestId: created.requestId,
           row: generated.run,
-        });
+        };
+        setCreatedRun(nextRun);
+        return { ok: true as const, createdRun: nextRun };
       } catch (error) {
-        setErrorMessage(toErrorMessage(error));
+        const message = toErrorMessage(error);
+        setErrorMessage(message);
+        return { ok: false as const, errorMessage: message };
       } finally {
         setIsSubmitting(false);
       }

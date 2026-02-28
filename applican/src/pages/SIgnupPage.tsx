@@ -3,7 +3,9 @@ import logo from "../assets/logo.png";
 import googleIcon from "../assets/GoogleIcon.png";
 import pageImage from "../assets/PageImage.png";
 import SignupForm from "../features/auth/SignupForm";
+import AuthLoadingScreen from "../features/auth/AuthLoadingScreen";
 import { useSignupFlow } from "../features/auth/useSignupFlow";
+import { useMinimumLoading } from "../features/auth/useMinimumLoading";
 import { useState } from "react";
 import { getAuthErrorMessage, signInWithGoogle, signUpWithPassword } from "../features/auth/auth";
 import { useNavigate } from "react-router-dom";
@@ -14,6 +16,7 @@ export default function SignupPage() {
   const [authError, setAuthError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const showLoading = useMinimumLoading(isSubmitting);
 
   const handleSignup = async ({
     email,
@@ -30,11 +33,16 @@ export default function SignupPage() {
     setSuccessMessage("");
     setIsSubmitting(true);
 
-    const { error } = await signUpWithPassword({ email, name, jobRole, password });
+    const { data, error } = await signUpWithPassword({ email, name, jobRole, password });
 
     setIsSubmitting(false);
     if (error) {
       setAuthError(getAuthErrorMessage(error));
+      return;
+    }
+
+    if (!data.session) {
+      setSuccessMessage("Check your inbox and verify your email before continuing.");
       return;
     }
 
@@ -53,6 +61,10 @@ export default function SignupPage() {
       return;
     }
   };
+
+  if (showLoading) {
+    return <AuthLoadingScreen />;
+  }
 
   return (
     <div className={styles.container}>

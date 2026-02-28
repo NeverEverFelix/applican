@@ -1,5 +1,13 @@
+@font-face {
+  font-family: "Neue Haas Grotesk Display Pro";
+  src: url("./assets/NHaasGroteskDSPro-55Rg.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: "Neue Haas Grotesk Display Pro", sans-serif;
   line-height: 1.5;
   font-weight: 400;
   font-synthesis: none;
@@ -13,10 +21,17 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  font-family: inherit;
   /* remove: display:flex + place-items:center */
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
 }
 
 #root {
   min-height: 100vh;
 }
-

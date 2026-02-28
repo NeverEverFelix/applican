@@ -1,0 +1,84 @@
+.container {
+  min-height: 100vh;
+  background: #151515;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.card {
+  width: 100%;
+  max-width: 520px;
+  border: 1px solid #222222;
+  border-radius: 16px;
+  background: #111111;
+  padding: 28px;
+  box-sizing: border-box;
+}
+
+.title {
+  margin: 0 0 10px;
+  color: #ffffff;
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.body {
+  margin: 0 0 18px;
+  color: #b6c0cf;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.email {
+  color: #ffffff;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.primary,
+.secondary,
+.ghost {
+  height: 40px;
+  border-radius: 10px;
+  padding: 0 14px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.primary {
+  border: 0;
+  background: #0068f4;
+  color: #ffffff;
+}
+
+.secondary {
+  border: 1px solid #2b3a4f;
+  background: #111a28;
+  color: #d0e0ff;
+}
+
+.ghost {
+  border: 1px solid #2d2d2d;
+  background: transparent;
+  color: #cccccc;
+}
+
+.message {
+  margin: 14px 0 0;
+  font-size: 13px;
+}
+
+.success {
+  color: #72d88a;
+}
+
+.error {
+  color: #ff7b7b;
+}
