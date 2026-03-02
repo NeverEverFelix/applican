@@ -12,6 +12,7 @@
   padding: 96px 32px 32px;
   gap: 24px;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .resumeStudio {
@@ -84,6 +85,71 @@
   flex-direction: column;
   align-items: center;
   margin-top: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.progressScreenContainer {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 45px;
+  box-sizing: border-box;
+}
+
+.progressLogoContainer {
+  width: 191.91px;
+  height: 192px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.progressLogoImage {
+  width: 191.91px;
+  height: 192px;
+  display: block;
+}
+
+.progressBarContainer {
+  width: 850px;
+  height: 15px;
+  border-radius: 100px;
+  background: #151515;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.progressBarFill {
+  width: 0%;
+  height: 100%;
+  border-radius: 100px;
+  background: #e600c7;
+  transition: width 180ms linear;
+  will-change: width;
+}
+
+.progressStatusContainer {
+  width: 439px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.progressStatusText {
+  width: 100%;
+  margin: 0;
+  color: #ffffff;
+  font-weight: 400;
+  line-height: 20px;
+  text-align: center;
+  white-space: normal;
 }
 
 .jobInputWrapper {
@@ -231,7 +297,7 @@
 
 .resumeAnalysisContainer {
   width: 995px;
-  height: auto;
+  height: 100%;
   margin-top: var(--resume-analysis-top-gap, 2px);
   display: flex;
   flex-direction: column;
@@ -239,26 +305,100 @@
   justify-content: flex-start;
   gap: var(--resume-analysis-stack-gap, 0px);
   box-sizing: border-box;
+  position: relative;
+  min-height: 0;
+}
+
+.resumeAnalysisActions {
+  width: 955px;
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 14px;
+}
+
+.newAnalysisButton {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid #2e2e2e;
+  background: #141414;
+  color: #d3d3d3;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.newAnalysisButton:hover {
+  border-color: #4a4a4a;
+  color: #ffffff;
+}
+
+.newAnalysisButton:focus,
+.newAnalysisButton:focus-visible {
+  outline: 2px solid #3f86ff;
+  outline-offset: 2px;
 }
 
 .resumeAnalysisBottomSeparator {
   width: 955px;
   border-top: 1px dashed #151515;
   align-self: center;
-  margin-top: 16px;
   box-sizing: border-box;
+}
+
+.resumeAnalysisSeparatorWrap {
+  width: 995px;
+  margin-top: 16px;
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.analysisCollapseButton {
+  position: absolute;
+  right: 10px;
+  top: 145px;
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 3;
+}
+
+.analysisCollapseButton:focus,
+.analysisCollapseButton:focus-visible {
+  outline: none;
+}
+
+.analysisCollapseIcon {
+  width: 10px;
+  height: 10px;
+  transition: transform 0.2s ease;
+}
+
+.analysisCollapseIconFlipped {
+  transform: rotate(180deg);
 }
 
 .resumeOptimizationsContainer,
 .resumeAnalysisScrollContainer {
   width: 955px;
-  height: 504px;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   font-size: 16px;
   margin-top: 42px;
   box-sizing: border-box;
+}
+
+.resumeOptimizationsContainerExpanded {
+  margin-top: 24px;
 }
 
 .resumeOptimizationsTitle {
@@ -326,15 +466,15 @@
 
 .resumeVirtuePill {
   min-height: 48px;
-  height: 48px;
   border-radius: 100px;
   background: #022d28;
   color: #31c56c;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 8px;
-  padding: 0 18px;
+  padding: 10px 18px;
+  max-width: 955px;
   box-sizing: border-box;
 }
 
@@ -353,8 +493,8 @@
   margin: 0;
   color: #31c56c;
   font-size: 16px;
-  line-height: 1;
-  white-space: nowrap;
+  line-height: 1.35;
+  white-space: normal;
 }
 
 .resumeNegativesContainer {
@@ -371,15 +511,15 @@
 
 .resumeNegativePill {
   min-height: 48px;
-  height: 48px;
   border-radius: 100px;
   background: #4a0719;
   color: #fe5e67;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 8px;
-  padding: 0 18px;
+  padding: 10px 18px;
+  max-width: 955px;
   box-sizing: border-box;
 }
 
@@ -398,8 +538,68 @@
   margin: 0;
   color: #fe5e67;
   font-size: 16px;
-  line-height: 1;
-  white-space: nowrap;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.optimizationGroup {
+  margin-bottom: 26px;
+}
+
+.optimizationExperienceTitle {
+  margin: 0 0 10px;
+  color: #ffffff;
+  font-size: 36px;
+  line-height: 1.1;
+}
+
+.optimizationRoleLine {
+  margin: 0 0 16px;
+  color: #bfbfbf;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.optimizationBulletCard {
+  border: 1px solid #222222;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: #101010;
+}
+
+.optimizationOriginalLine {
+  margin: 0 0 10px;
+  color: #b6b6b6;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.optimizationActionTag {
+  display: inline-flex;
+  margin-right: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: #222222;
+  color: #ffffff;
+}
+
+.optimizationRewrittenLine {
+  margin: 0;
+  color: #ffffff;
+  font-size: 18px;
+  line-height: 1.45;
+  font-weight: 600;
+}
+
+.optimizationReasonLine {
+  margin: 8px 0 0;
+  color: #9a9a9a;
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 .placeholderPanel {

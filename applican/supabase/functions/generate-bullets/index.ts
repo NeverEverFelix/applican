@@ -82,42 +82,300 @@ function extractAssistantText(content: unknown): string {
   return "";
 }
 
+type ModelOptimizationBullet = {
+  action: "replace" | "add";
+  original: string;
+  rewritten: string;
+  reason: string;
+};
+
+type ModelOptimization = {
+  experience_title: string;
+  role_before: string;
+  role_after: string;
+  bullets: ModelOptimizationBullet[];
+};
+
+type ModelOutput = {
+  company: string;
+  title: string;
+  match_score: number;
+  match_summary: string;
+  strengths: string[];
+  gaps: string[];
+  optimizations: ModelOptimization[];
+};
+
+type ResumeStudioOutput = {
+  job: {
+    company: string;
+    title: string;
+  };
+  match: {
+    score: number;
+    label: string;
+    summary: string;
+  };
+  analysis: {
+    strengths: string[];
+    gaps: string[];
+  };
+  optimizations: Array<{
+    experience_title: string;
+    role_before: string;
+    role_after: string;
+    bullets: Array<{
+      original: string;
+      rewritten: string;
+      action: "replace" | "add";
+      reason: string;
+    }>;
+  }>;
+  meta: {
+    model: string;
+    generated_at: string;
+    request_id: string;
+  };
+  // Backward-compatible fields used by older clients.
+  summary: string;
+  tailored_bullets: string[];
+  skills: string[];
+  missing_requirements: string[];
+};
+
+function cleanString(value: unknown, fallback = ""): string {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+  const trimmed = value.trim();
+  return trimmed || fallback;
+}
+
+function clampScore(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 0;
+  }
+  const rounded = Math.round(value);
+  if (rounded < 0) {
+    return 0;
+  }
+  if (rounded > 100) {
+    return 100;
+  }
+  return rounded;
+}
+
+function normalizeList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item) => cleanString(item))
+    .filter(Boolean);
+}
+
+function normalizeFixedCount(items: string[], size: number): string[] {
+  const result = items.slice(0, size);
+  while (result.length < size) {
+    result.push("No additional insight available.");
+  }
+  return result;
+}
+
+function normalizeOptimizations(value: unknown): ResumeStudioOutput["optimizations"] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") {
+        return null;
+      }
+
+      const row = entry as {
+        experience_title?: unknown;
+        role_before?: unknown;
+        role_after?: unknown;
+        bullets?: unknown;
+      };
+
+      const bullets = Array.isArray(row.bullets)
+        ? row.bullets
+            .map((bullet) => {
+              if (!bullet || typeof bullet !== "object") {
+                return null;
+              }
+              const b = bullet as {
+                original?: unknown;
+                rewritten?: unknown;
+                action?: unknown;
+                reason?: unknown;
+              };
+              const rewritten = cleanString(b.rewritten);
+              if (!rewritten) {
+                return null;
+              }
+
+              const action = b.action === "add" ? "add" : "replace";
+              return {
+                original: cleanString(b.original),
+                rewritten,
+                action,
+                reason: cleanString(b.reason),
+              };
+            })
+            .filter((bullet): bullet is NonNullable<typeof bullet> => Boolean(bullet))
+        : [];
+
+      if (!bullets.length) {
+        return null;
+      }
+
+      return {
+        experience_title: cleanString(row.experience_title, "Experience"),
+        role_before: cleanString(row.role_before),
+        role_after: cleanString(row.role_after),
+        bullets,
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+}
+
+function normalizeModelOutput(raw: unknown, model: string, requestId: string): ResumeStudioOutput {
+  if (!raw || typeof raw !== "object") {
+    throw new HttpError(502, "OPENAI_INVALID_JSON", "Model response was not a JSON object.");
+  }
+
+  const data = raw as Partial<ModelOutput>;
+  const strengths = normalizeFixedCount(normalizeList(data.strengths), 3);
+  const gaps = normalizeFixedCount(normalizeList(data.gaps), 2);
+  const optimizations = normalizeOptimizations(data.optimizations);
+  const score = clampScore(data.match_score);
+  const summary = cleanString(data.match_summary, "Resume has partial overlap with the job requirements.");
+
+  const rewrittenBullets = optimizations.flatMap((opt) => opt.bullets.map((bullet) => bullet.rewritten));
+
+  return {
+    job: {
+      company: cleanString(data.company, "Unknown Company"),
+      title: cleanString(data.title, "Target Role"),
+    },
+    match: {
+      score,
+      label: `${score}% Match`,
+      summary,
+    },
+    analysis: {
+      strengths,
+      gaps,
+    },
+    optimizations,
+    meta: {
+      model,
+      generated_at: new Date().toISOString(),
+      request_id: requestId,
+    },
+    summary,
+    tailored_bullets: rewrittenBullets,
+    skills: strengths,
+    missing_requirements: gaps,
+  };
+}
+
 function buildJsonSchema() {
   return {
-    name: "resume_run_output",
+    name: "resume_studio_output_v2",
     strict: true,
     schema: {
       type: "object",
       additionalProperties: false,
       properties: {
-        summary: {
+        company: {
           type: "string",
         },
-        tailored_bullets: {
+        title: {
+          type: "string",
+        },
+        match_score: {
+          type: "number",
+          minimum: 0,
+          maximum: 100,
+        },
+        match_summary: {
+          type: "string",
+        },
+        strengths: {
           type: "array",
+          minItems: 3,
+          maxItems: 3,
           items: {
             type: "string",
           },
         },
-        skills: {
+        gaps: {
           type: "array",
+          minItems: 2,
+          maxItems: 2,
           items: {
             type: "string",
           },
         },
-        missing_requirements: {
+        optimizations: {
           type: "array",
           items: {
-            type: "string",
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              experience_title: {
+                type: "string",
+              },
+              role_before: {
+                type: "string",
+              },
+              role_after: {
+                type: "string",
+              },
+              bullets: {
+                type: "array",
+                minItems: 1,
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  properties: {
+                    action: {
+                      type: "string",
+                      enum: ["replace", "add"],
+                    },
+                    original: {
+                      type: "string",
+                    },
+                    rewritten: {
+                      type: "string",
+                    },
+                    reason: {
+                      type: "string",
+                    },
+                  },
+                  required: ["action", "original", "rewritten", "reason"],
+                },
+              },
+            },
+            required: ["experience_title", "role_before", "role_after", "bullets"],
           },
         },
       },
-      required: ["summary", "tailored_bullets", "skills", "missing_requirements"],
+      required: ["company", "title", "match_score", "match_summary", "strengths", "gaps", "optimizations"],
     },
   };
 }
 
-async function callOpenAI(openAiApiKey: string, jobDescription: string, resumeText: string) {
+async function callOpenAI(
+  openAiApiKey: string,
+  jobDescription: string,
+  resumeText: string,
+  requestId: string,
+): Promise<ResumeStudioOutput> {
   const model = Deno.env.get("OPENAI_MODEL") ?? "gpt-4.1-mini";
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -136,15 +394,21 @@ async function callOpenAI(openAiApiKey: string, jobDescription: string, resumeTe
       messages: [
         {
           role: "system",
-          content:
-            "You rewrite resumes to match job descriptions. Return only valid JSON that matches the schema.",
+          content: [
+            "You are a resume optimization assistant.",
+            "Return only valid JSON matching the schema.",
+            "Score how well resume text matches the job description from 0-100.",
+            "Provide exactly 3 strengths and exactly 2 gaps.",
+            "Provide structured optimization rewrites that are concise and ATS-friendly.",
+          ].join(" "),
         },
         {
           role: "user",
           content: [
             `Job description:\n${jobDescription}`,
             `Resume text:\n${resumeText || "[No extractable text available]"}`,
-            "Create concise and ATS-friendly bullet points.",
+            "Infer company and role title from the job description when possible.",
+            "For optimization bullets, use action='replace' for edits to existing bullets and action='add' for new bullets.",
           ].join("\n\n"),
         },
       ],
@@ -163,11 +427,14 @@ async function callOpenAI(openAiApiKey: string, jobDescription: string, resumeTe
     throw new HttpError(502, "OPENAI_EMPTY_RESPONSE", "Model returned empty output.");
   }
 
+  let raw: unknown;
   try {
-    return JSON.parse(content);
+    raw = JSON.parse(content);
   } catch {
     throw new HttpError(502, "OPENAI_INVALID_JSON", "Model response was not valid JSON.");
   }
+
+  return normalizeModelOutput(raw, model, requestId);
 }
 
 serve(async (req) => {
@@ -277,7 +544,7 @@ serve(async (req) => {
       throw new HttpError(409, "RESUME_NOT_EXTRACTED", "Extracted resume text not found for run.");
     }
 
-    const output = await callOpenAI(openAiApiKey, runJobDescription, resumeText);
+    const output = await callOpenAI(openAiApiKey, runJobDescription, resumeText, runRequestId);
 
     const { data: updatedRun, error: updateError } = await adminClient
       .from(RUNS_TABLE)
