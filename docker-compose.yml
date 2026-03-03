@@ -1,0 +1,42 @@
+services:
+  applican:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: applican-web
+    ports:
+      - "8080:80"
+    depends_on:
+      - applicanrag
+      - resume-extract
+    restart: unless-stopped
+    networks:
+      - applican-net
+
+  applicanrag:
+    build:
+      context: ../ApplicanRAG
+      dockerfile: Dockerfile
+    container_name: applican-rag
+    environment:
+      PORT: "8000"
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    networks:
+      - applican-net
+
+  resume-extract:
+    build:
+      context: ../ResumeExtract/resume-extract
+      dockerfile: Dockerfile
+    container_name: resume-extract
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    networks:
+      - applican-net
+
+networks:
+  applican-net:
+    driver: bridge
