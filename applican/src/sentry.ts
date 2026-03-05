@@ -1,4 +1,11 @@
 import * as Sentry from "@sentry/react";
+import { useEffect } from "react";
+import {
+  createRoutesFromChildren,
+  matchRoutes,
+  useLocation,
+  useNavigationType,
+} from "react-router-dom";
 
 const dsn = import.meta.env.VITE_SENTRY_DSN;
 const isDev = import.meta.env.DEV;
@@ -11,7 +18,13 @@ if (dsn) {
     release,
     debug: isDev,
     integrations: [
-      Sentry.browserTracingIntegration(),
+      Sentry.reactRouterV7BrowserTracingIntegration({
+        useEffect,
+        useLocation,
+        useNavigationType,
+        createRoutesFromChildren,
+        matchRoutes,
+      }),
       Sentry.captureConsoleIntegration({
         levels: isDev ? ["log", "info", "warn", "error"] : ["warn", "error"],
       }),

@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react";
 import { type ComponentType, type UIEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   APPLICATION_STATUS,
@@ -91,6 +92,10 @@ function ApplicationTrackerView({
       link.remove();
       URL.revokeObjectURL(objectUrl);
     } catch (error) {
+      Sentry.captureException(error, {
+        tags: { feature: "application_tracker", action: "download_resume" },
+        extra: { applicationId },
+      });
       const message = error instanceof Error ? error.message : "Could not download resume.";
       setDownloadError(message);
     } finally {

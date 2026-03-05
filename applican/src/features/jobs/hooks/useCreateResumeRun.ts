@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react";
 import { useCallback, useState } from "react";
 import { createResumeRun } from "../api/createResumeRun";
 import { invokeGenerateBullets } from "../api/invokeGenerateBullets";
@@ -47,6 +48,10 @@ async function invokeGenerateBulletsWithRetry(params: { runId: string; requestId
       const canRetry = isExtractionRace && attempt < maxAttempts;
 
       if (!canRetry) {
+        Sentry.captureException(error, {
+          tags: { feature: "resume_studio", action: "generate_bullets" },
+          extra: params,
+        });
         throw error;
       }
 
@@ -86,6 +91,9 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
         setCreatedRun(nextRun);
         return { ok: true as const, createdRun: nextRun };
       } catch (error) {
+        Sentry.captureException(error, {
+          tags: { feature: "resume_studio", action: "submit_resume_run" },
+        });
         const message = toErrorMessage(error);
         setErrorMessage(message);
         return { ok: false as const, errorMessage: message };

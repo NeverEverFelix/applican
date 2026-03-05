@@ -1,4 +1,5 @@
 // src/router.tsx
+import * as Sentry from "@sentry/react";
 import {
   createBrowserRouter,
   Navigate,
@@ -30,7 +31,9 @@ function RootRedirect() {
   return <Navigate to={isAuthenticated ? "/app" : "/login"} replace />;
 }
 
-const router = createBrowserRouter([
+const sentryCreateBrowserRouter = Sentry.wrapCreateBrowserRouterV7(createBrowserRouter);
+
+const router = sentryCreateBrowserRouter([
   // Default entry: route by current auth session
   { path: "/", element: <RootRedirect /> },
 

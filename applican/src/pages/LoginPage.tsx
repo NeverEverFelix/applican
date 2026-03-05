@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react";
 import styles from "./LoginPage.module.css";
 import pageImage from "../assets/PageImage.png";
 import logo from "../assets/logo.png";
@@ -37,6 +38,7 @@ export default function LoginPage() {
       await ensureMinimumLoadingDuration(startedAt);
       navigate("/app", { replace: true });
     } catch (error) {
+      Sentry.captureException(error);
       setAuthError(getAuthErrorMessage(error));
     } finally {
       setIsSubmitting(false);
@@ -53,6 +55,7 @@ export default function LoginPage() {
         return;
       }
     } catch (error) {
+      Sentry.captureException(error);
       setAuthError(getAuthErrorMessage(error));
     } finally {
       setIsSubmitting(false);
