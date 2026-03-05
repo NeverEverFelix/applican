@@ -3,6 +3,9 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 const RUNS_TABLE = "resume_runs";
 const DOCUMENTS_TABLE = "resume_documents";
+const APPLICATIONS_TABLE = "applications";
+const ANALYSIS_RUNS_TABLE = "analysis_runs";
+const CONSUME_ANALYSIS_CREDIT_RPC = "consume_analysis_credit";
 const STATUS = {
   EXTRACTED: "extracted",
   FAILED: "failed",
@@ -99,6 +102,7 @@ type ModelOptimization = {
 type ModelOutput = {
   company: string;
   title: string;
+  location: string;
   match_score: number;
   match_summary: string;
   strengths: string[];
@@ -110,6 +114,7 @@ type ResumeStudioOutput = {
   job: {
     company: string;
     title: string;
+    location: string;
   };
   match: {
     score: number;
@@ -141,6 +146,13 @@ type ResumeStudioOutput = {
   tailored_bullets: string[];
   skills: string[];
   missing_requirements: string[];
+};
+
+type AnalysisCreditResult = {
+  allowed: boolean;
+  plan: string;
+  analyses_used: number;
+  analyses_limit: number | null;
 };
 
 function cleanString(value: unknown, fallback = ""): string {
@@ -260,6 +272,7 @@ function normalizeModelOutput(raw: unknown, model: string, requestId: string): R
     job: {
       company: cleanString(data.company, "Unknown Company"),
       title: cleanString(data.title, "Target Role"),
+      location: cleanString(data.location, "Unknown Location"),
     },
     match: {
       score,
@@ -283,6 +296,35 @@ function normalizeModelOutput(raw: unknown, model: string, requestId: string): R
   };
 }
 
+function parseAnalysisCreditResult(value: unknown): AnalysisCreditResult {
+  if (!value || typeof value !== "object") {
+    throw new HttpError(500, "ANALYSIS_CREDIT_INVALID_RESPONSE", "Invalid analysis credit response.");
+  }
+
+  const row = value as Partial<AnalysisCreditResult>;
+  if (
+    typeof row.allowed !== "boolean" ||
+    typeof row.plan !== "string" ||
+    typeof row.analyses_used !== "number" ||
+    !Number.isFinite(row.analyses_used) ||
+    !Number.isInteger(row.analyses_used) ||
+    (row.analyses_limit !== null &&
+      row.analyses_limit !== undefined &&
+      (typeof row.analyses_limit !== "number" ||
+        !Number.isFinite(row.analyses_limit) ||
+        !Number.isInteger(row.analyses_limit)))
+  ) {
+    throw new HttpError(500, "ANALYSIS_CREDIT_INVALID_RESPONSE", "Invalid analysis credit response.");
+  }
+
+  return {
+    allowed: row.allowed,
+    plan: row.plan,
+    analyses_used: row.analyses_used,
+    analyses_limit: row.analyses_limit ?? null,
+  };
+}
+
 function buildJsonSchema() {
   return {
     name: "resume_studio_output_v2",
@@ -295,6 +337,9 @@ function buildJsonSchema() {
           type: "string",
         },
         title: {
+          type: "string",
+        },
+        location: {
           type: "string",
         },
         match_score: {
@@ -365,7 +410,7 @@ function buildJsonSchema() {
           },
         },
       },
-      required: ["company", "title", "match_score", "match_summary", "strengths", "gaps", "optimizations"],
+      required: ["company", "title", "location", "match_score", "match_summary", "strengths", "gaps", "optimizations"],
     },
   };
 }
@@ -398,6 +443,7 @@ async function callOpenAI(
             "You are a resume optimization assistant.",
             "Return only valid JSON matching the schema.",
             "Score how well resume text matches the job description from 0-100.",
+            "Extract the company name, role title, and location from the job description.",
             "Provide exactly 3 strengths and exactly 2 gaps.",
             "Provide structured optimization rewrites that are concise and ATS-friendly.",
           ].join(" "),
@@ -544,6 +590,24 @@ serve(async (req) => {
       throw new HttpError(409, "RESUME_NOT_EXTRACTED", "Extracted resume text not found for run.");
     }
 
+    const { data: rawCreditResult, error: creditError } = await adminClient.rpc(CONSUME_ANALYSIS_CREDIT_RPC, {
+      p_user_id: authenticatedUserId,
+    });
+    if (creditError) {
+      throw new HttpError(500, "ANALYSIS_CREDIT_CHECK_FAILED", creditError.message);
+    }
+
+    const creditResult = parseAnalysisCreditResult(rawCreditResult);
+    if (!creditResult.allowed) {
+      const planName = creditResult.plan || "free";
+      const limitText = creditResult.analyses_limit ?? "current";
+      throw new HttpError(
+        402,
+        "ANALYSIS_LIMIT_REACHED",
+        `${planName} plan analysis limit reached (${creditResult.analyses_used}/${limitText}).`,
+      );
+    }
+
     const output = await callOpenAI(openAiApiKey, runJobDescription, resumeText, runRequestId);
 
     const { data: updatedRun, error: updateError } = await adminClient
@@ -560,6 +624,44 @@ serve(async (req) => {
 
     if (updateError || !updatedRun) {
       throw new HttpError(500, "RUN_UPDATE_FAILED", updateError?.message ?? "Could not update run.");
+    }
+
+    const { error: analysisRunUpsertError } = await adminClient.from(ANALYSIS_RUNS_TABLE).upsert(
+      {
+        run_id: runId,
+        user_id: authenticatedUserId,
+        job_title: output.job.title,
+        job_description: runJobDescription,
+        score: output.match.score,
+        positives: output.analysis.strengths,
+        negatives: output.analysis.gaps,
+      },
+      {
+        onConflict: "run_id",
+      },
+    );
+    if (analysisRunUpsertError) {
+      throw new HttpError(500, "ANALYSIS_RUN_SAVE_FAILED", analysisRunUpsertError.message);
+    }
+
+    const { data: updatedApplication, error: applicationUpdateError } = await adminClient
+      .from(APPLICATIONS_TABLE)
+      .update({
+        company: output.job.company,
+        position: output.job.title,
+        location: output.job.location,
+      })
+      .eq("source_resume_run_id", runId)
+      .eq("user_id", authenticatedUserId)
+      .select("id")
+      .maybeSingle();
+
+    if (applicationUpdateError) {
+      throw new HttpError(500, "APPLICATION_UPDATE_FAILED", applicationUpdateError.message);
+    }
+
+    if (!updatedApplication) {
+      throw new HttpError(404, "APPLICATION_NOT_FOUND", "Application linked to this run was not found.");
     }
 
     return jsonResponse({ run: updatedRun }, 200);

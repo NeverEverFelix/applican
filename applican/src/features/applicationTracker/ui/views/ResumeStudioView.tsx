@@ -9,6 +9,8 @@ import checkIcon from "../../../../assets/Check.png";
 import errorScreenIcon from "../../../../assets/error screen.png";
 import { useLocalStorageState } from "../../../../hooks/useLocalStorageState";
 import { useCreateResumeRun } from "../../../jobs/hooks/useCreateResumeRun";
+import WritingText from "../../../../effects/writing-text";
+import TypingText from "../../../../effects/typing-text";
 
 type ResumeStudioOutput = {
   job: {
@@ -143,6 +145,8 @@ function toResumeStudioOutput(value: unknown): ResumeStudioOutput | null {
 export function ResumeStudioView() {
   const MIN_JOB_DESCRIPTION_LENGTH = 200;
   const VALID_RESUME_EXTENSIONS = [".pdf", ".doc", ".docx"];
+  const ANALYSIS_TYPING_SPEED = 16;
+  const ANALYSIS_REVEAL_GAP_MS = 220;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const progressTickerRef = useRef<number | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -159,28 +163,48 @@ export function ResumeStudioView() {
     "applican:resume-studio:show-results",
     false,
   );
+  const [persistedRunOutput, setPersistedRunOutput] = useLocalStorageState<unknown>(
+    "applican:resume-studio:last-run-output",
+    null,
+  );
   const [isAnalysisCollapsed, setIsAnalysisCollapsed] = useState(false);
   const [isShowingProgressScreen, setIsShowingProgressScreen] = useState(false);
+  const [isShowingAnalysisCompleteScreen, setIsShowingAnalysisCompleteScreen] = useState(false);
   const [isShowingGenerationErrorScreen, setIsShowingGenerationErrorScreen] = useState(false);
   const [jobDescriptionValidationError, setJobDescriptionValidationError] = useState("");
   const [resumeValidationError, setResumeValidationError] = useState("");
   const [progressPercent, setProgressPercent] = useState(0);
+  const [revealedAnalysisCount, setRevealedAnalysisCount] = useState(0);
   const { submitResumeRun, isSubmitting, errorMessage, progressMessage, createdRun } = useCreateResumeRun();
 
-  const parsedOutput = useMemo(() => toResumeStudioOutput(createdRun?.row.output), [createdRun?.row.output]);
+  const currentRunOutput = createdRun?.row.output ?? persistedRunOutput;
+  const parsedOutput = useMemo(() => toResumeStudioOutput(currentRunOutput), [currentRunOutput]);
   const hasResult = Boolean(parsedOutput);
-  const hasRunOutput = createdRun?.row.output !== null && createdRun?.row.output !== undefined;
+  const hasRunOutput = currentRunOutput !== null && currentRunOutput !== undefined;
   const shouldShowResults = showComputedResults && hasResult;
   const outputShapeError =
     showComputedResults && hasRunOutput && !hasResult
       ? "Result was generated, but output shape is not UI-compatible yet."
       : "";
-  const roleTitle = parsedOutput ? `${parsedOutput.job.company} - ${parsedOutput.job.title}` : "";
   const progressStatusText = "Generating tailored bullet improvements... This usually takes ~10-25 seconds.";
+  const generationErrorText =
+    errorMessage.trim() ||
+    "We failed to generate resume improvements. Press X to retry.";
   const isJobDescriptionValid = jobDescription.trim().length > MIN_JOB_DESCRIPTION_LENGTH;
   const shouldShowValidatedJobDescriptionStyle = isJobDescriptionValid;
+  const shouldShowInvalidJobDescriptionStyle = Boolean(jobDescriptionValidationError);
   const isResumeValid = selectedFile !== null;
-  const jobDescriptionErrorText = "Job description must be longer than 200 characters.";
+  const jobDescriptionErrorText = "Job description should be longer than 200 characters";
+  const analysisSequence = useMemo(
+    () =>
+      parsedOutput
+        ? [...parsedOutput.analysis.strengths, ...parsedOutput.analysis.gaps]
+        : [],
+    [parsedOutput],
+  );
+  const strengthsLength = parsedOutput?.analysis.strengths.length ?? 0;
+  const revealedVirtuesCount = Math.min(strengthsLength, revealedAnalysisCount);
+  const revealedNegativesCount = Math.max(0, revealedAnalysisCount - strengthsLength);
 
   const validateJobDescription = (value: string) => {
     if (value.trim().length > MIN_JOB_DESCRIPTION_LENGTH) {
@@ -190,6 +214,23 @@ export function ResumeStudioView() {
 
     setJobDescriptionValidationError(jobDescriptionErrorText);
     return false;
+  };
+
+  const handleJobDescriptionChange = (value: string) => {
+    setJobDescription(value);
+
+    const normalizedValue = value.trim();
+    if (!normalizedValue) {
+      setJobDescriptionValidationError("");
+      return;
+    }
+
+    if (normalizedValue.length > MIN_JOB_DESCRIPTION_LENGTH) {
+      setJobDescriptionValidationError("");
+      return;
+    }
+
+    setJobDescriptionValidationError(jobDescriptionErrorText);
   };
 
   useEffect(() => {
@@ -219,6 +260,46 @@ export function ResumeStudioView() {
       isActive = false;
     };
   }, [setUploadedFileName]);
+
+  useEffect(() => {
+    if (!shouldShowResults || isAnalysisCollapsed || analysisSequence.length === 0) {
+      return;
+    }
+
+    let isCancelled = false;
+    let timeoutId: number | null = null;
+    let currentIndex = 0;
+
+    const revealNext = () => {
+      if (isCancelled || currentIndex >= analysisSequence.length) {
+        return;
+      }
+
+      currentIndex += 1;
+      setRevealedAnalysisCount(currentIndex);
+
+      const currentText = analysisSequence[currentIndex - 1] ?? "";
+      const waitMs = currentText.length * ANALYSIS_TYPING_SPEED + ANALYSIS_REVEAL_GAP_MS;
+
+      timeoutId = window.setTimeout(() => {
+        if (isCancelled) {
+          return;
+        }
+        revealNext();
+      }, waitMs);
+    };
+
+    timeoutId = window.setTimeout(() => {
+      revealNext();
+    }, 0);
+
+    return () => {
+      isCancelled = true;
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [analysisSequence, shouldShowResults, isAnalysisCollapsed]);
 
   const stopProgressTicker = () => {
     if (progressTickerRef.current !== null) {
@@ -291,6 +372,11 @@ export function ResumeStudioView() {
     setIsShowingProgressScreen(false);
 
     if (result.ok) {
+      setIsShowingAnalysisCompleteScreen(true);
+      await wait(2500);
+      setIsShowingAnalysisCompleteScreen(false);
+      setPersistedRunOutput(result.createdRun.row.output);
+      setRevealedAnalysisCount(0);
       setShowComputedResults(true);
       return;
     }
@@ -302,16 +388,30 @@ export function ResumeStudioView() {
     void clearPersistedResumeFile();
     setShowComputedResults(false);
     setIsAnalysisCollapsed(false);
+    setIsShowingAnalysisCompleteScreen(false);
     setIsShowingGenerationErrorScreen(false);
     setJobDescriptionValidationError("");
     setResumeValidationError("");
     setSelectedFile(null);
     setJobDescription("");
     setUploadedFileName("");
+    setPersistedRunOutput(null);
+    setRevealedAnalysisCount(0);
+  };
+
+  const onToggleAnalysisCollapse = () => {
+    setIsAnalysisCollapsed((previous) => {
+      if (previous) {
+        setRevealedAnalysisCount(0);
+      }
+      return !previous;
+    });
   };
 
   const rootClassName =
-    shouldShowResults || isShowingProgressScreen || isShowingGenerationErrorScreen ? styles.resultsContent : styles.content;
+    shouldShowResults || isShowingProgressScreen || isShowingAnalysisCompleteScreen || isShowingGenerationErrorScreen
+      ? styles.resultsContent
+      : styles.content;
 
   return (
     <div className={rootClassName}>
@@ -327,6 +427,11 @@ export function ResumeStudioView() {
             <p className={styles.progressStatusText}>{progressStatusText}</p>
           </div>
         </section>
+      ) : isShowingAnalysisCompleteScreen ? (
+        <section className={styles.analysisCompleteScreen} role="status" aria-live="polite" aria-label="Analyzing complete">
+          <p className={styles.analysisCompleteTitle}>Analyzing Complete</p>
+          <div className={styles.analysisCompleteSpinner} aria-hidden="true" />
+        </section>
       ) : isShowingGenerationErrorScreen ? (
         <section className={styles.generationErrorScreen}>
           <div className={styles.generationErrorButtonContainer}>
@@ -341,7 +446,7 @@ export function ResumeStudioView() {
           </div>
           <div className={styles.generationErrorSubtextContainer}>
             <p className={styles.generationErrorSubtext}>
-              uh-oh , we failed to generate your resume improvements this can happen for various reasons. Press the X to try again
+              {generationErrorText}
             </p>
           </div>
         </section>
@@ -354,16 +459,18 @@ export function ResumeStudioView() {
               className={[
                 styles.jobDescriptionInput,
                 shouldShowValidatedJobDescriptionStyle ? styles.jobDescriptionInputValidated : "",
+                shouldShowInvalidJobDescriptionStyle ? styles.jobDescriptionInputInvalid : "",
               ]
                 .filter(Boolean)
                 .join(" ")}
-              placeholder="Paste a job description..."
+              placeholder={
+                shouldShowInvalidJobDescriptionStyle
+                  ? "Job description should be longer than 200 characters"
+                  : "Paste a job description..."
+              }
               value={jobDescription}
               onChange={(event) => {
-                setJobDescription(event.target.value);
-                if (jobDescriptionValidationError) {
-                  setJobDescriptionValidationError("");
-                }
+                handleJobDescriptionChange(event.target.value);
               }}
             />
           </div>
@@ -412,17 +519,16 @@ export function ResumeStudioView() {
             />
           </div>
 
-          <button
-            type="button"
-            className={styles.generateResultButton}
-            onClick={() => void onGenerateResult()}
-            disabled={isSubmitting || isShowingProgressScreen || !isResumeValid || !isJobDescriptionValid}
-          >
+            <button
+              type="button"
+              className={styles.generateResultButton}
+              onClick={() => void onGenerateResult()}
+              disabled={isSubmitting || isShowingProgressScreen || isShowingAnalysisCompleteScreen || !isResumeValid || !isJobDescriptionValid}
+            >
             <img src={starIcon} alt="" aria-hidden="true" className={styles.generateResultButtonIcon} />
             <span>{isSubmitting ? "Generating..." : "Generate Result"}</span>
           </button>
           {progressMessage ? <p className={styles.statusSuccess}>{progressMessage}</p> : null}
-          {jobDescriptionValidationError ? <p className={styles.statusError}>{jobDescriptionValidationError}</p> : null}
           {resumeValidationError ? <p className={styles.statusError}>{resumeValidationError}</p> : null}
           {errorMessage && !isShowingGenerationErrorScreen ? <p className={styles.statusError}>{errorMessage}</p> : null}
           {outputShapeError ? <p className={styles.statusError}>{outputShapeError}</p> : null}
@@ -438,7 +544,7 @@ export function ResumeStudioView() {
           <button
             type="button"
             className={styles.analysisCollapseButton}
-            onClick={() => setIsAnalysisCollapsed((previous) => !previous)}
+            onClick={onToggleAnalysisCollapse}
             aria-label={isAnalysisCollapsed ? "Expand resume analysis" : "Collapse resume analysis"}
             aria-expanded={!isAnalysisCollapsed}
           >
@@ -458,7 +564,21 @@ export function ResumeStudioView() {
           {!isAnalysisCollapsed ? (
             <>
               <div className={styles.resumeRoleContainer}>
-                <h2 className={styles.resumeRoleText}>{roleTitle}</h2>
+                <h2 className={styles.resumeRoleText}>
+                  <WritingText
+                    key={`company-${parsedOutput?.job.company ?? ""}`}
+                    text={parsedOutput?.job.company ?? ""}
+                    transition={{ type: "spring", bounce: 0, duration: 4.25, delay: 0.175 }}
+                    spacing="0.3ch"
+                  />
+                  {" - "}
+                  <WritingText
+                    key={`title-${parsedOutput?.job.title ?? ""}`}
+                    text={parsedOutput?.job.title ?? ""}
+                    transition={{ type: "spring", bounce: 0, duration: 4.25, delay: 0.175 }}
+                    spacing="0.3ch"
+                  />
+                </h2>
               </div>
 
               <div className={styles.resumeScorePill}>
@@ -467,21 +587,41 @@ export function ResumeStudioView() {
               </div>
 
               <div className={styles.resumeVirtuesContainer}>
-                {parsedOutput?.analysis.strengths.map((virtue) => (
+                {parsedOutput?.analysis.strengths.slice(0, revealedVirtuesCount).map((virtue, index) => (
                   <span key={virtue} className={styles.resumeVirtuePill}>
                     <img src={checkIcon} alt="" aria-hidden="true" className={styles.resumeVirtueIcon} />
-                    <span className={styles.resumeVirtueText}>{virtue}</span>
+                    <TypingText
+                      key={`virtue-${index}-${virtue}`}
+                      as="span"
+                      className={styles.resumeVirtueText}
+                      text={virtue}
+                      showCursor={false}
+                      loop={false}
+                      typingSpeed={ANALYSIS_TYPING_SPEED}
+                      initialDelay={0}
+                      pauseDuration={0}
+                    />
                   </span>
                 ))}
               </div>
 
               <div className={styles.resumeNegativesContainer}>
-                {parsedOutput?.analysis.gaps.map((negative) => (
+                {parsedOutput?.analysis.gaps.slice(0, revealedNegativesCount).map((negative, index) => (
                   <span key={negative} className={styles.resumeNegativePill}>
                     <span className={styles.resumeNegativeIcon} aria-hidden="true">
                       ×
                     </span>
-                    <span className={styles.resumeNegativeText}>{negative}</span>
+                    <TypingText
+                      key={`negative-${index}-${negative}`}
+                      as="span"
+                      className={styles.resumeNegativeText}
+                      text={negative}
+                      showCursor={false}
+                      loop={false}
+                      typingSpeed={ANALYSIS_TYPING_SPEED}
+                      initialDelay={0}
+                      pauseDuration={0}
+                    />
                   </span>
                 ))}
               </div>

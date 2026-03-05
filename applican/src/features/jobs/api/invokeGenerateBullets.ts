@@ -39,6 +39,10 @@ async function toGenerateBulletsErrorMessage(error: unknown): Promise<string> {
       return "Failed to generate bullets: Stale request id for this run. Start a new analysis.";
     }
 
+    if (errorCode === "ANALYSIS_LIMIT_REACHED") {
+      return "Free plan limit reached: you have used all 5 analyses. Upgrade to continue.";
+    }
+
     if (errorMessage) {
       return `Failed to generate bullets: ${errorMessage}`;
     }

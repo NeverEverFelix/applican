@@ -31,6 +31,10 @@ services:
       context: ../ResumeExtract/resume-extract
       dockerfile: Dockerfile
     container_name: resume-extract
+    env_file:
+      - ../ResumeExtract/resume-extract/.env
+    environment:
+      WORKER_ATTACH_TO_API: "true"
     ports:
       - "3000:3000"
     restart: unless-stopped

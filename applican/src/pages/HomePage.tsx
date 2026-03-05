@@ -5,7 +5,7 @@ import starIcon from "../assets/Star.png";
 import hamburgerIcon from "../assets/Hamburger.png";
 import careerPathIcon from "../assets/Vector (1).png";
 import resourcesIcon from "../assets/oblong.png";
-import UserInfoCard from "../components/UserInfoCard";
+import UserMenu from "../components/UserMenu/UserMenu";
 import { useCurrentUserName } from "../features/auth/useCurrentUser";
 import AuthLoadingScreen from "../features/auth/AuthLoadingScreen";
 import { useMinimumLoading } from "../features/auth/useMinimumLoading";
@@ -62,7 +62,7 @@ export default function HomePage() {
   return (
     <div className={styles.container}>
       <div className={styles.userInfoContainer}>
-        <UserInfoCard user={{ name: currentUserName }} />
+        <UserMenu user={{ name: currentUserName }} onSignOut={() => void handleLogout()} isSigningOut={isLoggingOut} />
         <div className={userStyles.stateControlStack}>
           {pickerItems.map((item) => (
             <div
@@ -89,14 +89,6 @@ export default function HomePage() {
             </div>
           ))}
         </div>
-        <button
-          type="button"
-          className={userStyles.logoutButton}
-          onClick={() => void handleLogout()}
-          disabled={isLoggingOut}
-        >
-          {isLoggingOut ? "Logging out..." : "Log out"}
-        </button>
       </div>
       <ApplicationTracker selectedView={selectedView} />
     </div>
