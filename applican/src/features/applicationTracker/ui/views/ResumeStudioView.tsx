@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { usePostHog } from "@posthog/react";
 import styles from "../applicationTrack.module.css";
 import starIcon from "../../../../assets/Star.png";
 import blackStarIcon from "../../../../assets/Black star.png";
@@ -42,6 +43,7 @@ type ResumeStudioOutput = {
 const RESUME_FILE_DB_NAME = "applican_resume_file_db";
 const RESUME_FILE_STORE_NAME = "resume_files";
 const RESUME_FILE_KEY = "latest_resume";
+const DEFAULT_PAGE_TITLE = "applican";
 
 function openResumeFileDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -143,12 +145,14 @@ function toResumeStudioOutput(value: unknown): ResumeStudioOutput | null {
 }
 
 export function ResumeStudioView() {
+  const posthog = usePostHog();
   const MIN_JOB_DESCRIPTION_LENGTH = 200;
   const VALID_RESUME_EXTENSIONS = [".pdf", ".doc", ".docx"];
   const ANALYSIS_TYPING_SPEED = 16;
   const ANALYSIS_REVEAL_GAP_MS = 220;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const progressTickerRef = useRef<number | null>(null);
+  const lastTrackedResultKeyRef = useRef<string>("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [jobDescription, setJobDescription] = useLocalStorageState<string>(
     "applican:resume-studio:job-description",
@@ -301,6 +305,36 @@ export function ResumeStudioView() {
     };
   }, [analysisSequence, shouldShowResults, isAnalysisCollapsed]);
 
+  useEffect(() => {
+    if (!shouldShowResults || !parsedOutput) {
+      return;
+    }
+
+    const resultKey = `${parsedOutput.job.company}|${parsedOutput.job.title}|${parsedOutput.match.score}|${analysisSequence.length}`;
+    if (lastTrackedResultKeyRef.current === resultKey) {
+      return;
+    }
+
+    lastTrackedResultKeyRef.current = resultKey;
+    posthog.capture("results_viewed", {
+      company: parsedOutput.job.company,
+      title: parsedOutput.job.title,
+      match_score: parsedOutput.match.score,
+      strengths_count: parsedOutput.analysis.strengths.length,
+      gaps_count: parsedOutput.analysis.gaps.length,
+    });
+  }, [analysisSequence.length, parsedOutput, posthog, shouldShowResults]);
+
+  useEffect(() => {
+    const roleTitle = shouldShowResults ? (parsedOutput?.job.title.trim() ?? "") : "";
+    const nextTitle = roleTitle ? `${DEFAULT_PAGE_TITLE} | ${roleTitle}` : DEFAULT_PAGE_TITLE;
+    document.title = nextTitle;
+
+    return () => {
+      document.title = DEFAULT_PAGE_TITLE;
+    };
+  }, [parsedOutput?.job.title, shouldShowResults]);
+
   const stopProgressTicker = () => {
     if (progressTickerRef.current !== null) {
       window.clearInterval(progressTickerRef.current);
@@ -385,6 +419,7 @@ export function ResumeStudioView() {
   };
 
   const onStartNewAnalysis = () => {
+    lastTrackedResultKeyRef.current = "";
     void clearPersistedResumeFile();
     setShowComputedResults(false);
     setIsAnalysisCollapsed(false);

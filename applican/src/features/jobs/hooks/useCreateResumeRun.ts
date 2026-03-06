@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/react";
 import { useCallback, useState } from "react";
+import { captureEvent } from "../../../posthog";
 import { createResumeRun } from "../api/createResumeRun";
 import { invokeGenerateBullets } from "../api/invokeGenerateBullets";
 import { waitForRunExtraction } from "../api/waitForRunExtraction";
@@ -77,13 +78,56 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
 
       try {
         const created = await createResumeRun({ file, jobDescription });
-        setProgressMessage("Waiting for extraction service...");
-        await waitForRunExtraction({ runId: created.row.id });
-        setProgressMessage("Generating bullets...");
-        const generated = await invokeGenerateBulletsWithRetry({
-          runId: created.row.id,
-          requestId: created.requestId,
+        captureEvent("run_created", {
+          run_id: created.row.id,
+          request_id: created.requestId,
+          has_job_description: Boolean(jobDescription.trim()),
+          has_resume_file: Boolean(file),
         });
+
+        setProgressMessage("Waiting for extraction service...");
+        captureEvent("extract_started", {
+          run_id: created.row.id,
+          request_id: created.requestId,
+        });
+        try {
+          await waitForRunExtraction({ runId: created.row.id });
+          captureEvent("extract_succeeded", {
+            run_id: created.row.id,
+            request_id: created.requestId,
+          });
+        } catch (error) {
+          captureEvent("extract_failed", {
+            run_id: created.row.id,
+            request_id: created.requestId,
+            error_message: error instanceof Error ? error.message : "Unknown extraction error",
+          });
+          throw error;
+        }
+
+        setProgressMessage("Generating bullets...");
+        captureEvent("rag_started", {
+          run_id: created.row.id,
+          request_id: created.requestId,
+        });
+        let generated: Awaited<ReturnType<typeof invokeGenerateBulletsWithRetry>>;
+        try {
+          generated = await invokeGenerateBulletsWithRetry({
+            runId: created.row.id,
+            requestId: created.requestId,
+          });
+          captureEvent("rag_succeeded", {
+            run_id: created.row.id,
+            request_id: created.requestId,
+          });
+        } catch (error) {
+          captureEvent("rag_failed", {
+            run_id: created.row.id,
+            request_id: created.requestId,
+            error_message: error instanceof Error ? error.message : "Unknown RAG error",
+          });
+          throw error;
+        }
         const nextRun = {
           requestId: created.requestId,
           row: generated.run,

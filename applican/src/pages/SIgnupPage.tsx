@@ -9,6 +9,7 @@ import { useMinimumLoading } from "../features/auth/useMinimumLoading";
 import { useState } from "react";
 import { getAuthErrorMessage, signInWithGoogle, signUpWithPassword } from "../features/auth/auth";
 import { useNavigate } from "react-router-dom";
+import { captureEvent } from "../posthog";
 
 export default function SignupPage() {
   const flow = useSignupFlow();
@@ -32,6 +33,9 @@ export default function SignupPage() {
     setAuthError("");
     setSuccessMessage("");
     setIsSubmitting(true);
+    captureEvent("signup_started", {
+      method: "password",
+    });
 
     const { data, error } = await signUpWithPassword({ email, name, jobRole, password });
 
@@ -40,6 +44,11 @@ export default function SignupPage() {
       setAuthError(getAuthErrorMessage(error));
       return;
     }
+
+    captureEvent("signup_completed", {
+      method: "password",
+      requires_email_verification: !data.session,
+    });
 
     if (!data.session) {
       setSuccessMessage("Check your inbox and verify your email before continuing.");
@@ -53,6 +62,9 @@ export default function SignupPage() {
     setAuthError("");
     setSuccessMessage("");
     setIsSubmitting(true);
+    captureEvent("signup_started", {
+      method: "google",
+    });
 
     const { error } = await signInWithGoogle();
     if (error) {
@@ -60,6 +72,11 @@ export default function SignupPage() {
       setIsSubmitting(false);
       return;
     }
+
+    captureEvent("signup_completed", {
+      method: "google",
+      oauth_redirect_started: true,
+    });
   };
 
   if (showLoading) {

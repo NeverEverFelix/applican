@@ -98,3 +98,20 @@ Optional:
 ```bash
 supabase secrets set OPENAI_MODEL=gpt-4.1-mini --project-ref gvfiiqggcxpitswxloqb
 ```
+
+Sentry (Edge Functions):
+
+```bash
+supabase secrets set \
+  SENTRY_DSN=your_edge_function_sentry_dsn \
+  SENTRY_ENVIRONMENT=production \
+  SENTRY_TRACES_SAMPLE_RATE=0.1 \
+  SENTRY_DEBUG=false \
+  --project-ref gvfiiqggcxpitswxloqb
+```
+
+Optional release tag for grouping:
+
+```bash
+supabase secrets set SENTRY_RELEASE=applican@$(git rev-parse --short HEAD) --project-ref gvfiiqggcxpitswxloqb
+```

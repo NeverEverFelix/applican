@@ -90,3 +90,7 @@
 .signOutItem {
   color: #fe5e67;
 }
+
+.upgradeItem {
+  color: rgba(230, 0, 199, 0.5);
+}

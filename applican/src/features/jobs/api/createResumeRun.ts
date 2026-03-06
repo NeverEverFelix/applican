@@ -1,4 +1,5 @@
 import { supabase } from "../../../lib/supabaseClient";
+import { captureEvent } from "../../../posthog";
 import { RESUME_RUN_STATUS } from "../model/constants";
 import type { CreateResumeRunInput, CreateResumeRunResult } from "../model/types";
 import { insertResumeRun } from "./insertResumeRun";
@@ -44,11 +45,27 @@ export async function createResumeRun(
   }
 
   const requestId = crypto.randomUUID();
-  const upload = await uploadResumeToStorage({
-    file,
-    userId: user.id,
-    requestId,
-  });
+  let upload: Awaited<ReturnType<typeof uploadResumeToStorage>>;
+  try {
+    upload = await uploadResumeToStorage({
+      file,
+      userId: user.id,
+      requestId,
+    });
+    captureEvent("resume_upload_succeeded", {
+      request_id: requestId,
+      file_name: file.name,
+      file_size: file.size,
+    });
+  } catch (error) {
+    captureEvent("resume_upload_failed", {
+      request_id: requestId,
+      file_name: file.name,
+      file_size: file.size,
+      error_message: error instanceof Error ? error.message : "Unknown upload error",
+    });
+    throw error;
+  }
 
   const row = await insertResumeRun({
     request_id: requestId,

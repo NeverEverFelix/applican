@@ -28,3 +28,18 @@ export function useCurrentUserName() {
   const { session } = useAuthSession();
   return getDisplayName(session?.user ?? null);
 }
+
+export function useCurrentUserPlan() {
+  const { session } = useAuthSession();
+  const rawPlan = session?.user?.app_metadata?.plan;
+  if (typeof rawPlan !== "string") {
+    return null;
+  }
+
+  const normalizedPlan = rawPlan.trim().toLowerCase();
+  if (!normalizedPlan) {
+    return null;
+  }
+
+  return normalizedPlan;
+}

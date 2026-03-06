@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import * as Sentry from "npm:@sentry/deno";
 
 const RUNS_TABLE = "resume_runs";
 const DOCUMENTS_TABLE = "resume_documents";
@@ -10,6 +11,33 @@ const STATUS = {
   EXTRACTED: "extracted",
   FAILED: "failed",
 };
+const FUNCTION_NAME = "generate-bullets";
+const sentryDsn = Deno.env.get("SENTRY_DSN");
+const sentryEnabled = Boolean(sentryDsn);
+const sentryEnvironment = Deno.env.get("SENTRY_ENVIRONMENT") ?? Deno.env.get("SUPABASE_ENV") ?? "production";
+const sentryRelease = Deno.env.get("SENTRY_RELEASE");
+const sentryDebug = Deno.env.get("SENTRY_DEBUG") === "true";
+const sentryTracesSampleRateRaw = Deno.env.get("SENTRY_TRACES_SAMPLE_RATE") ?? "0";
+const sentryTracesSampleRate = Math.max(0, Math.min(1, Number.parseFloat(sentryTracesSampleRateRaw)));
+
+if (sentryEnabled) {
+  Sentry.init({
+    dsn: sentryDsn,
+    environment: sentryEnvironment,
+    release: sentryRelease,
+    tracesSampleRate: Number.isFinite(sentryTracesSampleRate) ? sentryTracesSampleRate : 0,
+    debug: sentryDebug,
+    attachStacktrace: true,
+    sendDefaultPii: false,
+    beforeSend(event) {
+      if (event.request?.headers) {
+        delete event.request.headers.authorization;
+        delete event.request.headers.Authorization;
+      }
+      return event;
+    },
+  });
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -57,6 +85,77 @@ function parseBearerToken(authHeader: string | null): string {
   }
 
   return token;
+}
+
+function toError(error: unknown): Error {
+  if (error instanceof Error) {
+    return error;
+  }
+  return new Error(typeof error === "string" ? error : "Unknown non-Error thrown.");
+}
+
+function getRequestContext(req: Request) {
+  const url = new URL(req.url);
+  const forwardedFor = req.headers.get("x-forwarded-for");
+  return {
+    method: req.method,
+    url: req.url,
+    path: url.pathname,
+    host: url.host,
+    user_agent: req.headers.get("user-agent"),
+    request_id: req.headers.get("x-request-id"),
+    forwarded_for: forwardedFor ? forwardedFor.split(",")[0]?.trim() : null,
+  };
+}
+
+async function reportServerError(
+  error: unknown,
+  context: {
+    req: Request;
+    runId?: string;
+    requestId?: string;
+    userId?: string;
+  },
+) {
+  if (!sentryEnabled) {
+    return;
+  }
+
+  if (error instanceof HttpError && error.status < 500) {
+    return;
+  }
+
+  Sentry.withScope((scope) => {
+    const requestContext = getRequestContext(context.req);
+    scope.setTag("supabase_function", FUNCTION_NAME);
+    scope.setTag("http_method", requestContext.method);
+    scope.setTag("http_path", requestContext.path);
+    scope.setTag("runtime", "deno");
+    scope.setTag("handled", "true");
+
+    if (error instanceof HttpError) {
+      scope.setTag("http_error_code", error.code);
+      scope.setExtra("http_status", error.status);
+    }
+
+    if (context.runId) {
+      scope.setExtra("run_id", context.runId);
+    }
+
+    if (context.requestId) {
+      scope.setExtra("request_id", context.requestId);
+    }
+
+    if (context.userId) {
+      scope.setUser({ id: context.userId });
+    }
+
+    scope.setContext("request", requestContext);
+    scope.setExtra("timestamp", new Date().toISOString());
+    Sentry.captureException(toError(error));
+  });
+
+  await Sentry.flush(2000);
 }
 
 function extractAssistantText(content: unknown): string {
@@ -486,6 +585,7 @@ async function callOpenAI(
 serve(async (req) => {
   let adminClient: ReturnType<typeof createClient> | null = null;
   let runId = "";
+  let requestId = "";
   let authenticatedUserId = "";
 
   if (req.method === "OPTIONS") {
@@ -533,6 +633,7 @@ serve(async (req) => {
 
     runId = typeof body.run_id === "string" ? body.run_id.trim() : "";
     const requestIdInput = typeof body.request_id === "string" ? body.request_id.trim() : "";
+    requestId = requestIdInput;
     if (!runId || !requestIdInput) {
       throw new HttpError(400, "INVALID_INPUT", "run_id and request_id are required.");
     }
@@ -599,11 +700,12 @@ serve(async (req) => {
 
     const creditResult = parseAnalysisCreditResult(rawCreditResult);
     if (!creditResult.allowed) {
-      const planName = creditResult.plan || "free";
+      const planName = (creditResult.plan || "free").trim().toLowerCase();
       const limitText = creditResult.analyses_limit ?? "current";
+      const limitErrorCode = planName === "free" ? "FREE_PLAN_LIMIT_REACHED" : "ANALYSIS_LIMIT_REACHED";
       throw new HttpError(
         402,
-        "ANALYSIS_LIMIT_REACHED",
+        limitErrorCode,
         `${planName} plan analysis limit reached (${creditResult.analyses_used}/${limitText}).`,
       );
     }
@@ -669,6 +771,13 @@ serve(async (req) => {
     const code = error instanceof HttpError ? error.code : "UNEXPECTED_ERROR";
     const message = error instanceof HttpError ? error.message : "Unexpected function error.";
     const status = error instanceof HttpError ? error.status : 500;
+
+    await reportServerError(error, {
+      req,
+      runId,
+      requestId,
+      userId: authenticatedUserId,
+    });
 
     if (runId && adminClient && authenticatedUserId) {
       await adminClient

@@ -6,7 +6,7 @@ import hamburgerIcon from "../assets/Hamburger.png";
 import careerPathIcon from "../assets/Vector (1).png";
 import resourcesIcon from "../assets/oblong.png";
 import UserMenu from "../components/UserMenu/UserMenu";
-import { useCurrentUserName } from "../features/auth/useCurrentUser";
+import { useCurrentUserName, useCurrentUserPlan } from "../features/auth/useCurrentUser";
 import AuthLoadingScreen from "../features/auth/AuthLoadingScreen";
 import { useMinimumLoading } from "../features/auth/useMinimumLoading";
 import userStyles from "../components/UserInfo.module.css";
@@ -14,6 +14,8 @@ import ApplicationTracker from "../features/applicationTracker/ui/applicationTra
 import type { PickerView } from "../features/applicationTracker/ui/studioContainerView";
 import { supabase } from "../lib/supabaseClient";
 import { useLocalStorageState } from "../hooks/useLocalStorageState";
+import { createCheckoutSession } from "../features/billing/api/createCheckoutSession";
+import { createPortalSession } from "../features/billing/api/createPortalSession";
 
 function isPickerView(value: unknown): value is PickerView {
   return (
@@ -34,6 +36,7 @@ export default function HomePage() {
   const showLoading = useMinimumLoading(isLoggingOut);
   const navigate = useNavigate();
   const currentUserName = useCurrentUserName();
+  const currentUserPlan = useCurrentUserPlan();
   const pickerItems: Array<{ label: PickerView; iconSrc: string }> = [
     { label: "Resume Studio", iconSrc: starIcon },
     { label: "Application Tracker", iconSrc: hamburgerIcon },
@@ -55,6 +58,16 @@ export default function HomePage() {
     }
   };
 
+  const handleUpgrade = async () => {
+    const checkoutUrl = await createCheckoutSession();
+    window.location.assign(checkoutUrl);
+  };
+
+  const handleBilling = async () => {
+    const portalUrl = await createPortalSession();
+    window.location.assign(portalUrl);
+  };
+
   if (showLoading) {
     return <AuthLoadingScreen />;
   }
@@ -62,7 +75,13 @@ export default function HomePage() {
   return (
     <div className={styles.container}>
       <div className={styles.userInfoContainer}>
-        <UserMenu user={{ name: currentUserName }} onSignOut={() => void handleLogout()} isSigningOut={isLoggingOut} />
+        <UserMenu
+          user={{ name: currentUserName, plan: currentUserPlan }}
+          onSignOut={() => void handleLogout()}
+          onUpgrade={handleUpgrade}
+          onBilling={handleBilling}
+          isSigningOut={isLoggingOut}
+        />
         <div className={userStyles.stateControlStack}>
           {pickerItems.map((item) => (
             <div

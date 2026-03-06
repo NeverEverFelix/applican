@@ -10,6 +10,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AuthLoadingScreen from "../features/auth/AuthLoadingScreen";
 import { ensureMinimumLoadingDuration, useMinimumLoading } from "../features/auth/useMinimumLoading";
+import { captureEvent } from "../posthog";
 
 export default function LoginPage() {
   const flow = useLoginFlow();
@@ -35,6 +36,10 @@ export default function LoginPage() {
         return;
       }
 
+      captureEvent("login_completed", {
+        method: "password",
+      });
+
       await ensureMinimumLoadingDuration(startedAt);
       navigate("/app", { replace: true });
     } catch (error) {
@@ -54,6 +59,11 @@ export default function LoginPage() {
         setAuthError(getAuthErrorMessage(error));
         return;
       }
+
+      captureEvent("login_completed", {
+        method: "google",
+        oauth_redirect_started: true,
+      });
     } catch (error) {
       Sentry.captureException(error);
       setAuthError(getAuthErrorMessage(error));
