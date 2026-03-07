@@ -158,6 +158,35 @@ async function reportServerError(
   await Sentry.flush(2000);
 }
 
+async function invokeGenerateTailoredResume(
+  supabaseUrl: string,
+  accessToken: string,
+  runId: string,
+  requestId: string,
+): Promise<GenerateTailoredResumeResult | null> {
+  const response = await fetch(`${supabaseUrl.replace(/\/+$/, "")}/functions/v1/generate-tailored-resume`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      run_id: runId,
+      request_id: requestId,
+    }),
+  });
+
+  const payload = (await response.json().catch(() => null)) as GenerateTailoredResumeResult | null;
+  if (!response.ok) {
+    const message = typeof payload?.error_message === "string"
+      ? payload.error_message
+      : `generate-tailored-resume failed with HTTP ${response.status}.`;
+    throw new HttpError(502, "TAILORED_RESUME_GENERATION_FAILED", message);
+  }
+
+  return payload;
+}
+
 function extractAssistantText(content: unknown): string {
   if (typeof content === "string") {
     return content;
@@ -198,6 +227,23 @@ type ModelOptimization = {
   bullets: ModelOptimizationBullet[];
 };
 
+type ModelExperienceRewrite = {
+  company: string;
+  title: string;
+  bullets: string[];
+};
+
+type ModelProjectRewrite = {
+  name: string;
+  bullets: string[];
+};
+
+type ModelEducation = {
+  school: string;
+  degree: string;
+  grad_date: string;
+};
+
 type ModelOutput = {
   company: string;
   title: string;
@@ -207,6 +253,31 @@ type ModelOutput = {
   strengths: string[];
   gaps: string[];
   optimizations: ModelOptimization[];
+  selected_skills?: string[];
+  experience_rewrites?: ModelExperienceRewrite[];
+  projects_rewrites?: ModelProjectRewrite[];
+  education?: ModelEducation;
+};
+
+type TailoredResumeInput = {
+  target_role: string;
+  target_company: string;
+  summary: string;
+  selected_skills: string[];
+  experience_rewrites: Array<{
+    company: string;
+    title: string;
+    bullets: string[];
+  }>;
+  projects_rewrites: Array<{
+    name: string;
+    bullets: string[];
+  }>;
+  education: {
+    school: string;
+    degree: string;
+    grad_date: string;
+  };
 };
 
 type ResumeStudioOutput = {
@@ -240,11 +311,19 @@ type ResumeStudioOutput = {
     generated_at: string;
     request_id: string;
   };
+  tailored_resume_input: TailoredResumeInput;
   // Backward-compatible fields used by older clients.
   summary: string;
   tailored_bullets: string[];
   skills: string[];
   missing_requirements: string[];
+};
+
+type GenerateTailoredResumeResult = {
+  run?: unknown;
+  tailored_resume?: unknown;
+  error_code?: unknown;
+  error_message?: unknown;
 };
 
 type AnalysisCreditResult = {
@@ -353,6 +432,106 @@ function normalizeOptimizations(value: unknown): ResumeStudioOutput["optimizatio
     .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
 }
 
+function normalizeSkills(value: unknown): string[] {
+  const normalized = normalizeList(value);
+  const deduped = Array.from(new Set(normalized.map((item) => item.trim()).filter(Boolean)));
+  return deduped.slice(0, 12);
+}
+
+function normalizeStringBullets(value: unknown, maxItems = 8): string[] {
+  return normalizeList(value).slice(0, maxItems);
+}
+
+function normalizeExperienceRewrites(value: unknown): TailoredResumeInput["experience_rewrites"] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") {
+        return null;
+      }
+
+      const row = entry as Partial<ModelExperienceRewrite>;
+      const company = cleanString(row.company);
+      const title = cleanString(row.title);
+      const bullets = normalizeStringBullets(row.bullets, 8);
+      if (!title || bullets.length === 0) {
+        return null;
+      }
+
+      return {
+        company: company || "Unknown Company",
+        title,
+        bullets,
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+}
+
+function normalizeProjectsRewrites(value: unknown): TailoredResumeInput["projects_rewrites"] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") {
+        return null;
+      }
+
+      const row = entry as Partial<ModelProjectRewrite>;
+      const name = cleanString(row.name);
+      const bullets = normalizeStringBullets(row.bullets, 6);
+      if (!name || bullets.length === 0) {
+        return null;
+      }
+
+      return {
+        name,
+        bullets,
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+}
+
+function normalizeEducation(value: unknown): TailoredResumeInput["education"] {
+  if (!value || typeof value !== "object") {
+    return {
+      school: "",
+      degree: "",
+      grad_date: "",
+    };
+  }
+
+  const row = value as Partial<ModelEducation>;
+  return {
+    school: cleanString(row.school),
+    degree: cleanString(row.degree),
+    grad_date: cleanString(row.grad_date),
+  };
+}
+
+function deriveExperienceRewritesFromOptimizations(
+  optimizations: ResumeStudioOutput["optimizations"],
+  fallbackCompany: string,
+): TailoredResumeInput["experience_rewrites"] {
+  return optimizations
+    .map((optimization) => {
+      const bullets = optimization.bullets.map((bullet) => bullet.rewritten).filter(Boolean);
+      if (bullets.length === 0) {
+        return null;
+      }
+      return {
+        company: fallbackCompany || "Unknown Company",
+        title: cleanString(optimization.role_after || optimization.role_before || optimization.experience_title, "Experience"),
+        bullets: bullets.slice(0, 8),
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+}
+
 function normalizeModelOutput(raw: unknown, model: string, requestId: string): ResumeStudioOutput {
   if (!raw || typeof raw !== "object") {
     throw new HttpError(502, "OPENAI_INVALID_JSON", "Model response was not a JSON object.");
@@ -364,13 +543,23 @@ function normalizeModelOutput(raw: unknown, model: string, requestId: string): R
   const optimizations = normalizeOptimizations(data.optimizations);
   const score = clampScore(data.match_score);
   const summary = cleanString(data.match_summary, "Resume has partial overlap with the job requirements.");
+  const jobCompany = cleanString(data.company, "Unknown Company");
+  const jobTitle = cleanString(data.title, "Target Role");
+
+  const selectedSkills = normalizeSkills(data.selected_skills);
+  const modelExperienceRewrites = normalizeExperienceRewrites(data.experience_rewrites);
+  const modelProjectsRewrites = normalizeProjectsRewrites(data.projects_rewrites);
+  const experienceRewrites =
+    modelExperienceRewrites.length > 0
+      ? modelExperienceRewrites
+      : deriveExperienceRewritesFromOptimizations(optimizations, jobCompany);
 
   const rewrittenBullets = optimizations.flatMap((opt) => opt.bullets.map((bullet) => bullet.rewritten));
 
   return {
     job: {
-      company: cleanString(data.company, "Unknown Company"),
-      title: cleanString(data.title, "Target Role"),
+      company: jobCompany,
+      title: jobTitle,
       location: cleanString(data.location, "Unknown Location"),
     },
     match: {
@@ -387,6 +576,15 @@ function normalizeModelOutput(raw: unknown, model: string, requestId: string): R
       model,
       generated_at: new Date().toISOString(),
       request_id: requestId,
+    },
+    tailored_resume_input: {
+      target_role: jobTitle,
+      target_company: jobCompany,
+      summary,
+      selected_skills: selectedSkills,
+      experience_rewrites: experienceRewrites,
+      projects_rewrites: modelProjectsRewrites,
+      education: normalizeEducation(data.education),
     },
     summary,
     tailored_bullets: rewrittenBullets,
@@ -508,8 +706,86 @@ function buildJsonSchema() {
             required: ["experience_title", "role_before", "role_after", "bullets"],
           },
         },
+        selected_skills: {
+          type: "array",
+          items: {
+            type: "string",
+          },
+        },
+        experience_rewrites: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              company: {
+                type: "string",
+              },
+              title: {
+                type: "string",
+              },
+              bullets: {
+                type: "array",
+                minItems: 1,
+                items: {
+                  type: "string",
+                },
+              },
+            },
+            required: ["company", "title", "bullets"],
+          },
+        },
+        projects_rewrites: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              name: {
+                type: "string",
+              },
+              bullets: {
+                type: "array",
+                minItems: 1,
+                items: {
+                  type: "string",
+                },
+              },
+            },
+            required: ["name", "bullets"],
+          },
+        },
+        education: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            school: {
+              type: "string",
+            },
+            degree: {
+              type: "string",
+            },
+            grad_date: {
+              type: "string",
+            },
+          },
+          required: ["school", "degree", "grad_date"],
+        },
       },
-      required: ["company", "title", "location", "match_score", "match_summary", "strengths", "gaps", "optimizations"],
+      required: [
+        "company",
+        "title",
+        "location",
+        "match_score",
+        "match_summary",
+        "strengths",
+        "gaps",
+        "optimizations",
+        "selected_skills",
+        "experience_rewrites",
+        "projects_rewrites",
+        "education",
+      ],
     },
   };
 }
@@ -545,6 +821,7 @@ async function callOpenAI(
             "Extract the company name, role title, and location from the job description.",
             "Provide exactly 3 strengths and exactly 2 gaps.",
             "Provide structured optimization rewrites that are concise and ATS-friendly.",
+            "Also return selected_skills, experience_rewrites, projects_rewrites, and education to support resume LaTeX generation.",
           ].join(" "),
         },
         {
@@ -554,6 +831,8 @@ async function callOpenAI(
             `Resume text:\n${resumeText || "[No extractable text available]"}`,
             "Infer company and role title from the job description when possible.",
             "For optimization bullets, use action='replace' for edits to existing bullets and action='add' for new bullets.",
+            "For experience_rewrites and projects_rewrites, provide concise, measurable, ATS-friendly bullets.",
+            "If education details are missing in resume text, return empty strings for school/degree/grad_date.",
           ].join("\n\n"),
         },
       ],
@@ -766,7 +1045,29 @@ serve(async (req) => {
       throw new HttpError(404, "APPLICATION_NOT_FOUND", "Application linked to this run was not found.");
     }
 
-    return jsonResponse({ run: updatedRun }, 200);
+    let responseRun = updatedRun;
+    try {
+      const tailoredResult = await invokeGenerateTailoredResume(
+        supabaseUrl,
+        accessToken,
+        runId,
+        runRequestId,
+      );
+
+      const maybeRun = tailoredResult && typeof tailoredResult.run === "object" ? tailoredResult.run : null;
+      if (maybeRun) {
+        responseRun = maybeRun;
+      }
+    } catch (tailoredError) {
+      await reportServerError(tailoredError, {
+        req,
+        runId,
+        requestId: runRequestId,
+        userId: authenticatedUserId,
+      });
+    }
+
+    return jsonResponse({ run: responseRun }, 200);
   } catch (error) {
     const code = error instanceof HttpError ? error.code : "UNEXPECTED_ERROR";
     const message = error instanceof HttpError ? error.message : "Unexpected function error.";

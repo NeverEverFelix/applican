@@ -50,3 +50,29 @@ export type GenerateBulletsInput = {
 export type GenerateBulletsResponse = {
   run: ResumeRunRow;
 };
+
+export type GenerateTailoredResumeInput = {
+  runId: string;
+  requestId?: string;
+};
+
+export type GenerateTailoredResumeResponse = {
+  run: ResumeRunRow;
+  tailored_resume: {
+    id?: string;
+    filename: string;
+    template: string;
+    latex: string;
+  };
+};
+
+export type GeneratedResumeRow = {
+  id: string;
+  run_id: string;
+  request_id: string | null;
+  template: string;
+  filename: string;
+  latex: string;
+  created_at: string;
+  updated_at: string;
+};

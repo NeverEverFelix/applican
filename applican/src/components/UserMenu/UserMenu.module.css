@@ -11,19 +11,14 @@
   box-sizing: border-box;
   cursor: pointer;
   text-align: left;
-  transition: background-color 140ms ease;
+  transition: background-color 180ms ease, transform 180ms ease;
   outline: none;
   -webkit-tap-highlight-color: transparent;
 }
 
 .triggerButton:active,
 .triggerButton[data-state="open"] {
-  background-color: #000000;
-}
-
-.triggerButton[data-state="open"] {
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
+  background-color: transparent;
 }
 
 .triggerButton:focus,
@@ -59,15 +54,35 @@
 .menuContent {
   width: 216px;
   box-sizing: border-box;
-  border-radius: 0 0 12px 12px;
-  padding: 4px 8px 8px;
+  border-radius: 12px;
+  padding: 8px;
   background: #000000;
   border: none;
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.45);
-  transform: translateY(-1px);
+  transform-origin: top left;
+  will-change: transform, opacity, filter;
+}
+
+.menuContent[data-state="closed"] {
+  pointer-events: none;
+}
+
+.menuHeader {
+  width: 100%;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  box-sizing: border-box;
+  margin-bottom: 4px;
 }
 
 .menuItem {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
   color: #ffffff;
   font-size: 14px;
   font-weight: 500;
@@ -76,10 +91,12 @@
   border-radius: 8px;
   outline: none;
   cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease, transform 140ms ease;
 }
 
 .menuItem[data-highlighted] {
   background: #171717;
+  transform: translateX(1px);
 }
 
 .menuItem[data-disabled] {
@@ -93,4 +110,30 @@
 
 .upgradeItem {
   color: rgba(230, 0, 199, 0.5);
+}
+
+@keyframes menuIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes menuOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.99);
+    filter: blur(8px);
+  }
 }

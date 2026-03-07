@@ -1,0 +1,30 @@
+.scrollFlow {
+  width: 955px;
+  max-width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+}
+
+.outer,
+.inner {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.panel {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  padding-right: 6px;
+}

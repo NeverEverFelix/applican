@@ -12,8 +12,10 @@ import { useMinimumLoading } from "../features/auth/useMinimumLoading";
 import userStyles from "../components/UserInfo.module.css";
 import ApplicationTracker from "../features/applicationTracker/ui/applicationTracker";
 import type { PickerView } from "../features/applicationTracker/ui/studioContainerView";
+import AppModal from "../components/Modal/Modal";
 import { supabase } from "../lib/supabaseClient";
 import { useLocalStorageState } from "../hooks/useLocalStorageState";
+import { useUpgradeGate } from "../hooks/useUpgradeGate";
 import { createCheckoutSession } from "../features/billing/api/createCheckoutSession";
 import { createPortalSession } from "../features/billing/api/createPortalSession";
 
@@ -22,6 +24,7 @@ function isPickerView(value: unknown): value is PickerView {
     value === "Resume Studio" ||
     value === "Application Tracker" ||
     value === "Career Path" ||
+    value === "Editor" ||
     value === "Resources"
   );
 }
@@ -33,6 +36,8 @@ export default function HomePage() {
     { validate: isPickerView },
   );
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { isUpgradeModalOpen, isUserMenuOpen, setIsUserMenuOpen, openUpgradeModal, closeUpgradeModalAndOpenMenu } =
+    useUpgradeGate();
   const showLoading = useMinimumLoading(isLoggingOut);
   const navigate = useNavigate();
   const currentUserName = useCurrentUserName();
@@ -41,8 +46,21 @@ export default function HomePage() {
     { label: "Resume Studio", iconSrc: starIcon },
     { label: "Application Tracker", iconSrc: hamburgerIcon },
     { label: "Career Path", iconSrc: careerPathIcon },
+    { label: "Editor", iconSrc: starIcon },
     { label: "Resources", iconSrc: resourcesIcon },
   ];
+  const isProUser = currentUserPlan === "pro";
+
+  const isViewRestricted = (view: PickerView) => view !== "Resume Studio" && view !== "Application Tracker";
+
+  const onSelectView = (view: PickerView) => {
+    if (!isProUser && isViewRestricted(view)) {
+      openUpgradeModal();
+      return;
+    }
+
+    setSelectedView(view);
+  };
 
   const handleLogout = async () => {
     if (isLoggingOut) {
@@ -81,6 +99,8 @@ export default function HomePage() {
           onUpgrade={handleUpgrade}
           onBilling={handleBilling}
           isSigningOut={isLoggingOut}
+          open={isUserMenuOpen}
+          onOpenChange={setIsUserMenuOpen}
         />
         <div className={userStyles.stateControlStack}>
           {pickerItems.map((item) => (
@@ -94,22 +114,38 @@ export default function HomePage() {
               ]
                 .filter(Boolean)
                 .join(" ")}
-              onClick={() => setSelectedView(item.label)}
+              onClick={() => onSelectView(item.label)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
-                  setSelectedView(item.label);
+                  onSelectView(item.label);
                 }
               }}
               aria-pressed={selectedView === item.label}
             >
-              <img src={item.iconSrc} alt="" aria-hidden="true" className={userStyles.stateControlIcon} />
-              <p className={userStyles.stateControlLabel}>{item.label}</p>
+              <img
+                src={item.iconSrc}
+                alt=""
+                aria-hidden="true"
+                className={[
+                  userStyles.stateControlIcon,
+                  item.label === "Editor" ? userStyles.stateControlIconPurple : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              />
+              <div className={userStyles.stateControlLabelRow}>
+                <p className={userStyles.stateControlLabel}>{item.label}</p>
+                {item.label === "Career Path" || item.label === "Editor" ? (
+                  <span className={userStyles.stateControlSoonLabel}>Coming soon</span>
+                ) : null}
+              </div>
             </div>
           ))}
         </div>
       </div>
       <ApplicationTracker selectedView={selectedView} />
+      <AppModal open={isUpgradeModalOpen} onClose={closeUpgradeModalAndOpenMenu} />
     </div>
   );
 }

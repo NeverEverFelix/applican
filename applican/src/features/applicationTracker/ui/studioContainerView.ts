@@ -2,6 +2,7 @@ export const STUDIO_VIEWS = [
   "Resume Studio",
   "Application Tracker",
   "Career Path",
+  "Editor",
   "Resources",
 ] as const;
 
@@ -11,12 +12,14 @@ export type StudioContainerVariant =
   | "resumeStudio"
   | "applicationTracker"
   | "careerPath"
+  | "editor"
   | "resources";
 
 const VARIANT_BY_VIEW: Record<PickerView, StudioContainerVariant> = {
   "Resume Studio": "resumeStudio",
   "Application Tracker": "applicationTracker",
   "Career Path": "careerPath",
+  Editor: "editor",
   Resources: "resources",
 };
 

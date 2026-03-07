@@ -14,6 +14,8 @@ interface TypingTextProps {
   className?: string
   showCursor?: boolean
   hideCursorWhileTyping?: boolean
+  hideCursorOnComplete?: boolean
+  showCursorWhileTypingOnly?: boolean
   cursorCharacter?: string | React.ReactNode
   cursorBlinkDuration?: number
   cursorClassName?: string
@@ -42,6 +44,8 @@ const TypingText = ({
   className = "",
   showCursor = true,
   hideCursorWhileTyping = false,
+  hideCursorOnComplete = false,
+  showCursorWhileTypingOnly = false,
   cursorCharacter = "|",
   cursorClassName = "",
   cursorBlinkDuration = 0.5,
@@ -203,7 +207,11 @@ const TypingText = ({
   ])
 
   const currentTextLength = hasText ? textArray[currentTextIndex]?.length ?? 0 : 0
-  const shouldHideCursor = hideCursorWhileTyping && (currentCharIndex < currentTextLength || isDeleting)
+  const isTyping = currentCharIndex < currentTextLength || isDeleting
+  const shouldHideCursor =
+    (showCursorWhileTypingOnly && !isTyping) ||
+    (hideCursorWhileTyping && isTyping) ||
+    (hideCursorOnComplete && !isTyping && displayedText.length > 0)
 
   return (
     <span ref={containerRef}>

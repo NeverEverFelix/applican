@@ -12,6 +12,7 @@ import { useLocalStorageState } from "../../../../hooks/useLocalStorageState";
 import { useCreateResumeRun } from "../../../jobs/hooks/useCreateResumeRun";
 import WritingText from "../../../../effects/writing-text";
 import TypingText from "../../../../effects/typing-text";
+import ScrollSections from "../../../../effects/ScrollSections";
 
 type ResumeStudioOutput = {
   job: {
@@ -148,8 +149,8 @@ export function ResumeStudioView() {
   const posthog = usePostHog();
   const MIN_JOB_DESCRIPTION_LENGTH = 200;
   const VALID_RESUME_EXTENSIONS = [".pdf", ".doc", ".docx"];
-  const ANALYSIS_TYPING_SPEED = 16;
-  const ANALYSIS_REVEAL_GAP_MS = 220;
+  const ANALYSIS_TYPING_SPEED = 28;
+  const ANALYSIS_REVEAL_GAP_MS = 420;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const progressTickerRef = useRef<number | null>(null);
   const lastTrackedResultKeyRef = useRef<string>("");
@@ -207,8 +208,11 @@ export function ResumeStudioView() {
     [parsedOutput],
   );
   const strengthsLength = parsedOutput?.analysis.strengths.length ?? 0;
+  const gapsLength = parsedOutput?.analysis.gaps.length ?? 0;
   const revealedVirtuesCount = Math.min(strengthsLength, revealedAnalysisCount);
   const revealedNegativesCount = Math.max(0, revealedAnalysisCount - strengthsLength);
+  const virtuesContainerMinHeight = strengthsLength > 0 ? strengthsLength * 60 - 12 : 0;
+  const negativesContainerMinHeight = gapsLength > 0 ? gapsLength * 60 - 12 : 0;
 
   const validateJobDescription = (value: string) => {
     if (value.trim().length > MIN_JOB_DESCRIPTION_LENGTH) {
@@ -447,6 +451,7 @@ export function ResumeStudioView() {
     shouldShowResults || isShowingProgressScreen || isShowingAnalysisCompleteScreen || isShowingGenerationErrorScreen
       ? styles.resultsContent
       : styles.content;
+  const useScrollSectionsFlow = true;
 
   return (
     <div className={rootClassName}>
@@ -568,6 +573,118 @@ export function ResumeStudioView() {
           {errorMessage && !isShowingGenerationErrorScreen ? <p className={styles.statusError}>{errorMessage}</p> : null}
           {outputShapeError ? <p className={styles.statusError}>{outputShapeError}</p> : null}
         </>
+      ) : useScrollSectionsFlow ? (
+        <section className={styles.resumeAnalysisContainer}>
+          <div className={styles.resumeAnalysisActions}>
+            <button type="button" className={styles.newAnalysisButton} onClick={onStartNewAnalysis}>
+              New analysis
+            </button>
+          </div>
+          <ScrollSections
+            sections={[
+              {
+                id: "analysis",
+                content: (
+                  <div className={styles.resumeAnalysisScrollContainer}>
+                    <div className={styles.resumeRoleContainer}>
+                      <h2 className={styles.resumeRoleText}>
+                        <WritingText
+                          key={`company-${parsedOutput?.job.company ?? ""}`}
+                          text={parsedOutput?.job.company ?? ""}
+                          transition={{ type: "spring", bounce: 0, duration: 4.25, delay: 0.175 }}
+                          spacing="0.3ch"
+                        />
+                        {" - "}
+                        <WritingText
+                          key={`title-${parsedOutput?.job.title ?? ""}`}
+                          text={parsedOutput?.job.title ?? ""}
+                          transition={{ type: "spring", bounce: 0, duration: 4.25, delay: 0.175 }}
+                          spacing="0.3ch"
+                        />
+                      </h2>
+                    </div>
+
+                    <div className={styles.resumeScorePill}>
+                      <img src={blackStarIcon} alt="" aria-hidden="true" className={styles.resumeScoreIcon} />
+                      <p className={styles.resumeScoreValue}>{parsedOutput?.match.label}</p>
+                    </div>
+
+                    <div className={styles.resumeVirtuesContainer} style={{ minHeight: virtuesContainerMinHeight }}>
+                      {parsedOutput?.analysis.strengths.slice(0, revealedVirtuesCount).map((virtue, index) => (
+                        <span key={virtue} className={styles.resumeVirtuePill}>
+                          <img src={checkIcon} alt="" aria-hidden="true" className={styles.resumeVirtueIcon} />
+                          <TypingText
+                            key={`virtue-${index}-${virtue}`}
+                            as="span"
+                            className={styles.resumeVirtueText}
+                            text={virtue}
+                            showCursor
+                            showCursorWhileTypingOnly
+                            cursorCharacter="│"
+                            cursorClassName={styles.resumeTypingCursor}
+                            loop={false}
+                            typingSpeed={ANALYSIS_TYPING_SPEED}
+                            initialDelay={0}
+                            pauseDuration={0}
+                          />
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className={styles.resumeNegativesContainer} style={{ minHeight: negativesContainerMinHeight }}>
+                      {parsedOutput?.analysis.gaps.slice(0, revealedNegativesCount).map((negative, index) => (
+                        <span key={negative} className={styles.resumeNegativePill}>
+                          <span className={styles.resumeNegativeIcon} aria-hidden="true">
+                            ×
+                          </span>
+                          <TypingText
+                            key={`negative-${index}-${negative}`}
+                            as="span"
+                            className={styles.resumeNegativeText}
+                            text={negative}
+                            showCursor
+                            showCursorWhileTypingOnly
+                            cursorCharacter="│"
+                            cursorClassName={styles.resumeTypingCursor}
+                            loop={false}
+                            typingSpeed={ANALYSIS_TYPING_SPEED}
+                            initialDelay={0}
+                            pauseDuration={0}
+                          />
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ),
+              },
+              {
+                id: "optimizations",
+                content: (
+                  <div className={styles.resumeOptimizationsContainer}>
+                    <h3 className={styles.resumeOptimizationsTitle}>Resume Optimizations</h3>
+                    {parsedOutput?.optimizations.map((optimization, optimizationIndex) => (
+                      <section key={`${optimization.experience_title}-${optimizationIndex}`} className={styles.optimizationGroup}>
+                        <h4 className={styles.optimizationExperienceTitle}>{optimization.experience_title}</h4>
+                        {optimization.bullets.map((bullet, index) => (
+                          <article key={`${optimization.experience_title}-${index}`} className={styles.optimizationBulletCard}>
+                            {bullet.original ? (
+                              <p className={styles.optimizationOriginalLine}>
+                                <span className={styles.optimizationActionTag}>{bullet.action.toUpperCase()}</span>
+                                {bullet.original}
+                              </p>
+                            ) : null}
+                            <p className={styles.optimizationRewrittenLine}>{bullet.rewritten}</p>
+                            {bullet.reason ? <p className={styles.optimizationReasonLine}>{bullet.reason}</p> : null}
+                          </article>
+                        ))}
+                      </section>
+                    ))}
+                  </div>
+                ),
+              },
+            ]}
+          />
+        </section>
       ) : (
         <section className={styles.resumeAnalysisContainer}>
           <div className={styles.resumeAnalysisActions}>
@@ -621,7 +738,7 @@ export function ResumeStudioView() {
                 <p className={styles.resumeScoreValue}>{parsedOutput?.match.label}</p>
               </div>
 
-              <div className={styles.resumeVirtuesContainer}>
+              <div className={styles.resumeVirtuesContainer} style={{ minHeight: virtuesContainerMinHeight }}>
                 {parsedOutput?.analysis.strengths.slice(0, revealedVirtuesCount).map((virtue, index) => (
                   <span key={virtue} className={styles.resumeVirtuePill}>
                     <img src={checkIcon} alt="" aria-hidden="true" className={styles.resumeVirtueIcon} />
@@ -630,7 +747,10 @@ export function ResumeStudioView() {
                       as="span"
                       className={styles.resumeVirtueText}
                       text={virtue}
-                      showCursor={false}
+                      showCursor
+                      showCursorWhileTypingOnly
+                      cursorCharacter="│"
+                      cursorClassName={styles.resumeTypingCursor}
                       loop={false}
                       typingSpeed={ANALYSIS_TYPING_SPEED}
                       initialDelay={0}
@@ -640,7 +760,7 @@ export function ResumeStudioView() {
                 ))}
               </div>
 
-              <div className={styles.resumeNegativesContainer}>
+              <div className={styles.resumeNegativesContainer} style={{ minHeight: negativesContainerMinHeight }}>
                 {parsedOutput?.analysis.gaps.slice(0, revealedNegativesCount).map((negative, index) => (
                   <span key={negative} className={styles.resumeNegativePill}>
                     <span className={styles.resumeNegativeIcon} aria-hidden="true">
@@ -651,7 +771,10 @@ export function ResumeStudioView() {
                       as="span"
                       className={styles.resumeNegativeText}
                       text={negative}
-                      showCursor={false}
+                      showCursor
+                      showCursorWhileTypingOnly
+                      cursorCharacter="│"
+                      cursorClassName={styles.resumeTypingCursor}
                       loop={false}
                       typingSpeed={ANALYSIS_TYPING_SPEED}
                       initialDelay={0}
@@ -679,9 +802,6 @@ export function ResumeStudioView() {
             {parsedOutput?.optimizations.map((optimization, optimizationIndex) => (
               <section key={`${optimization.experience_title}-${optimizationIndex}`} className={styles.optimizationGroup}>
                 <h4 className={styles.optimizationExperienceTitle}>{optimization.experience_title}</h4>
-                <p className={styles.optimizationRoleLine}>
-                  {optimization.role_before} {"->"} <strong>{optimization.role_after}</strong>
-                </p>
                 {optimization.bullets.map((bullet, index) => (
                   <article key={`${optimization.experience_title}-${index}`} className={styles.optimizationBulletCard}>
                     {bullet.original ? (

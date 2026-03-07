@@ -115,3 +115,23 @@ Optional release tag for grouping:
 ```bash
 supabase secrets set SENTRY_RELEASE=applican@$(git rev-parse --short HEAD) --project-ref gvfiiqggcxpitswxloqb
 ```
+
+## Supabase Edge Function: `generate-tailored-resume`
+
+This project includes an edge function at:
+
+- `supabase/functions/generate-tailored-resume/index.ts`
+
+### Deploy
+
+```bash
+supabase functions deploy generate-tailored-resume --project-ref gvfiiqggcxpitswxloqb
+```
+
+### Required function secrets
+
+```bash
+supabase secrets set \
+  SUPABASE_SERVICE_ROLE_KEY=your_service_role_key \
+  --project-ref gvfiiqggcxpitswxloqb
+```

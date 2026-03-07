@@ -13,8 +13,8 @@ import { useApplications } from "../data/useApplications";
 import styles from "./applicationTrack.module.css";
 import type { PickerView } from "./studioContainerView";
 import { ResumeStudioView } from "./views/ResumeStudioView";
+import { EditorView } from "./views/EditorView";
 import downloadIcon from "../../../assets/Download Icon.png";
-import starIcon from "../../../assets/Star.png";
 
 export type ApplicationTrackerStatus = ApplicationFilter;
 
@@ -30,14 +30,8 @@ function PlaceholderView({ title }: { title: string }) {
 function CareerPathView() {
   return (
     <section className={styles.careerPathView}>
-      <div className={styles.careerPathInputWrapper}>
-        <input
-          type="text"
-          className={styles.careerPathInput}
-          placeholder="Enter your target role"
-          aria-label="Career path target role"
-        />
-        <img src={starIcon} alt="" aria-hidden="true" className={styles.careerPathStarIcon} />
+      <div className={styles.careerPathComingSoonOverlay} role="status" aria-live="polite">
+        <p className={styles.careerPathComingSoonText}>Coming soon</p>
       </div>
     </section>
   );
@@ -279,6 +273,7 @@ function ApplicationTrackerView({
 const STUDIO_CONTENT_BY_VIEW: Record<Exclude<PickerView, "Application Tracker">, ComponentType> = {
   "Resume Studio": ResumeStudioView,
   "Career Path": CareerPathView,
+  Editor: EditorView,
   Resources: () => <PlaceholderView title="Resources" />,
 };
 
