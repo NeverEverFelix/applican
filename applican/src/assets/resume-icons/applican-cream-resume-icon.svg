@@ -1,0 +1,57 @@
+
+<svg width="420" height="520" viewBox="0 0 420 520" xmlns="http://www.w3.org/2000/svg">
+
+<defs>
+
+<linearGradient id="blueAccent" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0%" stop-color="#60A5FA"/>
+<stop offset="100%" stop-color="#38BDF8"/>
+</linearGradient>
+
+<linearGradient id="blueSoft" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0%" stop-color="#BFDBFE"/>
+<stop offset="100%" stop-color="#93C5FD"/>
+</linearGradient>
+
+<filter id="shadow">
+<feDropShadow dx="0" dy="10" stdDeviation="12" flood-opacity="0.25"/>
+</filter>
+
+<style>
+.paper { fill:#F8F6EC; stroke:#E6E2CF; stroke-width:2; }
+.line { fill:#94A3B8; }
+.lineSoft { fill:url(#blueSoft); }
+</style>
+
+</defs>
+
+<!-- paper -->
+<g filter="url(#shadow)">
+<rect x="40" y="30" width="340" height="450" rx="26" class="paper"/>
+</g>
+
+<!-- folded corner -->
+<path d="M300 30 L340 70 L300 70 Z" fill="url(#blueAccent)"/>
+
+<!-- title line -->
+<rect x="80" y="95" width="210" height="18" rx="9" fill="url(#blueAccent)"/>
+
+<!-- resume lines -->
+<rect x="80" y="140" width="260" height="12" rx="6" class="line"/>
+<rect x="80" y="170" width="240" height="12" rx="6" class="line"/>
+<rect x="80" y="200" width="270" height="12" rx="6" class="line"/>
+
+<!-- highlighted section -->
+<rect x="80" y="250" width="160" height="14" rx="7" class="lineSoft"/>
+
+<rect x="80" y="290" width="260" height="12" rx="6" class="line"/>
+<rect x="80" y="320" width="240" height="12" rx="6" class="line"/>
+<rect x="80" y="350" width="220" height="12" rx="6" class="line"/>
+
+<!-- approval badge -->
+<g transform="translate(280 270)">
+<circle cx="40" cy="40" r="38" fill="url(#blueAccent)"/>
+<path d="M24 40 L36 52 L58 28" stroke="#F8F6EC" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+
+</svg>

@@ -1,0 +1,70 @@
+<svg width="420" height="520" viewBox="0 0 420 520" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="cornerGlow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FF9E2C"/>
+      <stop offset="100%" stop-color="#F2C7F0"/>
+    </linearGradient>
+
+    <linearGradient id="titleGlow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#EBC7F2"/>
+      <stop offset="100%" stop-color="#FF4DB8"/>
+    </linearGradient>
+
+    <linearGradient id="accentSoft" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#C7B6FF"/>
+      <stop offset="100%" stop-color="#A7B7D6"/>
+    </linearGradient>
+
+    <linearGradient id="badgeGlow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F4A5FF"/>
+      <stop offset="100%" stop-color="#FF4DB8"/>
+    </linearGradient>
+
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-opacity="0.18"/>
+    </filter>
+
+    <style>
+      .paper { fill:#F8F6EC; stroke:#E9E3D0; stroke-width:2; }
+      .lineA { fill:#B7BFD5; }
+      .lineB { fill:#A7B3C9; }
+      .creamStroke { stroke:#F8F6EC; }
+    </style>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <rect x="40" y="30" width="340" height="450" rx="26" class="paper"/>
+  </g>
+
+  <!-- folded corner -->
+  <path d="M300 30 L340 70 L300 70 Z" fill="url(#cornerGlow)"/>
+
+  <!-- tiny GSAP-like flower accent -->
+  <g transform="translate(78 58) scale(0.22)">
+    <path d="M0 0H126C126 71 71 126 0 126V0Z" fill="url(#cornerGlow)"/>
+    <path d="M132 0H258C258 71 203 126 132 126V0Z" fill="url(#titleGlow)" transform="rotate(90 195 63)"/>
+    <path d="M132 132H258C258 203 203 258 132 258V132Z" fill="#EBC7F2" transform="rotate(180 195 195)"/>
+    <path d="M0 132H126C126 203 71 258 0 258V132Z" fill="#F3B6E2" transform="rotate(270 63 195)"/>
+  </g>
+
+  <!-- title -->
+  <rect x="122" y="95" width="180" height="18" rx="9" fill="url(#titleGlow)"/>
+
+  <!-- content lines -->
+  <rect x="80" y="145" width="265" height="12" rx="6" class="lineA"/>
+  <rect x="80" y="175" width="235" height="12" rx="6" class="lineB"/>
+  <rect x="80" y="205" width="278" height="12" rx="6" class="lineA"/>
+
+  <!-- section highlight -->
+  <rect x="80" y="252" width="150" height="14" rx="7" fill="url(#cornerGlow)"/>
+
+  <rect x="80" y="294" width="270" height="12" rx="6" class="lineA"/>
+  <rect x="80" y="324" width="245" height="12" rx="6" class="lineB"/>
+  <rect x="80" y="354" width="225" height="12" rx="6" class="lineA"/>
+
+  <!-- badge -->
+  <g transform="translate(282 272)">
+    <circle cx="38" cy="38" r="38" fill="url(#badgeGlow)"/>
+    <path d="M23 38 L34 49 L55 27" class="creamStroke" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+</svg>

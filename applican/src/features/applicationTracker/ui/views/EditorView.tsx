@@ -1,8 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Editor, { type BeforeMount } from "@monaco-editor/react";
-import { jsPDF } from "jspdf";
 import styles from "../applicationTrack.module.css";
+import { animateEditorFlip, captureEditorFlipState } from "../../../../effects/flip";
 import { invokeGenerateTailoredResume } from "../../../jobs/api/invokeGenerateTailoredResume";
+import {
+  invokeCompileTailoredResumePdf,
+  type CompileTailoredResumePdfError,
+} from "../../../jobs/api/invokeCompileTailoredResumePdf";
 import { listGeneratedResumes } from "../../../jobs/api/listGeneratedResumes";
 import { getLatestResumeRunForEditor } from "../../../jobs/api/getLatestResumeRunForEditor";
 import type { GeneratedResumeRow } from "../../../jobs/model/types";
@@ -72,16 +76,27 @@ function extractTailoredResumeFromOutput(output: unknown): TailoredResumeOutput 
 }
 
 export function EditorView() {
+  const historySkeletonRows = 5;
+  const PREVIEW_DEBOUNCE_MS = 1500;
   const [runId, setRunId] = useState("");
   const [requestId, setRequestId] = useState("");
   const [latex, setLatex] = useState(DEFAULT_LATEX);
   const [filename, setFilename] = useState("tailored-resume.tex");
   const [selectedResumeId, setSelectedResumeId] = useState("");
   const [isCompiling, setIsCompiling] = useState(false);
+  const [isPdfCompiling, setIsPdfCompiling] = useState(false);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [generatedResumes, setGeneratedResumes] = useState<GeneratedResumeRow[]>([]);
   const [statusMessage, setStatusMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [compileLog, setCompileLog] = useState("");
+  const [isEditorMode, setIsEditorMode] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [previewRenderKey, setPreviewRenderKey] = useState(0);
+  const [lastCompiledPreviewSignature, setLastCompiledPreviewSignature] = useState("");
+  const workspaceRef = useRef<HTMLDivElement | null>(null);
+  const pendingFlipRef = useRef<ReturnType<typeof captureEditorFlipState> | null>(null);
+  const previewBlobUrlRef = useRef<string | null>(null);
 
   const onSelectHistoryItem = (row: GeneratedResumeRow) => {
     setSelectedResumeId(row.id);
@@ -171,6 +186,15 @@ export function EditorView() {
     })();
   }, []);
 
+  useLayoutEffect(() => {
+    if (!pendingFlipRef.current) {
+      return;
+    }
+
+    animateEditorFlip(pendingFlipRef.current);
+    pendingFlipRef.current = null;
+  }, [isEditorMode]);
+
   const onCompileLatest = async () => {
     if (runId) {
       await compileForRun(runId, requestId || undefined);
@@ -204,39 +228,115 @@ export function EditorView() {
   };
 
   const onDownloadPdf = () => {
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "pt",
-      format: "a4",
-    });
+    void (async () => {
+      setIsPdfCompiling(true);
+      setErrorMessage("");
+      setCompileLog("");
 
-    pdf.setFont("courier", "normal");
-    pdf.setFontSize(9);
+      try {
+        const response = await invokeCompileTailoredResumePdf({
+          latex,
+          filename,
+        });
 
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 36;
-    const lineHeight = 11;
-    const maxTextWidth = pageWidth - margin * 2;
-    const maxLinesPerPage = Math.floor((pageHeight - margin * 2) / lineHeight);
-    const wrappedLines = pdf.splitTextToSize(latex || "", maxTextWidth) as string[];
+        const pdfResponse = await fetch(response.signed_url);
+        if (!pdfResponse.ok) {
+          throw new Error(`Failed to download compiled PDF (HTTP ${pdfResponse.status}).`);
+        }
 
-    if (wrappedLines.length === 0) {
-      wrappedLines.push("");
-    }
+        const pdfBlob = await pdfResponse.blob();
+        const objectUrl = URL.createObjectURL(pdfBlob);
+        const downloadName = `${(filename.replace(/\.tex$/i, "") || "tailored-resume")}.pdf`;
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = downloadName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(objectUrl);
 
-    for (let offset = 0; offset < wrappedLines.length; offset += maxLinesPerPage) {
-      if (offset > 0) {
-        pdf.addPage();
+        setStatusMessage("PDF compiled and ready to download.");
+      } catch (error) {
+        const compileError = error as CompileTailoredResumePdfError;
+        const message = compileError?.message || "Failed to compile PDF.";
+        setErrorMessage(message);
+        setStatusMessage("");
+        setCompileLog(compileError?.compileLog ?? "");
+      } finally {
+        setIsPdfCompiling(false);
       }
-      const pageLines = wrappedLines.slice(offset, offset + maxLinesPerPage);
-      pdf.text(pageLines, margin, margin, {
-        baseline: "top",
-      });
+    })();
+  };
+
+  const runPreviewCompile = async (options?: { force?: boolean }) => {
+    const currentSignature = `${filename}\n${latex}`;
+    if (!options?.force && currentSignature === lastCompiledPreviewSignature) {
+      return;
     }
 
-    const pdfFilename = filename.replace(/\.tex$/i, "") || "tailored-resume";
-    pdf.save(`${pdfFilename}.pdf`);
+    setCompileLog("");
+
+    try {
+      const response = await invokeCompileTailoredResumePdf({
+        latex,
+        filename,
+      });
+
+      const previewResponse = await fetch(response.signed_url);
+      if (!previewResponse.ok) {
+        throw new Error(`Failed to load preview PDF (HTTP ${previewResponse.status}).`);
+      }
+
+      const previewBlob = await previewResponse.blob();
+      const nextPreviewUrl = URL.createObjectURL(previewBlob);
+      if (previewBlobUrlRef.current) {
+        URL.revokeObjectURL(previewBlobUrlRef.current);
+      }
+      previewBlobUrlRef.current = nextPreviewUrl;
+      setPreviewUrl(nextPreviewUrl);
+      setPreviewRenderKey((current) => current + 1);
+      setLastCompiledPreviewSignature(currentSignature);
+      setStatusMessage("Preview ready.");
+    } catch (error) {
+      const compileError = error as CompileTailoredResumePdfError;
+      const message = compileError?.message || "Failed to compile preview.";
+      setErrorMessage(message);
+      setStatusMessage("");
+      setCompileLog(compileError?.compileLog ?? "");
+    }
+  };
+
+  useEffect(() => {
+    if (!latex.trim()) {
+      if (previewBlobUrlRef.current) {
+        URL.revokeObjectURL(previewBlobUrlRef.current);
+        previewBlobUrlRef.current = null;
+      }
+      setPreviewUrl("");
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void runPreviewCompile();
+    }, PREVIEW_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [latex, filename]);
+
+  useEffect(() => {
+    return () => {
+      if (previewBlobUrlRef.current) {
+        URL.revokeObjectURL(previewBlobUrlRef.current);
+        previewBlobUrlRef.current = null;
+      }
+    };
+  }, []);
+
+  const onToggleEditorMode = () => {
+    pendingFlipRef.current = captureEditorFlipState(workspaceRef.current);
+    setIsEditorMode((current) => !current);
   };
 
   return (
@@ -257,8 +357,16 @@ export function EditorView() {
           type="button"
           className={styles.editorButtonSecondary}
           onClick={onDownloadPdf}
+          disabled={isPdfCompiling}
         >
-          Download .pdf
+          {isPdfCompiling ? "Compiling PDF..." : "Download .pdf"}
+        </button>
+        <button
+          type="button"
+          className={styles.editorButtonSecondary}
+          onClick={onToggleEditorMode}
+        >
+          {isEditorMode ? "History" : "Editor"}
         </button>
         <button
           type="button"
@@ -273,15 +381,38 @@ export function EditorView() {
 
       {statusMessage ? <p className={styles.statusSuccess}>{statusMessage}</p> : null}
       {errorMessage ? <p className={styles.statusError}>{errorMessage}</p> : null}
+      {compileLog ? <pre className={styles.outputPanel}>{compileLog}</pre> : null}
 
-      <div className={styles.editorWorkspace}>
-        <aside className={styles.editorHistoryPanel}>
+      <div
+        ref={workspaceRef}
+        className={styles.editorWorkspace}
+      >
+        <aside
+          data-editor-flip="history"
+          className={[
+            styles.editorHistoryPanel,
+            isEditorMode ? styles.editorHistoryPanelCollapsed : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
           <div className={styles.editorHistoryHeader}>
             <p className={styles.editorHistoryTitle}>Generated History</p>
           </div>
 
           <div className={styles.editorHistoryList}>
-            {generatedResumes.length === 0 ? (
+            {isHistoryLoading && generatedResumes.length === 0 ? (
+              Array.from({ length: historySkeletonRows }).map((_, index) => (
+                <div
+                  key={`history-skeleton-${index}`}
+                  className={[styles.editorHistoryItem, styles.editorHistoryItemSkeleton].join(" ")}
+                  aria-hidden="true"
+                >
+                  <span className={[styles.editorHistorySkeletonLine, styles.editorHistorySkeletonName].join(" ")} />
+                  <span className={[styles.editorHistorySkeletonLine, styles.editorHistorySkeletonMeta].join(" ")} />
+                </div>
+              ))
+            ) : generatedResumes.length === 0 ? (
               <p className={styles.editorHistoryEmpty}>No generated resumes yet.</p>
             ) : (
               generatedResumes.map((row) => (
@@ -304,7 +435,16 @@ export function EditorView() {
           </div>
         </aside>
 
-        <div className={styles.editorFrame}>
+        <div
+          data-editor-flip="editor"
+          className={[
+            styles.editorFrame,
+            styles.editorFramePreview,
+            !isEditorMode ? styles.editorFrameCollapsed : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
           <Editor
             height="100%"
             defaultLanguage="latex"
@@ -322,6 +462,30 @@ export function EditorView() {
             theme="vs-dark"
           />
         </div>
+
+        <aside
+          data-editor-flip="preview"
+          className={[
+            styles.editorPreviewPanel,
+            styles.editorPreviewPanelOpen,
+            !isEditorMode ? styles.editorPreviewPanelHistoryMode : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          <div className={styles.editorPreviewFrame}>
+            {previewUrl ? (
+              <iframe
+                key={`${previewUrl}-${previewRenderKey}`}
+                title="Tailored resume PDF preview"
+                src={previewUrl}
+                className={styles.editorPreviewIframe}
+              />
+            ) : (
+              <div />
+            )}
+          </div>
+        </aside>
       </div>
     </section>
   );

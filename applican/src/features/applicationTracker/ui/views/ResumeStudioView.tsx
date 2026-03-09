@@ -4,12 +4,12 @@ import styles from "../applicationTrack.module.css";
 import starIcon from "../../../../assets/Star.png";
 import blackStarIcon from "../../../../assets/Black star.png";
 import arrowIcon from "../../../../assets/Arrow.png";
-import logoIcon from "../../../../assets/logo.png";
 import jobDescriptionIcon from "../../../../assets/Job Description Icon.png";
 import checkIcon from "../../../../assets/Check.png";
 import errorScreenIcon from "../../../../assets/error screen.png";
 import { useLocalStorageState } from "../../../../hooks/useLocalStorageState";
 import { useCreateResumeRun } from "../../../jobs/hooks/useCreateResumeRun";
+import LoadingScreen from "../../../../screens/loading/LoadingScreen.tsx";
 import WritingText from "../../../../effects/writing-text";
 import TypingText from "../../../../effects/typing-text";
 import ScrollSections from "../../../../effects/ScrollSections";
@@ -152,7 +152,6 @@ export function ResumeStudioView() {
   const ANALYSIS_TYPING_SPEED = 28;
   const ANALYSIS_REVEAL_GAP_MS = 420;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const progressTickerRef = useRef<number | null>(null);
   const lastTrackedResultKeyRef = useRef<string>("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [jobDescription, setJobDescription] = useLocalStorageState<string>(
@@ -178,7 +177,6 @@ export function ResumeStudioView() {
   const [isShowingGenerationErrorScreen, setIsShowingGenerationErrorScreen] = useState(false);
   const [jobDescriptionValidationError, setJobDescriptionValidationError] = useState("");
   const [resumeValidationError, setResumeValidationError] = useState("");
-  const [progressPercent, setProgressPercent] = useState(0);
   const [revealedAnalysisCount, setRevealedAnalysisCount] = useState(0);
   const { submitResumeRun, isSubmitting, errorMessage, progressMessage, createdRun } = useCreateResumeRun();
 
@@ -191,7 +189,6 @@ export function ResumeStudioView() {
     showComputedResults && hasRunOutput && !hasResult
       ? "Result was generated, but output shape is not UI-compatible yet."
       : "";
-  const progressStatusText = "Generating tailored bullet improvements... This usually takes ~10-25 seconds.";
   const generationErrorText =
     errorMessage.trim() ||
     "We failed to generate resume improvements. Press X to retry.";
@@ -240,14 +237,6 @@ export function ResumeStudioView() {
 
     setJobDescriptionValidationError(jobDescriptionErrorText);
   };
-
-  useEffect(() => {
-    return () => {
-      if (progressTickerRef.current !== null) {
-        window.clearInterval(progressTickerRef.current);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     let isActive = true;
@@ -339,27 +328,6 @@ export function ResumeStudioView() {
     };
   }, [parsedOutput?.job.title, shouldShowResults]);
 
-  const stopProgressTicker = () => {
-    if (progressTickerRef.current !== null) {
-      window.clearInterval(progressTickerRef.current);
-      progressTickerRef.current = null;
-    }
-  };
-
-  const startProgressTicker = () => {
-    stopProgressTicker();
-    progressTickerRef.current = window.setInterval(() => {
-      setProgressPercent((previous) => {
-        if (previous >= 92) {
-          return previous;
-        }
-        const remaining = 92 - previous;
-        const step = Math.max(0.25, remaining * 0.04);
-        return Math.min(previous + step, 92);
-      });
-    }, 80);
-  };
-
   const selectFile = (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
@@ -398,15 +366,11 @@ export function ResumeStudioView() {
     if (!isJobValidForSubmission || !isResumeValid) return;
 
     setIsShowingGenerationErrorScreen(false);
-    setProgressPercent(8);
     setIsShowingProgressScreen(true);
-    startProgressTicker();
 
     const result = await submitResumeRun({ file: selectedFile, jobDescription });
 
-    stopProgressTicker();
-    setProgressPercent(100);
-    await wait(350);
+    await wait(220);
     setIsShowingProgressScreen(false);
 
     if (result.ok) {
@@ -457,15 +421,7 @@ export function ResumeStudioView() {
     <div className={rootClassName}>
       {isShowingProgressScreen ? (
         <section className={styles.progressScreenContainer}>
-          <div className={styles.progressLogoContainer}>
-            <img src={logoIcon} alt="Applican logo" className={styles.progressLogoImage} />
-          </div>
-          <div className={styles.progressBarContainer} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progressPercent)}>
-            <div className={styles.progressBarFill} style={{ width: `${progressPercent}%` }} />
-          </div>
-          <div className={styles.progressStatusContainer}>
-            <p className={styles.progressStatusText}>{progressStatusText}</p>
-          </div>
+          <LoadingScreen />
         </section>
       ) : isShowingAnalysisCompleteScreen ? (
         <section className={styles.analysisCompleteScreen} role="status" aria-live="polite" aria-label="Analyzing complete">

@@ -141,6 +141,19 @@
   background: #0f0f0f;
 }
 
+.editorFramePreview {
+  flex: 1 1 auto;
+}
+
+.editorFrameCollapsed {
+  flex: 0 0 0;
+  width: 0;
+  min-width: 0;
+  border-color: transparent;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .editorWorkspace {
   width: 955px;
   flex: 1 1 auto;
@@ -159,6 +172,91 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+.editorHistoryPanelCollapsed {
+  width: 0;
+  min-width: 0;
+  padding: 0;
+  border-color: transparent;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.editorPreviewPanel {
+  flex: 0 0 0;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.editorPreviewPanelOpen {
+  flex-basis: 420px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.editorPreviewPanelHistoryMode {
+  flex: 1 1 auto;
+  min-width: 560px;
+}
+
+.editorPreviewHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border-bottom: 1px solid #242424;
+  background: #111111;
+}
+
+.editorPreviewTitle {
+  margin: 0;
+  font-size: 12px;
+  color: #bdbdbd;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.editorPreviewFrame {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  background: transparent;
+}
+
+.editorPreviewIframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+}
+
+.editorPreviewMessage {
+  margin: auto;
+  font-size: 13px;
+  color: #a1a1a1;
+  text-align: center;
+  padding: 14px;
+}
+
+.editorPreviewError {
+  margin: auto;
+  font-size: 13px;
+  color: #ff8f8f;
+  text-align: center;
+  padding: 14px;
 }
 
 .editorHistoryHeader {
@@ -213,6 +311,29 @@
 .editorHistoryItemActive {
   border-color: #4f7cff;
   background: #131a2f;
+}
+
+.editorHistoryItemSkeleton {
+  cursor: default;
+  pointer-events: none;
+}
+
+.editorHistorySkeletonLine {
+  display: block;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #1a1a1a 0%, #242424 50%, #1a1a1a 100%);
+  background-size: 200% 100%;
+  animation: trackerSkeletonPulse 1.2s ease-in-out infinite;
+}
+
+.editorHistorySkeletonName {
+  width: 88%;
+  height: 12px;
+}
+
+.editorHistorySkeletonMeta {
+  width: 62%;
+  height: 11px;
 }
 
 .editorHistoryItemName {

@@ -1,0 +1,63 @@
+<svg width="420" height="520" viewBox="0 0 420 520" fill="none" xmlns="http://www.w3.org/2000/svg">
+
+<defs>
+
+<!-- gradients -->
+<linearGradient id="gradLinePink" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0%" stop-color="#EBC7F2"/>
+<stop offset="100%" stop-color="#FF4DB8"/>
+</linearGradient>
+
+<linearGradient id="gradLineBlue" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0%" stop-color="#9DB0C9"/>
+<stop offset="100%" stop-color="#7D8BA3"/>
+</linearGradient>
+
+<linearGradient id="gradAccent" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0%" stop-color="#FFA33A"/>
+<stop offset="100%" stop-color="#F0B7D8"/>
+</linearGradient>
+
+<linearGradient id="gradCheck" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0%" stop-color="#F4A5FF"/>
+<stop offset="100%" stop-color="#FF4DB8"/>
+</linearGradient>
+
+<!-- soft shadow -->
+<filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+<feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000000" flood-opacity="0.35"/>
+</filter>
+
+</defs>
+
+<!-- document -->
+<g filter="url(#shadow)">
+
+<rect x="30" y="20" width="360" height="470" rx="28" fill="#050807" stroke="#1E2722" stroke-width="3"/>
+
+<!-- folded corner -->
+<path d="M310 20 L360 70 L310 70 Z" fill="url(#gradAccent)"/>
+
+</g>
+
+<!-- lines -->
+
+<rect x="80" y="110" width="260" height="18" rx="9" fill="url(#gradLinePink)"/>
+
+<rect x="80" y="150" width="300" height="16" rx="8" fill="url(#gradLineBlue)"/>
+<rect x="80" y="190" width="300" height="16" rx="8" fill="url(#gradLineBlue)"/>
+
+<rect x="80" y="250" width="200" height="18" rx="9" fill="url(#gradAccent)"/>
+
+<rect x="80" y="300" width="300" height="16" rx="8" fill="url(#gradLinePink)"/>
+<rect x="80" y="340" width="300" height="16" rx="8" fill="url(#gradLineBlue)"/>
+<rect x="80" y="380" width="260" height="16" rx="8" fill="url(#gradLineBlue)"/>
+
+<!-- verification badge -->
+
+<g transform="translate(300 290)">
+<circle cx="40" cy="40" r="40" fill="url(#gradCheck)"/>
+<path d="M25 40 L36 50 L58 28" stroke="#040606" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+
+</svg>

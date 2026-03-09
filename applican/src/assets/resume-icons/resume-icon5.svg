@@ -1,0 +1,57 @@
+<svg width="420" height="520" viewBox="0 0 420 520" xmlns="http://www.w3.org/2000/svg">
+
+<defs>
+
+<linearGradient id="grayCorner" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0%" stop-color="#9CA3AF"/>
+<stop offset="100%" stop-color="#6B7280"/>
+</linearGradient>
+
+<linearGradient id="graySoft" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0%" stop-color="#D1D5DB"/>
+<stop offset="100%" stop-color="#9CA3AF"/>
+</linearGradient>
+
+<filter id="shadow">
+<feDropShadow dx="0" dy="12" stdDeviation="14" flood-opacity="0.18"/>
+</filter>
+
+<style>
+.paper { fill:#F8F6EC; stroke:#E5E1CE; stroke-width:2; }
+.lineA { fill:#9CA3AF; }
+.lineB { fill:#6B7280; }
+.badge { fill:#6B7280; }
+</style>
+
+</defs>
+
+<!-- paper -->
+<g filter="url(#shadow)">
+<rect x="40" y="30" width="340" height="450" rx="26" class="paper"/>
+</g>
+
+<!-- folded corner -->
+<path d="M300 30 L340 70 L300 70 Z" fill="url(#grayCorner)"/>
+
+<!-- title -->
+<rect x="80" y="95" width="210" height="18" rx="9" fill="url(#graySoft)"/>
+
+<!-- lines -->
+<rect x="80" y="140" width="260" height="12" rx="6" class="lineA"/>
+<rect x="80" y="170" width="240" height="12" rx="6" class="lineB"/>
+<rect x="80" y="200" width="270" height="12" rx="6" class="lineA"/>
+
+<!-- subsection -->
+<rect x="80" y="250" width="160" height="14" rx="7" fill="#9CA3AF"/>
+
+<rect x="80" y="290" width="260" height="12" rx="6" class="lineA"/>
+<rect x="80" y="320" width="240" height="12" rx="6" class="lineB"/>
+<rect x="80" y="350" width="220" height="12" rx="6" class="lineA"/>
+
+<!-- badge -->
+<g transform="translate(280 270)">
+<circle cx="40" cy="40" r="36" class="badge"/>
+<path d="M24 40 L36 52 L58 28" stroke="#F8F6EC" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+
+</svg>

@@ -2,15 +2,16 @@ import type { Variants, Transition } from "framer-motion";
 
 export const dropdownSpring: Transition = {
   type: "spring",
-  stiffness: 360,
-  damping: 24,
-  mass: 0.9,
+  stiffness: 170,
+  damping: 7,
+  mass: 0.85,
+  velocity: 3,
 };
 
 export const dropdownVariants: Variants = {
   closed: {
     opacity: 0,
-    y: -20,
+    y: -36,
     scale: 0.92,
     filter: "blur(12px)",
     transformOrigin: "top right",
