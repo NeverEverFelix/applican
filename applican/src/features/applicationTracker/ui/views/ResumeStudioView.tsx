@@ -13,6 +13,7 @@ import LoadingScreen from "../../../../screens/loading/LoadingScreen.tsx";
 import WritingText from "../../../../effects/writing-text";
 import TypingText from "../../../../effects/typing-text";
 import ScrollSections from "../../../../effects/ScrollSections";
+import { CardStack } from "../../../../components/cardstack/cardstack";
 
 type ResumeStudioOutput = {
   job: {
@@ -178,7 +179,7 @@ export function ResumeStudioView() {
   const [jobDescriptionValidationError, setJobDescriptionValidationError] = useState("");
   const [resumeValidationError, setResumeValidationError] = useState("");
   const [revealedAnalysisCount, setRevealedAnalysisCount] = useState(0);
-  const { submitResumeRun, isSubmitting, errorMessage, progressMessage, createdRun } = useCreateResumeRun();
+  const { submitResumeRun, isSubmitting, errorMessage, progressMessage, progressPercent, createdRun } = useCreateResumeRun();
 
   const currentRunOutput = createdRun?.row.output ?? persistedRunOutput;
   const parsedOutput = useMemo(() => toResumeStudioOutput(currentRunOutput), [currentRunOutput]);
@@ -413,7 +414,7 @@ export function ResumeStudioView() {
 
   const rootClassName =
     shouldShowResults || isShowingProgressScreen || isShowingAnalysisCompleteScreen || isShowingGenerationErrorScreen
-      ? styles.resultsContent
+      ? [styles.resultsContent, isShowingProgressScreen ? styles.resultsContentLoading : ""].filter(Boolean).join(" ")
       : styles.content;
   const useScrollSectionsFlow = true;
 
@@ -421,7 +422,7 @@ export function ResumeStudioView() {
     <div className={rootClassName}>
       {isShowingProgressScreen ? (
         <section className={styles.progressScreenContainer}>
-          <LoadingScreen />
+          <LoadingScreen backendProgress={progressPercent} />
         </section>
       ) : isShowingAnalysisCompleteScreen ? (
         <section className={styles.analysisCompleteScreen} role="status" aria-live="polite" aria-label="Analyzing complete">
@@ -618,23 +619,7 @@ export function ResumeStudioView() {
                 content: (
                   <div className={styles.resumeOptimizationsContainer}>
                     <h3 className={styles.resumeOptimizationsTitle}>Resume Optimizations</h3>
-                    {parsedOutput?.optimizations.map((optimization, optimizationIndex) => (
-                      <section key={`${optimization.experience_title}-${optimizationIndex}`} className={styles.optimizationGroup}>
-                        <h4 className={styles.optimizationExperienceTitle}>{optimization.experience_title}</h4>
-                        {optimization.bullets.map((bullet, index) => (
-                          <article key={`${optimization.experience_title}-${index}`} className={styles.optimizationBulletCard}>
-                            {bullet.original ? (
-                              <p className={styles.optimizationOriginalLine}>
-                                <span className={styles.optimizationActionTag}>{bullet.action.toUpperCase()}</span>
-                                {bullet.original}
-                              </p>
-                            ) : null}
-                            <p className={styles.optimizationRewrittenLine}>{bullet.rewritten}</p>
-                            {bullet.reason ? <p className={styles.optimizationReasonLine}>{bullet.reason}</p> : null}
-                          </article>
-                        ))}
-                      </section>
-                    ))}
+                    <CardStack optimizations={parsedOutput?.optimizations ?? []} />
                   </div>
                 ),
               },
@@ -755,23 +740,7 @@ export function ResumeStudioView() {
               .join(" ")}
           >
             <h3 className={styles.resumeOptimizationsTitle}>Resume Optimizations</h3>
-            {parsedOutput?.optimizations.map((optimization, optimizationIndex) => (
-              <section key={`${optimization.experience_title}-${optimizationIndex}`} className={styles.optimizationGroup}>
-                <h4 className={styles.optimizationExperienceTitle}>{optimization.experience_title}</h4>
-                {optimization.bullets.map((bullet, index) => (
-                  <article key={`${optimization.experience_title}-${index}`} className={styles.optimizationBulletCard}>
-                    {bullet.original ? (
-                      <p className={styles.optimizationOriginalLine}>
-                        <span className={styles.optimizationActionTag}>{bullet.action.toUpperCase()}</span>
-                        {bullet.original}
-                      </p>
-                    ) : null}
-                    <p className={styles.optimizationRewrittenLine}>{bullet.rewritten}</p>
-                    {bullet.reason ? <p className={styles.optimizationReasonLine}>{bullet.reason}</p> : null}
-                  </article>
-                ))}
-              </section>
-            ))}
+            <CardStack optimizations={parsedOutput?.optimizations ?? []} />
           </div>
         </section>
       )}

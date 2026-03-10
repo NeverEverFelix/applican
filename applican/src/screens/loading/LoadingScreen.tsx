@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import applicanLogo from "../../assets/applican.svg";
+import LoadingMorph from "../../components/LoadingBar/LoadingMorph.tsx";
 import { animateWords } from "../../effects/splittext";
+import { gsap } from "gsap";
 import styles from "./LoadingScreen.module.css";
 import {
   buildResumeProjectile,
@@ -13,13 +15,20 @@ import {
 
 const SPAWN_INTERVAL_MS = 240;
 const MAX_PROJECTILES = 18;
+const MORPH_REVEAL_DELAY_MS = 1400;
 
-export default function LoadingScreen() {
+type LoadingScreenProps = {
+  backendProgress?: number;
+};
+
+export default function LoadingScreen({ backendProgress = 0 }: LoadingScreenProps) {
   const [projectiles, setProjectiles] = useState<ResumeProjectile[]>([]);
   const [showIntroMessage, setShowIntroMessage] = useState(true);
+  const [showMorph, setShowMorph] = useState(false);
   const [quoteIndex, setQuoteIndex] = useState(0);
   const nextId = useRef(1);
   const quoteRef = useRef<HTMLParagraphElement | null>(null);
+  const morphRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -63,6 +72,35 @@ export default function LoadingScreen() {
       tween?.kill();
     };
   }, [showIntroMessage, quoteIndex]);
+
+  useEffect(() => {
+    if (showIntroMessage) {
+      setShowMorph(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setShowMorph(true);
+    }, MORPH_REVEAL_DELAY_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [showIntroMessage]);
+
+  useEffect(() => {
+    if (!showMorph || !morphRef.current) {
+      return;
+    }
+
+    const tween = gsap.fromTo(
+      morphRef.current,
+      { opacity: 0, y: 16 },
+      { opacity: 1, y: 0, duration: 0.95, ease: "power2.out" },
+    );
+
+    return () => {
+      tween.kill();
+    };
+  }, [showMorph]);
 
   function handleProjectileDone(id: number) {
     setProjectiles((prev) => prev.filter((projectile) => projectile.id !== id));
@@ -129,6 +167,17 @@ export default function LoadingScreen() {
             ))}
           </p>
         </div>
+
+        <div
+          ref={morphRef}
+          className={[
+            styles.morphSlot,
+            showMorph ? styles.morphSlotVisible : styles.morphSlotHidden,
+          ].join(" ")}
+        >
+          <LoadingMorph progress={backendProgress} />
+        </div>
+
       </div>
     </section>
   );

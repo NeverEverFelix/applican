@@ -1,0 +1,69 @@
+.stack {
+  width: 100%;
+  max-width: 1225px;
+  min-height: 850px;
+  position: relative;
+  cursor: pointer;
+}
+
+.card {
+  width: min(100%, 1225px);
+  position: absolute;
+  inset: 0 auto auto 0;
+  pointer-events: none;
+}
+
+.card:nth-child(1) {
+  left: 0;
+  top: 0;
+  transform: scale(1.25);
+  opacity: 1;
+  z-index: 6;
+}
+
+.card:nth-child(2) {
+  left: 42px;
+  top: 0;
+  transform: scale(1.225);
+  opacity: 0.86;
+  z-index: 5;
+}
+
+.card:nth-child(3) {
+  left: 84px;
+  top: 0;
+  transform: scale(1.2);
+  opacity: 0.72;
+  z-index: 4;
+}
+
+.card:nth-child(4) {
+  left: 126px;
+  top: 0;
+  transform: scale(1.175);
+  opacity: 0.58;
+  z-index: 3;
+}
+
+.card:nth-child(5) {
+  left: 168px;
+  top: 0;
+  transform: scale(1.15);
+  opacity: 0.44;
+  z-index: 2;
+}
+
+.card:nth-child(n + 6) {
+  opacity: 0;
+  z-index: 1;
+}
+
+.cardSvg {
+  width: 100%;
+}
+
+.cardSvg :global(svg) {
+  width: 100%;
+  height: auto;
+  display: block;
+}

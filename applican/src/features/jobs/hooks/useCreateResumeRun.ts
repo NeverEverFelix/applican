@@ -10,6 +10,7 @@ type UseCreateResumeRunResult = {
   isSubmitting: boolean;
   errorMessage: string;
   progressMessage: string;
+  progressPercent: number;
   createdRun: CreateResumeRunResult | null;
   submitResumeRun: (params: { file: File | null; jobDescription: string }) => Promise<SubmitResumeRunResult>;
 };
@@ -67,6 +68,7 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [progressMessage, setProgressMessage] = useState("");
+  const [progressPercent, setProgressPercent] = useState(0);
   const [createdRun, setCreatedRun] = useState<CreateResumeRunResult | null>(null);
 
   const submitResumeRun = useCallback(
@@ -74,10 +76,12 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
       setIsSubmitting(true);
       setErrorMessage("");
       setProgressMessage("Uploading resume...");
+      setProgressPercent(8);
       setCreatedRun(null);
 
       try {
         const created = await createResumeRun({ file, jobDescription });
+        setProgressPercent(28);
         captureEvent("run_created", {
           run_id: created.row.id,
           request_id: created.requestId,
@@ -86,12 +90,14 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
         });
 
         setProgressMessage("Waiting for extraction service...");
+        setProgressPercent(42);
         captureEvent("extract_started", {
           run_id: created.row.id,
           request_id: created.requestId,
         });
         try {
           await waitForRunExtraction({ runId: created.row.id });
+          setProgressPercent(68);
           captureEvent("extract_succeeded", {
             run_id: created.row.id,
             request_id: created.requestId,
@@ -106,6 +112,7 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
         }
 
         setProgressMessage("Generating bullets...");
+        setProgressPercent(78);
         captureEvent("rag_started", {
           run_id: created.row.id,
           request_id: created.requestId,
@@ -132,6 +139,7 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
           requestId: created.requestId,
           row: generated.run,
         };
+        setProgressPercent(100);
         setCreatedRun(nextRun);
         return { ok: true as const, createdRun: nextRun };
       } catch (error) {
@@ -153,6 +161,7 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
     isSubmitting,
     errorMessage,
     progressMessage,
+    progressPercent,
     createdRun,
     submitResumeRun,
   };

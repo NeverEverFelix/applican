@@ -103,6 +103,25 @@
   transform: translate(-50%, -50%) translateY(8px);
 }
 
+.morphSlot {
+  width: 100%;
+  min-height: 72px;
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+  transform: translateY(16px);
+  opacity: 0;
+}
+
+.morphSlotHidden {
+  opacity: 0;
+}
+
+.morphSlotVisible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 @keyframes launch {
   0% {
     transform: translate(-50%, -50%) translate(0, 0) rotate(0deg) scale(var(--scale, 0.2));
@@ -132,5 +151,9 @@
 
   .projectile {
     width: 132px;
+  }
+
+  .morphSlot {
+    min-height: 58px;
   }
 }

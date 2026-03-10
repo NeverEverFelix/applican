@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Editor, { type BeforeMount } from "@monaco-editor/react";
 import styles from "../applicationTrack.module.css";
 import { animateEditorFlip, captureEditorFlipState } from "../../../../effects/flip";
+import { applyBounceEffect } from "../../../../effects/bounce";
 import { invokeGenerateTailoredResume } from "../../../jobs/api/invokeGenerateTailoredResume";
 import {
   invokeCompileTailoredResumePdf,
@@ -10,6 +11,7 @@ import {
 import { listGeneratedResumes } from "../../../jobs/api/listGeneratedResumes";
 import { getLatestResumeRunForEditor } from "../../../jobs/api/getLatestResumeRunForEditor";
 import type { GeneratedResumeRow } from "../../../jobs/model/types";
+import resumeIcon3 from "../../../../assets/resume-icons/resume-icon3.svg";
 
 const DEFAULT_LATEX = [
   "% Tailored resume output will appear here after compile.",
@@ -92,11 +94,14 @@ export function EditorView() {
   const [compileLog, setCompileLog] = useState("");
   const [isEditorMode, setIsEditorMode] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [previewRenderKey, setPreviewRenderKey] = useState(0);
   const [lastCompiledPreviewSignature, setLastCompiledPreviewSignature] = useState("");
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const pendingFlipRef = useRef<ReturnType<typeof captureEditorFlipState> | null>(null);
-  const previewBlobUrlRef = useRef<string | null>(null);
+  const latestPreviewRequestRef = useRef(0);
+  const previewLoaderIconRef = useRef<HTMLDivElement | null>(null);
+  const previewLoaderShadowRef = useRef<HTMLDivElement | null>(null);
 
   const onSelectHistoryItem = (row: GeneratedResumeRow) => {
     setSelectedResumeId(row.id);
@@ -195,6 +200,18 @@ export function EditorView() {
     pendingFlipRef.current = null;
   }, [isEditorMode]);
 
+  useEffect(() => {
+    if (!isPreviewLoading || !previewLoaderIconRef.current) {
+      return;
+    }
+
+    return applyBounceEffect(previewLoaderIconRef.current, {
+      shadowTarget: previewLoaderShadowRef.current,
+      duration: 1.2,
+      travelPercent: 82,
+    });
+  }, [isPreviewLoading]);
+
   const onCompileLatest = async () => {
     if (runId) {
       await compileForRun(runId, requestId || undefined);
@@ -275,6 +292,9 @@ export function EditorView() {
     }
 
     setCompileLog("");
+    const requestToken = latestPreviewRequestRef.current + 1;
+    latestPreviewRequestRef.current = requestToken;
+    setIsPreviewLoading(true);
 
     try {
       const response = await invokeCompileTailoredResumePdf({
@@ -282,37 +302,31 @@ export function EditorView() {
         filename,
       });
 
-      const previewResponse = await fetch(response.signed_url);
-      if (!previewResponse.ok) {
-        throw new Error(`Failed to load preview PDF (HTTP ${previewResponse.status}).`);
+      if (latestPreviewRequestRef.current !== requestToken) {
+        return;
       }
 
-      const previewBlob = await previewResponse.blob();
-      const nextPreviewUrl = URL.createObjectURL(previewBlob);
-      if (previewBlobUrlRef.current) {
-        URL.revokeObjectURL(previewBlobUrlRef.current);
-      }
-      previewBlobUrlRef.current = nextPreviewUrl;
-      setPreviewUrl(nextPreviewUrl);
+      setPreviewUrl(response.signed_url);
       setPreviewRenderKey((current) => current + 1);
       setLastCompiledPreviewSignature(currentSignature);
       setStatusMessage("Preview ready.");
     } catch (error) {
+      if (latestPreviewRequestRef.current !== requestToken) {
+        return;
+      }
       const compileError = error as CompileTailoredResumePdfError;
       const message = compileError?.message || "Failed to compile preview.";
       setErrorMessage(message);
       setStatusMessage("");
       setCompileLog(compileError?.compileLog ?? "");
+      setIsPreviewLoading(false);
     }
   };
 
   useEffect(() => {
     if (!latex.trim()) {
-      if (previewBlobUrlRef.current) {
-        URL.revokeObjectURL(previewBlobUrlRef.current);
-        previewBlobUrlRef.current = null;
-      }
       setPreviewUrl("");
+      setIsPreviewLoading(false);
       return;
     }
 
@@ -324,15 +338,6 @@ export function EditorView() {
       window.clearTimeout(timer);
     };
   }, [latex, filename]);
-
-  useEffect(() => {
-    return () => {
-      if (previewBlobUrlRef.current) {
-        URL.revokeObjectURL(previewBlobUrlRef.current);
-        previewBlobUrlRef.current = null;
-      }
-    };
-  }, []);
 
   const onToggleEditorMode = () => {
     pendingFlipRef.current = captureEditorFlipState(workspaceRef.current);
@@ -480,10 +485,36 @@ export function EditorView() {
                 title="Tailored resume PDF preview"
                 src={previewUrl}
                 className={styles.editorPreviewIframe}
+                onLoad={() => {
+                  setIsPreviewLoading(false);
+                }}
+                onError={() => {
+                  setIsPreviewLoading(false);
+                }}
               />
             ) : (
               <div />
             )}
+            {isPreviewLoading ? (
+              <div className={styles.editorPreviewLoading}>
+                <div
+                  ref={previewLoaderIconRef}
+                  className={styles.editorPreviewLoadingIconWrap}
+                >
+                  <img
+                    src={resumeIcon3}
+                    alt=""
+                    aria-hidden="true"
+                    className={styles.editorPreviewLoadingIcon}
+                  />
+                </div>
+                <div
+                  ref={previewLoaderShadowRef}
+                  className={styles.editorPreviewLoadingShadow}
+                  aria-hidden="true"
+                />
+              </div>
+            ) : null}
           </div>
         </aside>
       </div>

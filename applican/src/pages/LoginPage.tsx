@@ -89,7 +89,7 @@ export default function LoginPage() {
       />
 
       <div className={styles.assetContainer}>
-        <img src={pageImage} alt="Page visual" />
+        <img src={pageImage} alt="Page visual" loading="lazy" decoding="async" />
       </div>
     </div>
   );

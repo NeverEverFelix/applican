@@ -1,5 +1,7 @@
 // src/router.tsx
 import * as Sentry from "@sentry/react";
+import { Suspense, lazy } from "react";
+import type { ReactNode } from "react";
 import {
   createBrowserRouter,
   Navigate,
@@ -11,14 +13,19 @@ import RequireAuth from "./features/auth/RequireAuth";
 import AuthLoadingScreen from "./features/auth/AuthLoadingScreen";
 import RedirectIfAuthenticated from "./features/auth/RedirectIfAuthenticated";
 import { useAuthGate } from "./features/auth/useAuthGate";
-import LoginPage from "./pages/LoginPage";
-import SignupPage from "./pages/SIgnupPage";
-import VerifyEmailPage from "./pages/VerifyEmailPage";
-import HomePage from "./pages/HomePage";
-import NotFoundPage from "./pages/NotFoundPage";
+
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const SignupPage = lazy(() => import("./pages/SIgnupPage"));
+const VerifyEmailPage = lazy(() => import("./pages/VerifyEmailPage"));
+const HomePage = lazy(() => import("./pages/HomePage"));
+const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
 function AppLayout() {
   return <Outlet />;
+}
+
+function withSuspense(page: ReactNode) {
+  return <Suspense fallback={<AuthLoadingScreen />}>{page}</Suspense>;
 }
 
 function RootRedirect() {
@@ -42,7 +49,7 @@ const router = sentryCreateBrowserRouter([
     path: "/login",
     element: (
       <RedirectIfAuthenticated>
-        <LoginPage />
+        {withSuspense(<LoginPage />)}
       </RedirectIfAuthenticated>
     ),
   },
@@ -50,7 +57,7 @@ const router = sentryCreateBrowserRouter([
     path: "/signup",
     element: (
       <RedirectIfAuthenticated>
-        <SignupPage />
+        {withSuspense(<SignupPage />)}
       </RedirectIfAuthenticated>
     ),
   },
@@ -58,7 +65,7 @@ const router = sentryCreateBrowserRouter([
     path: "/verify-email",
     element: (
       <RequireAuth requireVerifiedEmail={false}>
-        <VerifyEmailPage />
+        {withSuspense(<VerifyEmailPage />)}
       </RequireAuth>
     ),
   },
@@ -72,13 +79,13 @@ const router = sentryCreateBrowserRouter([
       </RequireAuth>
     ),
     children: [
-      { index: true, element: <HomePage /> },
+      { index: true, element: withSuspense(<HomePage />) },
       // future: { path: "ask", element: <AskPage /> },
     ],
   },
 
   // Catch-all
-  { path: "*", element: <NotFoundPage /> },
+  { path: "*", element: withSuspense(<NotFoundPage />) },
 ]);
 
 export default function AppRouter() {

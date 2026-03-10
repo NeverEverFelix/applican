@@ -1,0 +1,22 @@
+<svg width="220" height="320" viewBox="0 0 220 320" xmlns="http://www.w3.org/2000/svg">
+
+  <defs>
+    <linearGradient id="grad" x1="0" y1="0" x2="220" y2="320" gradientUnits="userSpaceOnUse">
+      <stop offset="0.2" stop-color="#0068F4"/>
+      <stop offset="0.7" stop-color="#DCD9FB"/>
+    </linearGradient>
+  </defs>
+
+  <text
+    x="110"
+    y="250"
+    text-anchor="middle"
+    font-family="Inter, Helvetica, Arial, sans-serif"
+    font-size="280"
+    font-weight="800"
+    letter-spacing="-10"
+    fill="url(#grad)">
+    1
+  </text>
+
+</svg>
