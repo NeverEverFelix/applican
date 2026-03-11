@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Editor, { type BeforeMount } from "@monaco-editor/react";
+import gsap from "gsap";
 import styles from "../applicationTrack.module.css";
 import { animateEditorFlip, captureEditorFlipState } from "../../../../effects/flip";
 import { applyBounceEffect } from "../../../../effects/bounce";
@@ -12,6 +13,14 @@ import { listGeneratedResumes } from "../../../jobs/api/listGeneratedResumes";
 import { getLatestResumeRunForEditor } from "../../../jobs/api/getLatestResumeRunForEditor";
 import type { GeneratedResumeRow } from "../../../jobs/model/types";
 import resumeIcon3 from "../../../../assets/resume-icons/resume-icon3.svg";
+import texFileIcon from "../../../../assets/.tex.svg";
+import pdfFileIcon from "../../../../assets/.pdf.svg";
+import downloadIcon from "../../../../assets/downloadIcon.svg";
+import editorModeIcon from "../../../../assets/editor.svg";
+import historyModeIcon from "../../../../assets/history.svg";
+import refreshHistoryIcon from "../../../../assets/refresh-history.svg";
+import previewErrorScreenIcon from "../../../../assets/preview-error-screen.svg";
+import previewFailedTextIcon from "../../../../assets/preview-failed-text.svg";
 
 const DEFAULT_LATEX = [
   "% Tailored resume output will appear here after compile.",
@@ -77,49 +86,85 @@ function extractTailoredResumeFromOutput(output: unknown): TailoredResumeOutput 
   };
 }
 
+function toPreviewPdfUrl(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  if (trimmed.includes("#")) {
+    return `${trimmed}&view=FitH&zoom=page-width`;
+  }
+
+  return `${trimmed}#view=FitH&zoom=page-width`;
+}
+
 export function EditorView() {
   const historySkeletonRows = 5;
   const PREVIEW_DEBOUNCE_MS = 1500;
-  const [runId, setRunId] = useState("");
-  const [requestId, setRequestId] = useState("");
   const [latex, setLatex] = useState(DEFAULT_LATEX);
   const [filename, setFilename] = useState("tailored-resume.tex");
   const [selectedResumeId, setSelectedResumeId] = useState("");
-  const [isCompiling, setIsCompiling] = useState(false);
   const [isPdfCompiling, setIsPdfCompiling] = useState(false);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [isHistoryRefreshAnimating, setIsHistoryRefreshAnimating] = useState(false);
   const [generatedResumes, setGeneratedResumes] = useState<GeneratedResumeRow[]>([]);
-  const [statusMessage, setStatusMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [compileLog, setCompileLog] = useState("");
   const [isEditorMode, setIsEditorMode] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [isPreviewFailed, setIsPreviewFailed] = useState(false);
   const [previewRenderKey, setPreviewRenderKey] = useState(0);
   const [lastCompiledPreviewSignature, setLastCompiledPreviewSignature] = useState("");
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const pendingFlipRef = useRef<ReturnType<typeof captureEditorFlipState> | null>(null);
   const latestPreviewRequestRef = useRef(0);
+  const previewSelectionTransitionRef = useRef(0);
+  const previewDocumentRef = useRef<HTMLDivElement | null>(null);
   const previewLoaderIconRef = useRef<HTMLDivElement | null>(null);
   const previewLoaderShadowRef = useRef<HTMLDivElement | null>(null);
 
-  const onSelectHistoryItem = (row: GeneratedResumeRow) => {
+  const onSelectHistoryItem = async (row: GeneratedResumeRow) => {
+    const transitionToken = previewSelectionTransitionRef.current + 1;
+    previewSelectionTransitionRef.current = transitionToken;
+
+    if (previewDocumentRef.current && previewUrl) {
+      await new Promise<void>((resolve) => {
+        gsap.killTweensOf(previewDocumentRef.current);
+        gsap.to(previewDocumentRef.current, {
+          opacity: 0,
+          duration: 0.28,
+          ease: "power2.out",
+          onComplete: resolve,
+        });
+      });
+    }
+
+    if (previewSelectionTransitionRef.current !== transitionToken) {
+      return;
+    }
+
+    setPreviewUrl("");
+    setIsPreviewLoading(true);
+    setIsPreviewFailed(false);
+    setLastCompiledPreviewSignature("");
     setSelectedResumeId(row.id);
-    setRunId(row.run_id);
-    setRequestId(row.request_id ?? "");
     setFilename(row.filename);
     setLatex(row.latex);
-    setStatusMessage(`Loaded ${row.filename}.`);
     setErrorMessage("");
   };
 
-  const loadHistory = async (autoSelectFirst = false) => {
+  const loadHistory = async (autoSelectFirst = false, showRefreshAnimation = false) => {
     setIsHistoryLoading(true);
+    if (showRefreshAnimation) {
+      setIsHistoryRefreshAnimating(true);
+    }
     try {
       const rows = await listGeneratedResumes(30);
       setGeneratedResumes(rows);
       if (autoSelectFirst && rows.length > 0) {
-        onSelectHistoryItem(rows[0]);
+        await onSelectHistoryItem(rows[0]);
       }
       return rows;
     } catch (error) {
@@ -128,13 +173,12 @@ export function EditorView() {
       return [];
     } finally {
       setIsHistoryLoading(false);
+      setIsHistoryRefreshAnimating(false);
     }
   };
 
   const compileForRun = async (targetRunId: string, targetRequestId?: string) => {
-    setIsCompiling(true);
     setErrorMessage("");
-    setStatusMessage("");
 
     try {
       const response = await invokeGenerateTailoredResume({
@@ -142,18 +186,13 @@ export function EditorView() {
         requestId: targetRequestId || undefined,
       });
 
-      setRunId(targetRunId);
-      setRequestId(targetRequestId ?? "");
       setLatex(response.tailored_resume.latex);
       setFilename(response.tailored_resume.filename || "tailored-resume.tex");
       setSelectedResumeId(response.tailored_resume.id ?? "");
-      setStatusMessage("LaTeX compiled from your latest analysis.");
       await loadHistory(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to compile LaTeX.";
       setErrorMessage(message);
-    } finally {
-      setIsCompiling(false);
     }
   };
 
@@ -167,19 +206,14 @@ export function EditorView() {
       try {
         const latestRun = await getLatestResumeRunForEditor();
         if (!latestRun) {
-          setStatusMessage("No completed resume analyses yet.");
           return;
         }
-
-        setRunId(latestRun.id);
-        setRequestId(latestRun.request_id);
 
         const existingTailored = extractTailoredResumeFromOutput(latestRun.output);
         if (existingTailored?.latex) {
           setLatex(existingTailored.latex);
           setFilename(existingTailored.filename || "tailored-resume.tex");
           setSelectedResumeId(existingTailored.id ?? "");
-          setStatusMessage("Loaded latest generated resume.");
           return;
         }
 
@@ -211,26 +245,6 @@ export function EditorView() {
       travelPercent: 82,
     });
   }, [isPreviewLoading]);
-
-  const onCompileLatest = async () => {
-    if (runId) {
-      await compileForRun(runId, requestId || undefined);
-      return;
-    }
-
-    try {
-      const latestRun = await getLatestResumeRunForEditor();
-      if (!latestRun) {
-        setErrorMessage("No completed resume analyses found to compile.");
-        return;
-      }
-
-      await compileForRun(latestRun.id, latestRun.request_id);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to find latest run.";
-      setErrorMessage(message);
-    }
-  };
 
   const onDownloadTex = () => {
     const blob = new Blob([latex], { type: "application/x-tex" });
@@ -271,13 +285,10 @@ export function EditorView() {
         link.click();
         link.remove();
         URL.revokeObjectURL(objectUrl);
-
-        setStatusMessage("PDF compiled and ready to download.");
       } catch (error) {
         const compileError = error as CompileTailoredResumePdfError;
         const message = compileError?.message || "Failed to compile PDF.";
         setErrorMessage(message);
-        setStatusMessage("");
         setCompileLog(compileError?.compileLog ?? "");
       } finally {
         setIsPdfCompiling(false);
@@ -295,6 +306,7 @@ export function EditorView() {
     const requestToken = latestPreviewRequestRef.current + 1;
     latestPreviewRequestRef.current = requestToken;
     setIsPreviewLoading(true);
+    setIsPreviewFailed(false);
 
     try {
       const response = await invokeCompileTailoredResumePdf({
@@ -309,7 +321,7 @@ export function EditorView() {
       setPreviewUrl(response.signed_url);
       setPreviewRenderKey((current) => current + 1);
       setLastCompiledPreviewSignature(currentSignature);
-      setStatusMessage("Preview ready.");
+      setIsPreviewFailed(false);
     } catch (error) {
       if (latestPreviewRequestRef.current !== requestToken) {
         return;
@@ -317,8 +329,9 @@ export function EditorView() {
       const compileError = error as CompileTailoredResumePdfError;
       const message = compileError?.message || "Failed to compile preview.";
       setErrorMessage(message);
-      setStatusMessage("");
       setCompileLog(compileError?.compileLog ?? "");
+      setPreviewUrl("");
+      setIsPreviewFailed(true);
       setIsPreviewLoading(false);
     }
   };
@@ -327,6 +340,7 @@ export function EditorView() {
     if (!latex.trim()) {
       setPreviewUrl("");
       setIsPreviewLoading(false);
+      setIsPreviewFailed(false);
       return;
     }
 
@@ -344,47 +358,59 @@ export function EditorView() {
     setIsEditorMode((current) => !current);
   };
 
+  const shouldShowHistorySkeleton = isHistoryLoading && (generatedResumes.length === 0 || isHistoryRefreshAnimating);
+
   return (
     <section className={styles.editorView}>
       <div className={styles.editorToolbar}>
+        <div className={styles.editorDownloadActions} aria-label="Download resume files">
+          <div className={styles.editorDownloadAction}>
+            <img src={texFileIcon} alt=".tex" className={styles.editorDownloadFileTypeIcon} />
+            <button
+              type="button"
+              className={styles.editorDownloadIconButton}
+              onClick={onDownloadTex}
+              aria-label="Download .tex file"
+            >
+              <img src={downloadIcon} alt="" aria-hidden="true" className={styles.editorDownloadIcon} />
+            </button>
+          </div>
+          <div className={styles.editorDownloadAction}>
+            <img src={pdfFileIcon} alt=".pdf" className={styles.editorDownloadFileTypeIcon} />
+            <button
+              type="button"
+              className={styles.editorDownloadIconButton}
+              onClick={onDownloadPdf}
+              disabled={isPdfCompiling}
+              aria-label={isPdfCompiling ? "Compiling PDF" : "Download .pdf file"}
+            >
+              <img src={downloadIcon} alt="" aria-hidden="true" className={styles.editorDownloadIcon} />
+            </button>
+          </div>
+        </div>
         <button
           type="button"
-          className={styles.editorButton}
-          onClick={() => void onCompileLatest()}
-          disabled={isCompiling}
-        >
-          {isCompiling ? "Compiling..." : "Compile Latest Resume"}
-        </button>
-        <button type="button" className={styles.editorButtonSecondary} onClick={onDownloadTex}>
-          Download .tex
-        </button>
-        <button
-          type="button"
-          className={styles.editorButtonSecondary}
-          onClick={onDownloadPdf}
-          disabled={isPdfCompiling}
-        >
-          {isPdfCompiling ? "Compiling PDF..." : "Download .pdf"}
-        </button>
-        <button
-          type="button"
-          className={styles.editorButtonSecondary}
+          className={styles.editorModeToggleButton}
           onClick={onToggleEditorMode}
+          aria-label={isEditorMode ? "Switch to history view" : "Switch to editor view"}
         >
-          {isEditorMode ? "History" : "Editor"}
+          <img
+            src={isEditorMode ? historyModeIcon : editorModeIcon}
+            alt={isEditorMode ? "History" : "Editor"}
+            className={styles.editorModeToggleIcon}
+          />
         </button>
         <button
           type="button"
-          className={styles.editorButtonSecondary}
-          onClick={() => void loadHistory(false)}
+          className={styles.editorModeToggleButton}
+          onClick={() => void loadHistory(false, true)}
           disabled={isHistoryLoading}
+          aria-label={isHistoryLoading ? "Refreshing history" : "Refresh history"}
         >
-          {isHistoryLoading ? "Refreshing..." : "Refresh History"}
+          <img src={refreshHistoryIcon} alt="Refresh History" className={styles.editorModeToggleIcon} />
         </button>
-        {runId ? <p className={styles.editorMeta}>Run: {runId.slice(0, 8)}...</p> : null}
       </div>
 
-      {statusMessage ? <p className={styles.statusSuccess}>{statusMessage}</p> : null}
       {errorMessage ? <p className={styles.statusError}>{errorMessage}</p> : null}
       {compileLog ? <pre className={styles.outputPanel}>{compileLog}</pre> : null}
 
@@ -406,7 +432,7 @@ export function EditorView() {
           </div>
 
           <div className={styles.editorHistoryList}>
-            {isHistoryLoading && generatedResumes.length === 0 ? (
+            {shouldShowHistorySkeleton ? (
               Array.from({ length: historySkeletonRows }).map((_, index) => (
                 <div
                   key={`history-skeleton-${index}`}
@@ -430,7 +456,7 @@ export function EditorView() {
                   ]
                     .filter(Boolean)
                     .join(" ")}
-                  onClick={() => onSelectHistoryItem(row)}
+                  onClick={() => void onSelectHistoryItem(row)}
                 >
                   <span className={styles.editorHistoryItemName}>{row.filename}</span>
                   <span className={styles.editorHistoryItemMeta}>{new Date(row.created_at).toLocaleString()}</span>
@@ -445,6 +471,7 @@ export function EditorView() {
           className={[
             styles.editorFrame,
             styles.editorFramePreview,
+            isEditorMode ? styles.editorFrameSplit : "",
             !isEditorMode ? styles.editorFrameCollapsed : "",
           ]
             .filter(Boolean)
@@ -473,28 +500,54 @@ export function EditorView() {
           className={[
             styles.editorPreviewPanel,
             styles.editorPreviewPanelOpen,
-            !isEditorMode ? styles.editorPreviewPanelHistoryMode : "",
+            isEditorMode ? styles.editorPreviewPanelSplit : styles.editorPreviewPanelHistoryMode,
           ]
             .filter(Boolean)
             .join(" ")}
         >
           <div className={styles.editorPreviewFrame}>
             {previewUrl ? (
-              <iframe
-                key={`${previewUrl}-${previewRenderKey}`}
-                title="Tailored resume PDF preview"
-                src={previewUrl}
-                className={styles.editorPreviewIframe}
-                onLoad={() => {
-                  setIsPreviewLoading(false);
-                }}
-                onError={() => {
-                  setIsPreviewLoading(false);
-                }}
-              />
+              <div ref={previewDocumentRef} className={styles.editorPreviewDocument}>
+                <iframe
+                  key={`${toPreviewPdfUrl(previewUrl)}-${previewRenderKey}`}
+                  title="Tailored resume PDF preview"
+                  src={toPreviewPdfUrl(previewUrl)}
+                  className={styles.editorPreviewIframe}
+                  onLoad={() => {
+                    if (previewDocumentRef.current) {
+                      gsap.killTweensOf(previewDocumentRef.current);
+                      gsap.fromTo(
+                        previewDocumentRef.current,
+                        { opacity: 0 },
+                        { opacity: 1, duration: 0.32, ease: "power2.in" },
+                      );
+                    }
+                    setIsPreviewLoading(false);
+                  }}
+                  onError={() => {
+                    setPreviewUrl("");
+                    setIsPreviewFailed(true);
+                    setIsPreviewLoading(false);
+                  }}
+                />
+              </div>
             ) : (
               <div />
             )}
+            {isPreviewFailed && !isPreviewLoading ? (
+              <div className={styles.editorPreviewFailure}>
+                <img
+                  src={previewErrorScreenIcon}
+                  alt="Preview failed"
+                  className={styles.editorPreviewFailureGraphic}
+                />
+                <img
+                  src={previewFailedTextIcon}
+                  alt="Preview failed to load"
+                  className={styles.editorPreviewFailureText}
+                />
+              </div>
+            ) : null}
             {isPreviewLoading ? (
               <div className={styles.editorPreviewLoading}>
                 <div

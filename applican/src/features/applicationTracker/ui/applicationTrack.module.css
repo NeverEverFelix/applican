@@ -126,6 +126,76 @@
   cursor: not-allowed;
 }
 
+.editorButtonSecondary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.editorModeToggleButton {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.editorModeToggleButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.editorModeToggleIcon {
+  width: auto;
+  height: 28px;
+  display: block;
+}
+
+.editorDownloadActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editorDownloadAction {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+
+.editorDownloadFileTypeIcon {
+  width: auto;
+  height: 28px;
+  display: block;
+}
+
+.editorDownloadIconButton {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  margin-left: -1px;
+}
+
+.editorDownloadIconButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.editorDownloadIcon {
+  width: 28px;
+  height: 28px;
+  display: block;
+}
+
 .editorMeta {
   margin: 0;
   color: #a1a1a1;
@@ -143,6 +213,11 @@
 
 .editorFramePreview {
   flex: 1 1 auto;
+}
+
+.editorFrameSplit {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .editorFrameCollapsed {
@@ -172,6 +247,12 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+.editorHistoryPanelSplit {
+  width: auto;
+  min-width: 0;
+  flex: 1 1 0;
 }
 
 .editorHistoryPanelCollapsed {
@@ -207,6 +288,15 @@
 .editorPreviewPanelHistoryMode {
   flex: 1 1 auto;
   min-width: 560px;
+}
+
+.editorPreviewPanelSplit {
+  flex: 1 1 0;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: hidden;
 }
 
 .editorPreviewHeader {
@@ -245,7 +335,7 @@
   justify-content: center;
   flex-direction: column;
   gap: 10px;
-  background: rgba(9, 9, 9, 0.6);
+  background: transparent;
   z-index: 1;
 }
 
@@ -277,6 +367,35 @@
   height: 100%;
   border: 0;
   background: transparent;
+}
+
+.editorPreviewDocument {
+  width: 100%;
+  height: 100%;
+}
+
+.editorPreviewFailure {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.editorPreviewFailureGraphic {
+  width: min(210px, 55%);
+  height: auto;
+  display: block;
+}
+
+.editorPreviewFailureText {
+  height: 20px;
+  width: auto;
+  opacity: 0.5;
+  display: block;
 }
 
 .editorPreviewMessage {
@@ -340,13 +459,12 @@
   cursor: pointer;
 }
 
-.editorHistoryItem:hover {
-  border-color: #3a3a3a;
-}
-
 .editorHistoryItemActive {
-  border-color: #4f7cff;
-  background: #131a2f;
+  border-color: #dcd9fb;
+  background: #1a1823;
+  box-shadow:
+    0 0 0 1px rgba(220, 217, 251, 0.38),
+    0 0 18px rgba(220, 217, 251, 0.28);
 }
 
 .editorHistoryItemSkeleton {
@@ -852,7 +970,7 @@
 .resumeOptimizationsTitle {
   margin: 0 0 24px;
   color: #ffffff;
-  font-size: 48px;
+  font-size: 43.2px;
   line-height: 1;
   text-align: center;
 }

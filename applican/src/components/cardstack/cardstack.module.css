@@ -1,9 +1,11 @@
 .stack {
-  width: 100%;
+  width: calc(100% / 1.15);
   max-width: 1225px;
-  min-height: 850px;
+  min-height: 978px;
   position: relative;
   cursor: pointer;
+  transform: scale(1.15);
+  transform-origin: top left;
 }
 
 .card {

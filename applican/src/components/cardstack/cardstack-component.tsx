@@ -100,7 +100,7 @@ export function CardStack({ optimizations }: CardStackProps) {
     }
     const sliderElement = slider;
 
-    function moveCard() {
+    function moveCard(): HTMLElement | null {
       const lastItem = sliderElement.querySelector(".item:last-child") as HTMLElement | null;
 
       if (lastItem) {
@@ -109,6 +109,8 @@ export function CardStack({ optimizations }: CardStackProps) {
         newItem.style.removeProperty("display");
         sliderElement.insertBefore(newItem, sliderElement.firstChild);
       }
+
+      return lastItem;
     }
 
     const handleCycle = () => {
@@ -124,12 +126,18 @@ export function CardStack({ optimizations }: CardStackProps) {
       isAnimatingRef.current = true;
       const state = Flip.getState(targets);
 
-      moveCard();
+      const staleNode = moveCard();
 
       Flip.from(state, {
         targets: sliderElement.querySelectorAll(".item"),
         ease: "sine.inOut",
         absolute: true,
+        onComplete: () => {
+          if (staleNode && sliderElement.contains(staleNode)) {
+            sliderElement.removeChild(staleNode);
+          }
+          isAnimatingRef.current = false;
+        },
         onEnter: (elements) => {
           return gsap.from(elements, {
             duration: 0.3,
@@ -146,13 +154,6 @@ export function CardStack({ optimizations }: CardStackProps) {
             transformOrigin: "bottom left",
             opacity: 0,
             ease: "expo.out",
-            onComplete() {
-              const leaving = Array.isArray(elements) ? elements[0] : elements;
-              if (leaving && sliderElement.contains(leaving as Node)) {
-                sliderElement.removeChild(leaving as Node);
-              }
-              isAnimatingRef.current = false;
-            },
           });
         },
       });

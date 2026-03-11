@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePostHog } from "@posthog/react";
+import gsap from "gsap";
 import styles from "../applicationTrack.module.css";
 import starIcon from "../../../../assets/Star.png";
 import blackStarIcon from "../../../../assets/Black star.png";
@@ -9,6 +10,7 @@ import checkIcon from "../../../../assets/Check.png";
 import errorScreenIcon from "../../../../assets/error screen.png";
 import { useLocalStorageState } from "../../../../hooks/useLocalStorageState";
 import { useCreateResumeRun } from "../../../jobs/hooks/useCreateResumeRun";
+import { getLatestResumeRunForEditor } from "../../../jobs/api/getLatestResumeRunForEditor";
 import LoadingScreen from "../../../../screens/loading/LoadingScreen.tsx";
 import WritingText from "../../../../effects/writing-text";
 import TypingText from "../../../../effects/typing-text";
@@ -46,6 +48,72 @@ const RESUME_FILE_DB_NAME = "applican_resume_file_db";
 const RESUME_FILE_STORE_NAME = "resume_files";
 const RESUME_FILE_KEY = "latest_resume";
 const DEFAULT_PAGE_TITLE = "applican";
+
+function cleanString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeOptimizations(value: unknown): ResumeStudioOutput["optimizations"] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") {
+        return null;
+      }
+
+      const optimization = entry as {
+        experience_title?: unknown;
+        role_before?: unknown;
+        role_after?: unknown;
+        bullets?: unknown;
+      };
+
+      const bullets = Array.isArray(optimization.bullets)
+        ? optimization.bullets
+            .map((bullet) => {
+              if (!bullet || typeof bullet !== "object") {
+                return null;
+              }
+
+              const row = bullet as {
+                original?: unknown;
+                rewritten?: unknown;
+                action?: unknown;
+                reason?: unknown;
+              };
+
+              const rewritten = cleanString(row.rewritten);
+              if (!rewritten) {
+                return null;
+              }
+              const action: "replace" | "add" = row.action === "add" ? "add" : "replace";
+
+              return {
+                original: cleanString(row.original),
+                rewritten,
+                action,
+                reason: cleanString(row.reason),
+              };
+            })
+            .filter((bullet): bullet is NonNullable<typeof bullet> => Boolean(bullet))
+        : [];
+
+      if (bullets.length === 0) {
+        return null;
+      }
+
+      return {
+        experience_title: cleanString(optimization.experience_title),
+        role_before: cleanString(optimization.role_before),
+        role_after: cleanString(optimization.role_after),
+        bullets,
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+}
 
 function openResumeFileDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -143,7 +211,22 @@ function toResumeStudioOutput(value: unknown): ResumeStudioOutput | null {
     return null;
   }
 
-  return maybe as ResumeStudioOutput;
+  return {
+    job: {
+      company: cleanString(job.company),
+      title: cleanString(job.title),
+    },
+    match: {
+      score: match.score,
+      label: cleanString(match.label),
+      summary: typeof match.summary === "string" ? match.summary : "",
+    },
+    analysis: {
+      strengths: analysis.strengths.filter((item): item is string => typeof item === "string"),
+      gaps: analysis.gaps.filter((item): item is string => typeof item === "string"),
+    },
+    optimizations: normalizeOptimizations(maybe.optimizations),
+  };
 }
 
 export function ResumeStudioView() {
@@ -153,6 +236,7 @@ export function ResumeStudioView() {
   const ANALYSIS_TYPING_SPEED = 28;
   const ANALYSIS_REVEAL_GAP_MS = 420;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const analysisCompleteScreenRef = useRef<HTMLElement | null>(null);
   const lastTrackedResultKeyRef = useRef<string>("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [jobDescription, setJobDescription] = useLocalStorageState<string>(
@@ -175,6 +259,7 @@ export function ResumeStudioView() {
   const [isAnalysisCollapsed, setIsAnalysisCollapsed] = useState(false);
   const [isShowingProgressScreen, setIsShowingProgressScreen] = useState(false);
   const [isShowingAnalysisCompleteScreen, setIsShowingAnalysisCompleteScreen] = useState(false);
+  const [shouldRenderAnalysisCompleteScreen, setShouldRenderAnalysisCompleteScreen] = useState(false);
   const [isShowingGenerationErrorScreen, setIsShowingGenerationErrorScreen] = useState(false);
   const [jobDescriptionValidationError, setJobDescriptionValidationError] = useState("");
   const [resumeValidationError, setResumeValidationError] = useState("");
@@ -211,6 +296,61 @@ export function ResumeStudioView() {
   const revealedNegativesCount = Math.max(0, revealedAnalysisCount - strengthsLength);
   const virtuesContainerMinHeight = strengthsLength > 0 ? strengthsLength * 60 - 12 : 0;
   const negativesContainerMinHeight = gapsLength > 0 ? gapsLength * 60 - 12 : 0;
+
+  useEffect(() => {
+    const screen = analysisCompleteScreenRef.current;
+    if (!screen || !shouldRenderAnalysisCompleteScreen) {
+      return;
+    }
+
+    gsap.killTweensOf(screen);
+
+    if (isShowingAnalysisCompleteScreen) {
+      gsap.fromTo(
+        screen,
+        { autoAlpha: 0, y: 24, scale: 0.98 },
+        { autoAlpha: 1, y: 0, scale: 1, duration: 0.45, ease: "power2.inOut" },
+      );
+      return;
+    }
+
+    gsap.to(screen, {
+      autoAlpha: 0,
+      y: -16,
+      scale: 0.985,
+      duration: 0.35,
+      ease: "power2.inOut",
+      onComplete: () => {
+        setShouldRenderAnalysisCompleteScreen(false);
+      },
+    });
+  }, [isShowingAnalysisCompleteScreen, shouldRenderAnalysisCompleteScreen]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    if (createdRun?.row.output) {
+      return () => {
+        isActive = false;
+      };
+    }
+
+    void (async () => {
+      try {
+        const latestRun = await getLatestResumeRunForEditor();
+        if (!isActive || latestRun?.output === null || latestRun?.output === undefined) {
+          return;
+        }
+        setPersistedRunOutput(latestRun.output);
+      } catch {
+        // Ignore hydration failures and use local persisted output.
+      }
+    })();
+
+    return () => {
+      isActive = false;
+    };
+  }, [createdRun?.row.output, setPersistedRunOutput]);
 
   const validateJobDescription = (value: string) => {
     if (value.trim().length > MIN_JOB_DESCRIPTION_LENGTH) {
@@ -375,9 +515,11 @@ export function ResumeStudioView() {
     setIsShowingProgressScreen(false);
 
     if (result.ok) {
+      setShouldRenderAnalysisCompleteScreen(true);
       setIsShowingAnalysisCompleteScreen(true);
       await wait(2500);
       setIsShowingAnalysisCompleteScreen(false);
+      await wait(360);
       setPersistedRunOutput(result.createdRun.row.output);
       setRevealedAnalysisCount(0);
       setShowComputedResults(true);
@@ -393,6 +535,7 @@ export function ResumeStudioView() {
     setShowComputedResults(false);
     setIsAnalysisCollapsed(false);
     setIsShowingAnalysisCompleteScreen(false);
+    setShouldRenderAnalysisCompleteScreen(false);
     setIsShowingGenerationErrorScreen(false);
     setJobDescriptionValidationError("");
     setResumeValidationError("");
@@ -413,7 +556,10 @@ export function ResumeStudioView() {
   };
 
   const rootClassName =
-    shouldShowResults || isShowingProgressScreen || isShowingAnalysisCompleteScreen || isShowingGenerationErrorScreen
+    shouldShowResults ||
+    isShowingProgressScreen ||
+    shouldRenderAnalysisCompleteScreen ||
+    isShowingGenerationErrorScreen
       ? [styles.resultsContent, isShowingProgressScreen ? styles.resultsContentLoading : ""].filter(Boolean).join(" ")
       : styles.content;
   const useScrollSectionsFlow = true;
@@ -424,8 +570,14 @@ export function ResumeStudioView() {
         <section className={styles.progressScreenContainer}>
           <LoadingScreen backendProgress={progressPercent} />
         </section>
-      ) : isShowingAnalysisCompleteScreen ? (
-        <section className={styles.analysisCompleteScreen} role="status" aria-live="polite" aria-label="Analyzing complete">
+      ) : shouldRenderAnalysisCompleteScreen ? (
+        <section
+          ref={analysisCompleteScreenRef}
+          className={styles.analysisCompleteScreen}
+          role="status"
+          aria-live="polite"
+          aria-label="Analyzing complete"
+        >
           <p className={styles.analysisCompleteTitle}>Analyzing Complete</p>
           <div className={styles.analysisCompleteSpinner} aria-hidden="true" />
         </section>
