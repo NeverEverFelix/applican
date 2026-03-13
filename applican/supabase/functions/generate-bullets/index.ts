@@ -248,6 +248,8 @@ type ModelOutput = {
   company: string;
   title: string;
   location: string;
+  experience_needed: string;
+  job_type: string;
   match_score: number;
   match_summary: string;
   strengths: string[];
@@ -285,6 +287,8 @@ type ResumeStudioOutput = {
     company: string;
     title: string;
     location: string;
+    experience_needed: string;
+    job_type: "remote" | "hybrid" | "onsite" | "unknown";
   };
   match: {
     score: number;
@@ -353,6 +357,14 @@ function clampScore(value: unknown): number {
     return 100;
   }
   return rounded;
+}
+
+function normalizeJobType(value: unknown): ResumeStudioOutput["job"]["job_type"] {
+  const normalized = cleanString(value).toLowerCase();
+  if (normalized === "remote" || normalized === "hybrid" || normalized === "onsite") {
+    return normalized;
+  }
+  return "unknown";
 }
 
 function normalizeList(value: unknown): string[] {
@@ -545,6 +557,8 @@ function normalizeModelOutput(raw: unknown, model: string, requestId: string): R
   const summary = cleanString(data.match_summary, "Resume has partial overlap with the job requirements.");
   const jobCompany = cleanString(data.company, "Unknown Company");
   const jobTitle = cleanString(data.title, "Target Role");
+  const jobType = normalizeJobType(data.job_type);
+  const experienceNeeded = cleanString(data.experience_needed, "Not specified");
 
   const selectedSkills = normalizeSkills(data.selected_skills);
   const modelExperienceRewrites = normalizeExperienceRewrites(data.experience_rewrites);
@@ -561,6 +575,8 @@ function normalizeModelOutput(raw: unknown, model: string, requestId: string): R
       company: jobCompany,
       title: jobTitle,
       location: cleanString(data.location, "Unknown Location"),
+      experience_needed: experienceNeeded,
+      job_type: jobType,
     },
     match: {
       score,
@@ -638,6 +654,13 @@ function buildJsonSchema() {
         },
         location: {
           type: "string",
+        },
+        experience_needed: {
+          type: "string",
+        },
+        job_type: {
+          type: "string",
+          enum: ["remote", "hybrid", "onsite", "unknown"],
         },
         match_score: {
           type: "number",
@@ -776,6 +799,8 @@ function buildJsonSchema() {
         "company",
         "title",
         "location",
+        "experience_needed",
+        "job_type",
         "match_score",
         "match_summary",
         "strengths",
@@ -819,6 +844,7 @@ async function callOpenAI(
             "Return only valid JSON matching the schema.",
             "Score how well resume text matches the job description from 0-100.",
             "Extract the company name, role title, and location from the job description.",
+            "Extract the required experience (for example, '5+ years') and job type (remote, hybrid, onsite, unknown).",
             "Provide exactly 3 strengths and exactly 2 gaps.",
             "Provide structured optimization rewrites that are concise and ATS-friendly.",
             "Also return selected_skills, experience_rewrites, projects_rewrites, and education to support resume LaTeX generation.",
@@ -1011,9 +1037,14 @@ serve(async (req) => {
       {
         run_id: runId,
         user_id: authenticatedUserId,
+        company: output.job.company,
         job_title: output.job.title,
+        location: output.job.location,
+        experience_needed: output.job.experience_needed,
+        job_type: output.job.job_type,
         job_description: runJobDescription,
         score: output.match.score,
+        analysis_summary: output.match.summary,
         positives: output.analysis.strengths,
         negatives: output.analysis.gaps,
       },

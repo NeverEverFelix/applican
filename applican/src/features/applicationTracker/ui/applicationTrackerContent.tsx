@@ -15,6 +15,11 @@ import type { PickerView } from "./studioContainerView";
 import { ResumeStudioView } from "./views/ResumeStudioView";
 import { EditorView } from "./views/EditorView";
 import downloadIcon from "../../../assets/Download Icon.png";
+import HistoryCard from "../../../components/history/HistoryCard";
+import HistorySummaryPanel from "../../../components/history/HistorySummaryPanel";
+import type { HistoryCardData } from "../../../components/history/history";
+import { listHistoryCards } from "../../../features/history/api/listHistoryCards";
+import HorizontalScrollPanels from "../../../effects/HorizontalScrollPanels";
 
 export type ApplicationTrackerStatus = ApplicationFilter;
 
@@ -33,6 +38,119 @@ function CareerPathView() {
       <div className={styles.careerPathComingSoonOverlay} role="status" aria-live="polite">
         <p className={styles.careerPathComingSoonText}>Coming soon</p>
       </div>
+    </section>
+  );
+}
+
+function HistoryView() {
+  const [historyCards, setHistoryCards] = useState<HistoryCardData[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+  const [historyLoadError, setHistoryLoadError] = useState<string | null>(null);
+  const [historyResumeError, setHistoryResumeError] = useState<string | null>(null);
+  const [openingResumeByApplicationId, setOpeningResumeByApplicationId] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    const loadHistory = async () => {
+      setIsHistoryLoading(true);
+      setHistoryLoadError(null);
+      try {
+        const { cards } = await listHistoryCards(10, 0);
+        if (!isCancelled) {
+          setHistoryCards(cards.slice(0, 10));
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          const message = error instanceof Error ? error.message : "Failed to load history.";
+          setHistoryLoadError(message);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsHistoryLoading(false);
+        }
+      }
+    };
+
+    void loadHistory();
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  if (isHistoryLoading) {
+    return (
+      <section className={styles.historyView}>
+        <p className={styles.historyStatusMessage}>Loading history...</p>
+      </section>
+    );
+  }
+
+  if (historyLoadError) {
+    return (
+      <section className={styles.historyView}>
+        <p className={styles.historyStatusMessage}>{historyLoadError}</p>
+      </section>
+    );
+  }
+
+  if (historyCards.length === 0) {
+    return (
+      <section className={styles.historyView}>
+        <p className={styles.historyStatusMessage}>No previous analyses yet.</p>
+      </section>
+    );
+  }
+  const openHistoryResume = async (card: HistoryCardData) => {
+    const applicationId = card.sourceApplicationId?.trim() ?? "";
+    if (!applicationId) {
+      setHistoryResumeError("Resume file unavailable for this history item.");
+      return;
+    }
+
+    setHistoryResumeError(null);
+    setOpeningResumeByApplicationId((prev) => ({ ...prev, [applicationId]: true }));
+    try {
+      const data = await getResumeDownloadUrl(applicationId);
+      window.open(data.signed_url, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to open resume.";
+      setHistoryResumeError(message);
+    } finally {
+      setOpeningResumeByApplicationId((prev) => ({ ...prev, [applicationId]: false }));
+    }
+  };
+
+  return (
+    <section className={styles.historyView}>
+      {historyResumeError ? <p className={styles.historyInlineError}>{historyResumeError}</p> : null}
+      <HorizontalScrollPanels
+        className={styles.historyScrollArea}
+        trackClassName={styles.historyTrack}
+        panelClassName={styles.historyTrackItem}
+        revealSelector="[data-history-summary-reveal]"
+        scrollDistanceFactor={1.35}
+      >
+        {historyCards.flatMap((card, index) => {
+          const panelKey = `${card.sourceApplicationId ?? card.submittedAtIso ?? card.createdAt}-${index}`;
+          return [
+            <div key={`${panelKey}-card`} className={styles.historySingleCardWrap}>
+              <HistoryCard
+                data={card}
+                onResumeIconClick={openHistoryResume}
+                isResumeIconDisabled={
+                  !card.sourceApplicationId ||
+                  Boolean(card.sourceApplicationId && openingResumeByApplicationId[card.sourceApplicationId])
+                }
+                showSummary={false}
+              />
+            </div>,
+            <div key={`${panelKey}-summary`} className={styles.historySingleCardWrap}>
+              <HistorySummaryPanel data={card} />
+            </div>,
+          ];
+        })}
+      </HorizontalScrollPanels>
     </section>
   );
 }
@@ -272,6 +390,7 @@ function ApplicationTrackerView({
 
 const STUDIO_CONTENT_BY_VIEW: Record<Exclude<PickerView, "Application Tracker">, ComponentType> = {
   "Resume Studio": ResumeStudioView,
+  History: HistoryView,
   "Career Path": CareerPathView,
   Editor: EditorView,
   Resources: () => <PlaceholderView title="Resources" />,

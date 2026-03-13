@@ -23,6 +23,7 @@ function isPickerView(value: unknown): value is PickerView {
   return (
     value === "Resume Studio" ||
     value === "Application Tracker" ||
+    value === "History" ||
     value === "Career Path" ||
     value === "Editor" ||
     value === "Resources"
@@ -51,7 +52,8 @@ export default function HomePage() {
   ];
   const isProUser = currentUserPlan === "pro";
 
-  const isViewRestricted = (view: PickerView) => view !== "Resume Studio" && view !== "Application Tracker";
+  const isViewRestricted = (view: PickerView) =>
+    view !== "Resume Studio" && view !== "Application Tracker" && view !== "History";
 
   const onSelectView = (view: PickerView) => {
     if (!isProUser && isViewRestricted(view)) {
@@ -98,6 +100,7 @@ export default function HomePage() {
           onSignOut={() => void handleLogout()}
           onUpgrade={handleUpgrade}
           onBilling={handleBilling}
+          onHistorySelect={() => onSelectView("History")}
           isSigningOut={isLoggingOut}
           open={isUserMenuOpen}
           onOpenChange={setIsUserMenuOpen}

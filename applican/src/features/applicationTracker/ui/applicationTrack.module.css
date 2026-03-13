@@ -23,6 +23,11 @@
   border: none;
 }
 
+.history {
+  border: none;
+  padding: 48px 32px 32px;
+}
+
 .careerPath {
   border: none;
   padding: 0;
@@ -1631,4 +1636,75 @@
   100% {
     background-position: -200% 0;
   }
+}
+
+.historyView {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.historySingleCardWrap {
+  width: 100%;
+  max-width: 860px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 24px;
+  box-sizing: border-box;
+}
+
+.historyStatusMessage {
+  margin: 0;
+  color: #9a9a9a;
+  font-size: 14px;
+  text-align: center;
+}
+
+.historyInlineError {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  color: #ff8f8f;
+  font-size: 12px;
+  text-align: center;
+  z-index: 2;
+}
+
+.historyScrollArea {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  position: relative;
+  scrollbar-width: none;
+}
+
+.historyScrollArea::-webkit-scrollbar {
+  display: none;
+}
+
+.historyTrack {
+  display: flex;
+  align-items: center;
+  width: max-content;
+  min-width: 100%;
+  height: 100%;
+  will-change: transform;
+}
+
+.historyTrackItem {
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }

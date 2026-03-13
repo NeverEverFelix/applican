@@ -4,19 +4,22 @@ import { Suspense, lazy } from "react";
 import type { ReactNode } from "react";
 import {
   createBrowserRouter,
+  isRouteErrorResponse,
+  Link,
   Navigate,
   Outlet,
   RouterProvider,
+  useRouteError,
 } from "react-router-dom";
 
 import RequireAuth from "./features/auth/RequireAuth";
 import AuthLoadingScreen from "./features/auth/AuthLoadingScreen";
 import RedirectIfAuthenticated from "./features/auth/RedirectIfAuthenticated";
 import { useAuthGate } from "./features/auth/useAuthGate";
+import LoginPage from "./pages/LoginPage";
+import SignupPage from "./pages/SignupPage";
+import VerifyEmailPage from "./pages/VerifyEmailPage";
 
-const LoginPage = lazy(() => import("./pages/LoginPage"));
-const SignupPage = lazy(() => import("./pages/SIgnupPage"));
-const VerifyEmailPage = lazy(() => import("./pages/VerifyEmailPage"));
 const HomePage = lazy(() => import("./pages/HomePage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
@@ -38,34 +41,66 @@ function RootRedirect() {
   return <Navigate to={isAuthenticated ? "/app" : "/login"} replace />;
 }
 
+function RouteErrorBoundary() {
+  const error = useRouteError();
+  const message = isRouteErrorResponse(error)
+    ? `${error.status} ${error.statusText}`
+    : error instanceof Error
+      ? error.message
+      : "Unexpected route error";
+
+  return (
+    <main
+      style={{
+        minHeight: "100dvh",
+        display: "grid",
+        placeItems: "center",
+        padding: "2rem",
+        textAlign: "center",
+      }}
+    >
+      <section>
+        <h1>Something went wrong</h1>
+        <p>{message}</p>
+        <p>
+          <Link to="/login">Return to login</Link>
+        </p>
+      </section>
+    </main>
+  );
+}
+
 const sentryCreateBrowserRouter = Sentry.wrapCreateBrowserRouterV7(createBrowserRouter);
 
 const router = sentryCreateBrowserRouter([
   // Default entry: route by current auth session
-  { path: "/", element: <RootRedirect /> },
+  { path: "/", element: <RootRedirect />, errorElement: <RouteErrorBoundary /> },
 
   // Public
   {
     path: "/login",
+    errorElement: <RouteErrorBoundary />,
     element: (
       <RedirectIfAuthenticated>
-        {withSuspense(<LoginPage />)}
+        <LoginPage />
       </RedirectIfAuthenticated>
     ),
   },
   {
     path: "/signup",
+    errorElement: <RouteErrorBoundary />,
     element: (
       <RedirectIfAuthenticated>
-        {withSuspense(<SignupPage />)}
+        <SignupPage />
       </RedirectIfAuthenticated>
     ),
   },
   {
     path: "/verify-email",
+    errorElement: <RouteErrorBoundary />,
     element: (
       <RequireAuth requireVerifiedEmail={false}>
-        {withSuspense(<VerifyEmailPage />)}
+        <VerifyEmailPage />
       </RequireAuth>
     ),
   },
@@ -73,6 +108,7 @@ const router = sentryCreateBrowserRouter([
   // Protected app shell
   {
     path: "/app",
+    errorElement: <RouteErrorBoundary />,
     element: (
       <RequireAuth>
         <AppLayout />
@@ -85,7 +121,7 @@ const router = sentryCreateBrowserRouter([
   },
 
   // Catch-all
-  { path: "*", element: withSuspense(<NotFoundPage />) },
+  { path: "*", element: withSuspense(<NotFoundPage />), errorElement: <RouteErrorBoundary /> },
 ]);
 
 export default function AppRouter() {
