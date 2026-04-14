@@ -11,6 +11,7 @@ type UserMenuProps = {
   onSignOut: () => void;
   onUpgrade: () => Promise<void>;
   onBilling: () => Promise<void>;
+  onProfileSelect?: () => void;
   onHistorySelect?: () => void;
   isSigningOut?: boolean;
   open?: boolean;
@@ -22,6 +23,7 @@ export default function UserMenu({
   onSignOut,
   onUpgrade,
   onBilling,
+  onProfileSelect,
   onHistorySelect,
   isSigningOut = false,
   open,
@@ -52,6 +54,7 @@ export default function UserMenu({
     posthog?.capture("profile_button_clicked", {
       source: "user_menu_item",
     });
+    onProfileSelect?.();
   };
   const handleHistorySelect = () => {
     posthog?.capture("history_menu_clicked", {

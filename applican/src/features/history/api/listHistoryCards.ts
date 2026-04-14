@@ -52,6 +52,8 @@ function toHistoryCardData(
   const application = applicationByRunId.get(row.run_id);
 
   return {
+    historyEntryId: row.run_id,
+    resumeRunId: row.run_id,
     role: row.job_title || "Target Role",
     company: row.company || "Unknown Company",
     location: row.location || "Unknown Location",

@@ -9,6 +9,8 @@ export default function HistorySummaryPanel({ data }: HistorySummaryPanelProps) 
   return (
     <article
       className={styles.summaryPanel}
+      data-history-entry-id={data.historyEntryId}
+      data-history-panel="summary"
       data-history-summary-reveal
       aria-label={`Analysis summary for ${data.role} at ${data.company}`}
     >

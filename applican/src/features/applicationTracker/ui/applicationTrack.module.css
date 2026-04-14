@@ -23,9 +23,18 @@
   border: none;
 }
 
+.profile {
+  border: none;
+  padding: 32px;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
 .history {
   border: none;
-  padding: 48px 32px 32px;
+  padding: 32px;
+  align-items: center;
+  justify-content: center;
 }
 
 .careerPath {
@@ -1644,11 +1653,29 @@
   min-height: 0;
   box-sizing: border-box;
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.historyFlow {
+  width: 100%;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.historySequence {
+  width: fit-content;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .historySingleCardWrap {
-  width: 100%;
-  max-width: 860px;
+  width: fit-content;
+  max-width: 908px;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -1679,32 +1706,29 @@
 .historyScrollArea {
   width: 100%;
   height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
-  overscroll-behavior: contain;
+  min-height: 0;
   position: relative;
-  scrollbar-width: none;
-}
-
-.historyScrollArea::-webkit-scrollbar {
-  display: none;
-}
-
-.historyTrack {
-  display: flex;
   align-items: center;
-  width: max-content;
-  min-width: 100%;
-  height: 100%;
-  will-change: transform;
+  justify-content: center;
 }
 
-.historyTrackItem {
-  flex: 0 0 100%;
+.historyFadeStage {
   width: 100%;
   height: 100%;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}
+
+.historyFadeLayer {
+  grid-area: 1 / 1;
+  width: fit-content;
+  max-width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-sizing: border-box;
+}
+
+.historyFadeLayer:last-child {
+  will-change: opacity, transform;
 }

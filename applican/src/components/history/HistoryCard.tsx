@@ -20,20 +20,27 @@ export default function HistoryCard({
   const isIconClickable = Boolean(onResumeIconClick);
 
   return (
-    <article className={styles.card} aria-label={`History card for ${role} at ${company}`}>
-      <button
-        type="button"
-        className={[styles.iconContainer, isIconClickable ? styles.iconButton : ""].join(" ").trim()}
-        onClick={() => onResumeIconClick?.(data)}
-        disabled={!isIconClickable || isResumeIconDisabled}
-        aria-label={`Open resume used for ${role} at ${company}`}
-      >
-        <img src={applicanCreamIcon} alt="" className={styles.icon} />
-      </button>
+    <article
+      className={styles.card}
+      data-history-entry-id={data.historyEntryId}
+      data-history-panel="card"
+      aria-label={`History card for ${role} at ${company}`}
+    >
+      <div className={styles.headerRow}>
+        <button
+          type="button"
+          className={[styles.iconContainer, isIconClickable ? styles.iconButton : ""].join(" ").trim()}
+          onClick={() => onResumeIconClick?.(data)}
+          disabled={!isIconClickable || isResumeIconDisabled}
+          aria-label={`Open resume used for ${role} at ${company}`}
+        >
+          <img src={applicanCreamIcon} alt="" className={styles.icon} />
+        </button>
 
-      <div className={styles.titleLocationContainer}>
-        <p className={styles.titleText}>{role}</p>
-        <p className={styles.locationText}>{locationDisplay}</p>
+        <div className={styles.titleLocationContainer}>
+          <p className={styles.titleText}>{role}</p>
+          <p className={styles.locationText}>{locationDisplay}</p>
+        </div>
       </div>
 
       <div className={styles.contentStack}>

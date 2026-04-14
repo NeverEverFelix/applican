@@ -19,7 +19,8 @@ import HistoryCard from "../../../components/history/HistoryCard";
 import HistorySummaryPanel from "../../../components/history/HistorySummaryPanel";
 import type { HistoryCardData } from "../../../components/history/history";
 import { listHistoryCards } from "../../../features/history/api/listHistoryCards";
-import HorizontalScrollPanels from "../../../effects/HorizontalScrollPanels";
+import FadeSwipePanels from "../../../effects/FadeSwipePanels";
+import Profile from "../../../components/profile/Profile";
 
 export type ApplicationTrackerStatus = ApplicationFilter;
 
@@ -43,6 +44,7 @@ function CareerPathView() {
 }
 
 function HistoryView() {
+  const historyLimit = 10;
   const [historyCards, setHistoryCards] = useState<HistoryCardData[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const [historyLoadError, setHistoryLoadError] = useState<string | null>(null);
@@ -56,9 +58,9 @@ function HistoryView() {
       setIsHistoryLoading(true);
       setHistoryLoadError(null);
       try {
-        const { cards } = await listHistoryCards(10, 0);
+        const { cards } = await listHistoryCards(historyLimit, 0);
         if (!isCancelled) {
-          setHistoryCards(cards.slice(0, 10));
+          setHistoryCards(cards);
         }
       } catch (error) {
         if (!isCancelled) {
@@ -76,7 +78,7 @@ function HistoryView() {
     return () => {
       isCancelled = true;
     };
-  }, []);
+  }, [historyLimit]);
 
   if (isHistoryLoading) {
     return (
@@ -121,36 +123,57 @@ function HistoryView() {
     }
   };
 
+  const historyPanels = historyCards.flatMap((card, index) => {
+    const panelBaseKey =
+      card.historyEntryId || `${card.sourceApplicationId ?? card.submittedAtIso ?? card.createdAt}-${index}`;
+
+    return [
+      (
+        <div
+          key={`${panelBaseKey}-card`}
+          className={styles.historySequence}
+          data-history-entry-id={card.historyEntryId}
+          data-history-panel="card"
+        >
+          <div className={styles.historySingleCardWrap}>
+            <HistoryCard
+              data={card}
+              onResumeIconClick={openHistoryResume}
+              isResumeIconDisabled={
+                !card.sourceApplicationId ||
+                Boolean(card.sourceApplicationId && openingResumeByApplicationId[card.sourceApplicationId])
+              }
+              showSummary={false}
+            />
+          </div>
+        </div>
+      ),
+      (
+        <div
+          key={`${panelBaseKey}-summary`}
+          className={styles.historySequence}
+          data-history-entry-id={card.historyEntryId}
+          data-history-panel="summary"
+        >
+          <div className={styles.historySingleCardWrap}>
+            <HistorySummaryPanel data={card} />
+          </div>
+        </div>
+      ),
+    ];
+  });
+
   return (
     <section className={styles.historyView}>
       {historyResumeError ? <p className={styles.historyInlineError}>{historyResumeError}</p> : null}
-      <HorizontalScrollPanels
-        className={styles.historyScrollArea}
-        trackClassName={styles.historyTrack}
-        panelClassName={styles.historyTrackItem}
-        revealSelector="[data-history-summary-reveal]"
-        scrollDistanceFactor={1.35}
-      >
-        {historyCards.flatMap((card, index) => {
-          const panelKey = `${card.sourceApplicationId ?? card.submittedAtIso ?? card.createdAt}-${index}`;
-          return [
-            <div key={`${panelKey}-card`} className={styles.historySingleCardWrap}>
-              <HistoryCard
-                data={card}
-                onResumeIconClick={openHistoryResume}
-                isResumeIconDisabled={
-                  !card.sourceApplicationId ||
-                  Boolean(card.sourceApplicationId && openingResumeByApplicationId[card.sourceApplicationId])
-                }
-                showSummary={false}
-              />
-            </div>,
-            <div key={`${panelKey}-summary`} className={styles.historySingleCardWrap}>
-              <HistorySummaryPanel data={card} />
-            </div>,
-          ];
-        })}
-      </HorizontalScrollPanels>
+      <div className={styles.historyFlow}>
+        <FadeSwipePanels
+          className={styles.historyScrollArea}
+          stageClassName={styles.historyFadeStage}
+          layerClassName={styles.historyFadeLayer}
+          items={historyPanels}
+        />
+      </div>
     </section>
   );
 }
@@ -390,6 +413,7 @@ function ApplicationTrackerView({
 
 const STUDIO_CONTENT_BY_VIEW: Record<Exclude<PickerView, "Application Tracker">, ComponentType> = {
   "Resume Studio": ResumeStudioView,
+  Profile,
   History: HistoryView,
   "Career Path": CareerPathView,
   Editor: EditorView,

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import Editor, { type BeforeMount } from "@monaco-editor/react";
 import gsap from "gsap";
 import styles from "../applicationTrack.module.css";
@@ -296,7 +296,7 @@ export function EditorView() {
     })();
   };
 
-  const runPreviewCompile = async (options?: { force?: boolean }) => {
+  const runPreviewCompile = async (options?: { force?: boolean; clearPreview?: boolean }) => {
     const currentSignature = `${filename}\n${latex}`;
     if (!options?.force && currentSignature === lastCompiledPreviewSignature) {
       return;
@@ -305,6 +305,9 @@ export function EditorView() {
     setCompileLog("");
     const requestToken = latestPreviewRequestRef.current + 1;
     latestPreviewRequestRef.current = requestToken;
+    if (options?.clearPreview) {
+      setPreviewUrl("");
+    }
     setIsPreviewLoading(true);
     setIsPreviewFailed(false);
 
@@ -356,6 +359,14 @@ export function EditorView() {
   const onToggleEditorMode = () => {
     pendingFlipRef.current = captureEditorFlipState(workspaceRef.current);
     setIsEditorMode((current) => !current);
+  };
+
+  const onEditorKeyDownCapture = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+      event.preventDefault();
+      event.stopPropagation();
+      void runPreviewCompile({ force: true, clearPreview: true });
+    }
   };
 
   const shouldShowHistorySkeleton = isHistoryLoading && (generatedResumes.length === 0 || isHistoryRefreshAnimating);
@@ -476,6 +487,7 @@ export function EditorView() {
           ]
             .filter(Boolean)
             .join(" ")}
+          onKeyDownCapture={onEditorKeyDownCapture}
         >
           <Editor
             height="100%"

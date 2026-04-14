@@ -1,4 +1,6 @@
 export type HistoryCardData = {
+  historyEntryId: string;
+  resumeRunId: string;
   role: string;
   company: string;
   location: string;
@@ -14,6 +16,8 @@ export type HistoryCardData = {
 
 // Placeholder shape for UI work. Replace with Supabase-backed data later.
 export const historyCardSeed: HistoryCardData = {
+  historyEntryId: "seed-history-entry",
+  resumeRunId: "seed-history-entry",
   role: "Senior Product Designer",
   company: "Figma",
   location: "San Francisco, CA",
@@ -28,6 +32,8 @@ export const historyCardSeed: HistoryCardData = {
 export const historyCardsMock: HistoryCardData[] = [
   historyCardSeed,
   {
+    historyEntryId: "seed-history-entry-2",
+    resumeRunId: "seed-history-entry-2",
     role: "Product Designer",
     company: "Notion",
     location: "New York, NY",
@@ -39,6 +45,8 @@ export const historyCardsMock: HistoryCardData[] = [
       "Strong product thinking and UX work. Add more measurable business impact and cross-functional collaboration outcomes to improve match confidence.",
   },
   {
+    historyEntryId: "seed-history-entry-3",
+    resumeRunId: "seed-history-entry-3",
     role: "Senior UX Designer",
     company: "Airbnb",
     location: "San Francisco, CA",

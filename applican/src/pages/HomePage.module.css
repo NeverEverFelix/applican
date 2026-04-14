@@ -19,3 +19,18 @@
   flex-direction: column;
   gap: 84px;
 }
+
+.studioArea {
+  width: 1152px;
+  grid-column: 2;
+  justify-self: end;
+  position: relative;
+}
+
+.studioUserCard {
+  position: absolute;
+  top: 92px;
+  left: 78px;
+  z-index: 2;
+  pointer-events: none;
+}

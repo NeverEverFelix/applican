@@ -1,0 +1,125 @@
+.profileView {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.profileColumn {
+  position: absolute;
+  top: 146px;
+  left: 46px;
+  display: flex;
+  flex-direction: column;
+  gap: 50px;
+}
+
+.nameRow {
+  display: flex;
+  gap: 50px;
+}
+
+.emailRow {
+  display: flex;
+  align-items: center;
+  gap: 50px;
+}
+
+.firstNameTextbox {
+  width: 400px;
+  height: 48px;
+  padding-left: 10px;
+  background: rgb(219 219 219 / 50%);
+  border: 0;
+  border-radius: 12px;
+  outline: none;
+  box-shadow: none;
+  appearance: none;
+  color: rgb(255 255 255 / 50%);
+}
+
+.lastNameTextbox {
+  width: 400px;
+  height: 48px;
+  padding-left: 10px;
+  background: rgb(219 219 219 / 50%);
+  border: 0;
+  border-radius: 12px;
+  outline: none;
+  box-shadow: none;
+  appearance: none;
+  color: rgb(255 255 255 / 50%);
+}
+
+.emailTextbox {
+  width: 600px;
+  height: 48px;
+  padding-left: 10px;
+  background: rgb(219 219 219 / 50%);
+  border: 0;
+  border-radius: 12px;
+  outline: none;
+  box-shadow: none;
+  appearance: none;
+  color: rgb(255 255 255 / 50%);
+}
+
+.professionalSummaryTextbox {
+  width: 743px;
+  height: 313px;
+  padding-left: 10px;
+  background: rgb(219 219 219 / 50%);
+  border: 0;
+  border-radius: 12px;
+  outline: none;
+  box-shadow: none;
+  appearance: none;
+  color: rgb(255 255 255 / 50%);
+}
+
+.professionalSummaryTextboxInvalid {
+  color: #ec2542;
+}
+
+.changeEmailLink {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  outline: none;
+  box-shadow: none;
+  appearance: none;
+  font-size: 21px;
+  color: rgb(255 255 255 / 50%);
+}
+
+.changeEmailLinkActive {
+  color: #0068f4;
+}
+
+.changeEmailLinkInvalid {
+  color: #ec2542;
+}
+
+.profileActionLink {
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  outline: none;
+  box-shadow: none;
+  appearance: none;
+  font-size: 21px;
+  color: rgb(255 255 255 / 50%);
+}
+
+.cancelSubscriptionLink {
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  outline: none;
+  box-shadow: none;
+  appearance: none;
+  font-size: 21px;
+  color: #ec2542;
+}

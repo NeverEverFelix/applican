@@ -10,6 +10,7 @@ import { useCurrentUserName, useCurrentUserPlan } from "../features/auth/useCurr
 import AuthLoadingScreen from "../features/auth/AuthLoadingScreen";
 import { useMinimumLoading } from "../features/auth/useMinimumLoading";
 import userStyles from "../components/UserInfo.module.css";
+import UserInfoCard from "../components/UserInfoCard";
 import ApplicationTracker from "../features/applicationTracker/ui/applicationTracker";
 import type { PickerView } from "../features/applicationTracker/ui/studioContainerView";
 import AppModal from "../components/Modal/Modal";
@@ -23,6 +24,7 @@ function isPickerView(value: unknown): value is PickerView {
   return (
     value === "Resume Studio" ||
     value === "Application Tracker" ||
+    value === "Profile" ||
     value === "History" ||
     value === "Career Path" ||
     value === "Editor" ||
@@ -53,7 +55,7 @@ export default function HomePage() {
   const isProUser = currentUserPlan === "pro";
 
   const isViewRestricted = (view: PickerView) =>
-    view !== "Resume Studio" && view !== "Application Tracker" && view !== "History";
+    view !== "Resume Studio" && view !== "Application Tracker" && view !== "Profile" && view !== "History";
 
   const onSelectView = (view: PickerView) => {
     if (!isProUser && isViewRestricted(view)) {
@@ -100,6 +102,7 @@ export default function HomePage() {
           onSignOut={() => void handleLogout()}
           onUpgrade={handleUpgrade}
           onBilling={handleBilling}
+          onProfileSelect={() => onSelectView("Profile")}
           onHistorySelect={() => onSelectView("History")}
           isSigningOut={isLoggingOut}
           open={isUserMenuOpen}
@@ -147,7 +150,14 @@ export default function HomePage() {
           ))}
         </div>
       </div>
-      <ApplicationTracker selectedView={selectedView} />
+      <div className={styles.studioArea}>
+        {selectedView === "Profile" ? (
+          <div className={styles.studioUserCard}>
+            <UserInfoCard user={{ name: currentUserName, plan: currentUserPlan }} />
+          </div>
+        ) : null}
+        <ApplicationTracker selectedView={selectedView} />
+      </div>
       <AppModal open={isUpgradeModalOpen} onClose={closeUpgradeModalAndOpenMenu} />
     </div>
   );
