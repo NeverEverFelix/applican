@@ -1,6 +1,6 @@
 // src/router.tsx
 import * as Sentry from "@sentry/react";
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import type { ReactNode } from "react";
 import {
   createBrowserRouter,
@@ -9,13 +9,17 @@ import {
   Navigate,
   Outlet,
   RouterProvider,
+  useLocation,
   useRouteError,
+  useNavigate,
 } from "react-router-dom";
 
 import RequireAuth from "./features/auth/RequireAuth";
 import AuthLoadingScreen from "./features/auth/AuthLoadingScreen";
 import RedirectIfAuthenticated from "./features/auth/RedirectIfAuthenticated";
 import { useAuthGate } from "./features/auth/useAuthGate";
+import ChangePassword from "./pages/ChangePassword";
+import ForgotPassword from "./pages/ForgotPassword";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
@@ -23,8 +27,35 @@ import VerifyEmailPage from "./pages/VerifyEmailPage";
 const HomePage = lazy(() => import("./pages/HomePage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
+function RecoveryRedirect() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const recoveryInHash = new URLSearchParams(location.hash.replace(/^#/, "")).get("type") === "recovery";
+    if (!recoveryInHash || location.pathname === "/change-password") {
+      return;
+    }
+
+    navigate(
+      {
+        pathname: "/change-password",
+        hash: location.hash,
+      },
+      { replace: true },
+    );
+  }, [location.hash, location.pathname, navigate]);
+
+  return null;
+}
+
 function AppLayout() {
-  return <Outlet />;
+  return (
+    <>
+      <RecoveryRedirect />
+      <Outlet />
+    </>
+  );
 }
 
 function withSuspense(page: ReactNode) {
@@ -102,6 +133,20 @@ const router = sentryCreateBrowserRouter([
       <RequireAuth requireVerifiedEmail={false}>
         <VerifyEmailPage />
       </RequireAuth>
+    ),
+  },
+  {
+    path: "/change-password",
+    errorElement: <RouteErrorBoundary />,
+    element: <ChangePassword />,
+  },
+  {
+    path: "/forgot-password",
+    errorElement: <RouteErrorBoundary />,
+    element: (
+      <RedirectIfAuthenticated>
+        <ForgotPassword />
+      </RedirectIfAuthenticated>
     ),
   },
 

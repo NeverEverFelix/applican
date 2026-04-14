@@ -2,6 +2,7 @@ import type { User } from "@supabase/supabase-js";
 import { useAuthSession } from "../../features/auth/AuthSessionContext";
 import styles from "./Profile.module.css";
 import { useChangeEmail } from "./changeEmail";
+import { useChangePassword } from "./changePassword";
 import { useProfessionalSummary } from "./professionalSummary";
 
 function getNameParts(user: User | null) {
@@ -36,9 +37,14 @@ export default function Profile() {
     canSubmit: canChangeEmail,
     isInvalid: isEmailInvalid,
   } = useChangeEmail(email);
+  const {
+    submitChange: submitChangePassword,
+    isSubmitting: isChangingPassword,
+    canSubmit: canChangePassword,
+  } = useChangePassword(email);
 
   const handleResetPassword = () => {
-    // Placeholder for future reset-password flow.
+    void submitChangePassword();
   };
   const handleCancelSubscription = () => {
     // Placeholder for future cancel-subscription flow.
@@ -82,8 +88,13 @@ export default function Profile() {
             void persistSummary();
           }}
         />
-        <button type="button" className={styles.profileActionLink} onClick={handleResetPassword}>
-          reset password
+        <button
+          type="button"
+          className={styles.profileActionLink}
+          onClick={handleResetPassword}
+          disabled={!canChangePassword}
+        >
+          {isChangingPassword ? "sending..." : "change password"}
         </button>
         <button type="button" className={styles.cancelSubscriptionLink} onClick={handleCancelSubscription}>
           cancel subscription

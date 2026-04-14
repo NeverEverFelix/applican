@@ -93,9 +93,9 @@ export default function LoginForm({
             <img src={googleIconSrc} alt="Google" />
             <span>Sign in with Google</span>
           </button>
-          <a href="/forgot-password" className={styles.forgotPassword}>
+          <Link to="/forgot-password" className={styles.forgotPassword}>
             Forgot password?
-          </a>
+          </Link>
         </div>
       )}
 
