@@ -29,7 +29,7 @@
   width: 400px;
   height: 48px;
   padding-left: 10px;
-  background: rgb(219 219 219 / 50%);
+  background: rgba(21, 21, 21, 0.65);
   border: 0;
   border-radius: 12px;
   outline: none;
@@ -42,7 +42,7 @@
   width: 400px;
   height: 48px;
   padding-left: 10px;
-  background: rgb(219 219 219 / 50%);
+  background: rgba(21, 21, 21, 0.65);
   border: 0;
   border-radius: 12px;
   outline: none;
@@ -55,7 +55,7 @@
   width: 600px;
   height: 48px;
   padding-left: 10px;
-  background: rgb(219 219 219 / 50%);
+  background: rgba(21, 21, 21, 0.65);
   border: 0;
   border-radius: 12px;
   outline: none;
@@ -67,14 +67,48 @@
 .professionalSummaryTextbox {
   width: 743px;
   height: 313px;
-  padding-left: 10px;
-  background: rgb(219 219 219 / 50%);
+  padding: 16px;
+  background-color: transparent !important;
   border: 0;
   border-radius: 12px;
   outline: none;
   box-shadow: none;
   appearance: none;
-  color: rgb(255 255 255 / 50%);
+  color: rgba(255, 255, 255, 0.4) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.4);
+  caret-color: rgba(255, 255, 255, 0.4);
+  resize: none;
+  font: inherit;
+  line-height: 1.4;
+  position: relative;
+  z-index: 1;
+}
+
+.professionalSummaryField {
+  position: relative;
+  width: 743px;
+  height: 313px;
+  background-color: rgba(21, 21, 21, 0.65) !important;
+  border-radius: 12px;
+}
+
+.professionalSummaryPlaceholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  font-size: 21px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.4) !important;
+  pointer-events: none;
+  text-align: center;
+  z-index: 2;
+}
+
+.professionalSummaryPlaceholderHidden {
+  opacity: 0;
 }
 
 .professionalSummaryTextboxInvalid {

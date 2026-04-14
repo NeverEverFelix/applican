@@ -78,16 +78,26 @@ export default function Profile() {
             change email
           </button>
         </div>
-        <input
-          type="text"
-          className={[styles.professionalSummaryTextbox, isOverLimit ? styles.professionalSummaryTextboxInvalid : ""].join(" ").trim()}
-          placeholder="Professional Summary ( Optional )"
-          value={summary}
-          onChange={(event) => setSummary(event.target.value)}
-          onBlur={() => {
-            void persistSummary();
-          }}
-        />
+        <div className={styles.professionalSummaryField}>
+          <span
+            className={[
+              styles.professionalSummaryPlaceholder,
+              summary.length > 0 ? styles.professionalSummaryPlaceholderHidden : "",
+            ]
+              .join(" ")
+              .trim()}
+          >
+            Enter Professional Summary
+          </span>
+          <textarea
+            className={[styles.professionalSummaryTextbox, isOverLimit ? styles.professionalSummaryTextboxInvalid : ""].join(" ").trim()}
+            value={summary}
+            onChange={(event) => setSummary(event.target.value)}
+            onBlur={() => {
+              void persistSummary();
+            }}
+          />
+        </div>
         <button
           type="button"
           className={styles.profileActionLink}
