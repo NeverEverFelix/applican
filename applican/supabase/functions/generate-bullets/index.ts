@@ -238,6 +238,18 @@ type ModelProjectRewrite = {
   bullets: string[];
 };
 
+type ModelProjectOptimizationBullet = {
+  action: "replace" | "add";
+  original: string;
+  rewritten: string;
+  reason: string;
+};
+
+type ModelProjectOptimization = {
+  name: string;
+  bullets: ModelProjectOptimizationBullet[];
+};
+
 type ModelEducation = {
   school: string;
   degree: string;
@@ -255,6 +267,7 @@ type ModelOutput = {
   strengths: string[];
   gaps: string[];
   optimizations: ModelOptimization[];
+  project_optimizations?: ModelProjectOptimization[];
   selected_skills?: string[];
   experience_rewrites?: ModelExperienceRewrite[];
   projects_rewrites?: ModelProjectRewrite[];
@@ -309,6 +322,19 @@ type ResumeStudioOutput = {
       action: "replace" | "add";
       reason: string;
     }>;
+  }>;
+  project_optimizations: Array<{
+    name: string;
+    bullets: Array<{
+      original: string;
+      rewritten: string;
+      action: "replace" | "add";
+      reason: string;
+    }>;
+  }>;
+  source_experience_sections: Array<{
+    title: string;
+    bullets: string[];
   }>;
   meta: {
     model: string;
@@ -384,6 +410,161 @@ function normalizeFixedCount(items: string[], size: number): string[] {
   return result;
 }
 
+type ParsedExperienceSection = {
+  title: string;
+  bullets: string[];
+};
+
+function normalizeMatchText(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function parseExperienceSections(resumeText: string): ParsedExperienceSection[] {
+  const lines = resumeText
+    .replace(/\f/g, "\n")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const experienceIndex = lines.findIndex((line) => normalizeMatchText(line) === "experience");
+  if (experienceIndex === -1) {
+    return [];
+  }
+
+  const endIndex = lines.findIndex(
+    (line, index) =>
+      index > experienceIndex &&
+      ["projects", "technical skills", "skills", "education", "certifications"].includes(normalizeMatchText(line)),
+  );
+  const slice = lines.slice(experienceIndex + 1, endIndex === -1 ? undefined : endIndex);
+
+  const sections: ParsedExperienceSection[] = [];
+  let currentTitle = "";
+  let currentBullets: string[] = [];
+  let sawBullet = false;
+
+  const flush = () => {
+    if (!currentTitle || currentBullets.length === 0) {
+      currentTitle = "";
+      currentBullets = [];
+      sawBullet = false;
+      return;
+    }
+    sections.push({
+      title: currentTitle,
+      bullets: currentBullets,
+    });
+    currentTitle = "";
+    currentBullets = [];
+    sawBullet = false;
+  };
+
+  for (let index = 0; index < slice.length; index += 1) {
+    const line = slice[index];
+    const isBullet = line.startsWith("•");
+    const nextLine = slice[index + 1] ?? "";
+
+    if (isBullet) {
+      if (!currentTitle) {
+        currentTitle = `Experience ${sections.length + 1}`;
+      }
+      sawBullet = true;
+      currentBullets.push(line.replace(/^•\s*/, "").trim());
+      continue;
+    }
+
+    if (sawBullet) {
+      const lastBulletIndex = currentBullets.length - 1;
+      const nextLineStartsBullet = nextLine.startsWith("•");
+      const looksLikeNextTitle =
+        /^[A-Z]/.test(line) &&
+        !/[,:]/.test(line) &&
+        !nextLineStartsBullet &&
+        !/[–-]/.test(line) &&
+        currentBullets.length > 0;
+      if (lastBulletIndex >= 0 && !looksLikeNextTitle) {
+        currentBullets[lastBulletIndex] = `${currentBullets[lastBulletIndex]} ${line}`.replace(/\s+/g, " ").trim();
+        continue;
+      }
+
+      flush();
+      currentTitle = line;
+      continue;
+    }
+
+    if (!currentTitle) {
+      currentTitle = line;
+    }
+  }
+
+  flush();
+  return sections;
+}
+
+function rebuildExperienceOptimizations(
+  optimizations: ResumeStudioOutput["optimizations"],
+  experienceRewrites: TailoredResumeInput["experience_rewrites"],
+  resumeText: string,
+): ResumeStudioOutput["optimizations"] {
+  const sourceSections = parseExperienceSections(resumeText);
+  if (sourceSections.length === 0) {
+    return optimizations.length > 0 ? optimizations : [];
+  }
+
+  const rebuiltSections = sourceSections
+    .map((sourceSection, sectionIndex) => {
+      const optimization = optimizations[sectionIndex] ?? null;
+      const rewrite = experienceRewrites[sectionIndex] ?? null;
+      const rewriteBullets = rewrite?.bullets ?? [];
+      const optimizationBullets = optimization?.bullets ?? [];
+      const title =
+        cleanString(optimization?.experience_title) ||
+        cleanString(optimization?.role_before) ||
+        cleanString(optimization?.role_after) ||
+        cleanString(rewrite?.title) ||
+        cleanString(sourceSection.title) ||
+        `Experience ${sectionIndex + 1}`;
+      const roleAfter =
+        cleanString(optimization?.role_after) ||
+        cleanString(rewrite?.title) ||
+        cleanString(sourceSection.title) ||
+        title;
+      const maxBullets = Math.max(sourceSection.bullets.length, rewriteBullets.length, optimizationBullets.length);
+
+      const bullets = Array.from({ length: maxBullets }, (_, bulletIndex) => {
+        const sourceOriginal = cleanString(sourceSection.bullets[bulletIndex]);
+        const optimizationBullet = optimizationBullets[bulletIndex];
+        const rewritten =
+          cleanString(optimizationBullet?.rewritten) ||
+          cleanString(rewriteBullets[bulletIndex]) ||
+          sourceOriginal;
+
+        if (!sourceOriginal && !rewritten) {
+          return null;
+        }
+
+        return {
+          action: optimizationBullet?.action ?? "replace",
+          original: sourceOriginal,
+          rewritten: rewritten || sourceOriginal,
+          reason: cleanString(optimizationBullet?.reason),
+        };
+      }).filter((bullet): bullet is NonNullable<typeof bullet> => Boolean(bullet));
+
+      return bullets.length > 0
+        ? {
+            experience_title: title,
+            role_before: cleanString(sourceSection.title) || title,
+            role_after: roleAfter,
+            bullets,
+          }
+        : null;
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+
+  return rebuiltSections.length > 0 ? rebuiltSections : optimizations;
+}
+
 function normalizeOptimizations(value: unknown): ResumeStudioOutput["optimizations"] {
   if (!Array.isArray(value)) {
     return [];
@@ -452,6 +633,65 @@ function normalizeSkills(value: unknown): string[] {
 
 function normalizeStringBullets(value: unknown, maxItems = 8): string[] {
   return normalizeList(value).slice(0, maxItems);
+}
+
+function normalizeProjectOptimizations(
+  value: unknown,
+): ResumeStudioOutput["project_optimizations"] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") {
+        return null;
+      }
+
+      const row = entry as {
+        name?: unknown;
+        bullets?: unknown;
+      };
+      const name = cleanString(row.name, "Project");
+      const bullets = Array.isArray(row.bullets)
+        ? row.bullets
+            .map((bullet) => {
+              if (!bullet || typeof bullet !== "object") {
+                return null;
+              }
+              const b = bullet as {
+                action?: unknown;
+                original?: unknown;
+                rewritten?: unknown;
+                reason?: unknown;
+              };
+              const action = b.action === "add" ? "add" : "replace";
+              const original = cleanString(b.original);
+              const rewritten = cleanString(b.rewritten);
+              const reason = cleanString(b.reason);
+              if (!original && !rewritten) {
+                return null;
+              }
+              return {
+                action,
+                original: original || rewritten,
+                rewritten: rewritten || original,
+                reason,
+              };
+            })
+            .filter((bullet): bullet is NonNullable<typeof bullet> => Boolean(bullet))
+        : [];
+
+      if (!bullets.length) {
+        return null;
+      }
+
+      return {
+        name,
+        bullets,
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
 }
 
 function normalizeExperienceRewrites(value: unknown): TailoredResumeInput["experience_rewrites"] {
@@ -544,15 +784,17 @@ function deriveExperienceRewritesFromOptimizations(
     .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
 }
 
-function normalizeModelOutput(raw: unknown, model: string, requestId: string): ResumeStudioOutput {
+function normalizeModelOutput(raw: unknown, model: string, requestId: string, resumeText: string): ResumeStudioOutput {
   if (!raw || typeof raw !== "object") {
     throw new HttpError(502, "OPENAI_INVALID_JSON", "Model response was not a JSON object.");
   }
 
   const data = raw as Partial<ModelOutput>;
+  const sourceExperienceSections = parseExperienceSections(resumeText);
   const strengths = normalizeFixedCount(normalizeList(data.strengths), 3);
   const gaps = normalizeFixedCount(normalizeList(data.gaps), 2);
-  const optimizations = normalizeOptimizations(data.optimizations);
+  const normalizedOptimizations = normalizeOptimizations(data.optimizations);
+  const projectOptimizations = normalizeProjectOptimizations(data.project_optimizations);
   const score = clampScore(data.match_score);
   const summary = cleanString(data.match_summary, "Resume has partial overlap with the job requirements.");
   const jobCompany = cleanString(data.company, "Unknown Company");
@@ -563,6 +805,11 @@ function normalizeModelOutput(raw: unknown, model: string, requestId: string): R
   const selectedSkills = normalizeSkills(data.selected_skills);
   const modelExperienceRewrites = normalizeExperienceRewrites(data.experience_rewrites);
   const modelProjectsRewrites = normalizeProjectsRewrites(data.projects_rewrites);
+  const optimizations = rebuildExperienceOptimizations(
+    normalizedOptimizations,
+    modelExperienceRewrites,
+    resumeText,
+  );
   const experienceRewrites =
     modelExperienceRewrites.length > 0
       ? modelExperienceRewrites
@@ -588,6 +835,8 @@ function normalizeModelOutput(raw: unknown, model: string, requestId: string): R
       gaps,
     },
     optimizations,
+    project_optimizations: projectOptimizations,
+    source_experience_sections: sourceExperienceSections,
     meta: {
       model,
       generated_at: new Date().toISOString(),
@@ -729,6 +978,43 @@ function buildJsonSchema() {
             required: ["experience_title", "role_before", "role_after", "bullets"],
           },
         },
+        project_optimizations: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              name: {
+                type: "string",
+              },
+              bullets: {
+                type: "array",
+                minItems: 1,
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  properties: {
+                    action: {
+                      type: "string",
+                      enum: ["replace", "add"],
+                    },
+                    original: {
+                      type: "string",
+                    },
+                    rewritten: {
+                      type: "string",
+                    },
+                    reason: {
+                      type: "string",
+                    },
+                  },
+                  required: ["action", "original", "rewritten", "reason"],
+                },
+              },
+            },
+            required: ["name", "bullets"],
+          },
+        },
         selected_skills: {
           type: "array",
           items: {
@@ -806,6 +1092,7 @@ function buildJsonSchema() {
         "strengths",
         "gaps",
         "optimizations",
+        "project_optimizations",
         "selected_skills",
         "experience_rewrites",
         "projects_rewrites",
@@ -847,7 +1134,7 @@ async function callOpenAI(
             "Extract the required experience (for example, '5+ years') and job type (remote, hybrid, onsite, unknown).",
             "Provide exactly 3 strengths and exactly 2 gaps.",
             "Provide structured optimization rewrites that are concise and ATS-friendly.",
-            "Also return selected_skills, experience_rewrites, projects_rewrites, and education to support resume LaTeX generation.",
+            "Also return selected_skills, experience_rewrites, project_optimizations, projects_rewrites, and education to support resume LaTeX generation.",
           ].join(" "),
         },
         {
@@ -856,7 +1143,8 @@ async function callOpenAI(
             `Job description:\n${jobDescription}`,
             `Resume text:\n${resumeText || "[No extractable text available]"}`,
             "Infer company and role title from the job description when possible.",
-            "For optimization bullets, use action='replace' for edits to existing bullets and action='add' for new bullets.",
+            "For optimization bullets and project_optimizations bullets, use action='replace' for edits to existing bullets and action='add' for new bullets.",
+            "Each project_optimizations entry must preserve the source project name and pair each original project bullet with its improved rewritten version.",
             "For experience_rewrites and projects_rewrites, provide concise, measurable, ATS-friendly bullets.",
             "If education details are missing in resume text, return empty strings for school/degree/grad_date.",
           ].join("\n\n"),
@@ -884,7 +1172,7 @@ async function callOpenAI(
     throw new HttpError(502, "OPENAI_INVALID_JSON", "Model response was not valid JSON.");
   }
 
-  return normalizeModelOutput(raw, model, requestId);
+  return normalizeModelOutput(raw, model, requestId, resumeText);
 }
 
 serve(async (req) => {

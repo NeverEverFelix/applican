@@ -24,7 +24,7 @@ type LoadingScreenProps = {
 export default function LoadingScreen({ backendProgress = 0 }: LoadingScreenProps) {
   const [projectiles, setProjectiles] = useState<ResumeProjectile[]>([]);
   const [showIntroMessage, setShowIntroMessage] = useState(true);
-  const [showMorph, setShowMorph] = useState(false);
+  const [shouldRevealMorph, setShouldRevealMorph] = useState(false);
   const [quoteIndex, setQuoteIndex] = useState(0);
   const nextId = useRef(1);
   const quoteRef = useRef<HTMLParagraphElement | null>(null);
@@ -75,16 +75,17 @@ export default function LoadingScreen({ backendProgress = 0 }: LoadingScreenProp
 
   useEffect(() => {
     if (showIntroMessage) {
-      setShowMorph(false);
       return;
     }
 
     const timeoutId = window.setTimeout(() => {
-      setShowMorph(true);
+      setShouldRevealMorph(true);
     }, MORPH_REVEAL_DELAY_MS);
 
     return () => window.clearTimeout(timeoutId);
   }, [showIntroMessage]);
+
+  const showMorph = !showIntroMessage && shouldRevealMorph;
 
   useEffect(() => {
     if (!showMorph || !morphRef.current) {

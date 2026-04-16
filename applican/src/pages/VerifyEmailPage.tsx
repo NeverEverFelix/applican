@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
-import { useAuthSession } from "../features/auth/AuthSessionContext";
+import { useAuthSession } from "../features/auth/useAuthSession";
 import { isEmailVerifiedSession } from "../features/auth/emailVerification";
 import styles from "./VerifyEmailPage.module.css";
 

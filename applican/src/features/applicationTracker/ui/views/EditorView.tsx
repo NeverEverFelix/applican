@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import Editor, { type BeforeMount } from "@monaco-editor/react";
 import gsap from "gsap";
 import styles from "../applicationTrack.module.css";
@@ -49,7 +49,7 @@ const configureLatexLanguage: BeforeMount = (monaco) => {
         root: [
           [/\\\\[a-zA-Z@]+/, "keyword"],
           [/%.*$/, "comment"],
-          [/[{}\[\]()]/, "delimiter"],
+          [/[[\]{}()]/, "delimiter"],
           [/\$[^$]*\$/, "string"],
         ],
       },
@@ -125,7 +125,7 @@ export function EditorView() {
   const previewLoaderIconRef = useRef<HTMLDivElement | null>(null);
   const previewLoaderShadowRef = useRef<HTMLDivElement | null>(null);
 
-  const onSelectHistoryItem = async (row: GeneratedResumeRow) => {
+  const onSelectHistoryItem = useCallback(async (row: GeneratedResumeRow) => {
     const transitionToken = previewSelectionTransitionRef.current + 1;
     previewSelectionTransitionRef.current = transitionToken;
 
@@ -153,9 +153,9 @@ export function EditorView() {
     setFilename(row.filename);
     setLatex(row.latex);
     setErrorMessage("");
-  };
+  }, [previewUrl]);
 
-  const loadHistory = async (autoSelectFirst = false, showRefreshAnimation = false) => {
+  const loadHistory = useCallback(async (autoSelectFirst = false, showRefreshAnimation = false) => {
     setIsHistoryLoading(true);
     if (showRefreshAnimation) {
       setIsHistoryRefreshAnimating(true);
@@ -175,9 +175,9 @@ export function EditorView() {
       setIsHistoryLoading(false);
       setIsHistoryRefreshAnimating(false);
     }
-  };
+  }, [onSelectHistoryItem]);
 
-  const compileForRun = async (targetRunId: string, targetRequestId?: string) => {
+  const compileForRun = useCallback(async (targetRunId: string, targetRequestId?: string) => {
     setErrorMessage("");
 
     try {
@@ -194,7 +194,7 @@ export function EditorView() {
       const message = error instanceof Error ? error.message : "Failed to compile LaTeX.";
       setErrorMessage(message);
     }
-  };
+  }, [loadHistory]);
 
   useEffect(() => {
     void (async () => {
@@ -223,7 +223,7 @@ export function EditorView() {
         setErrorMessage(message);
       }
     })();
-  }, []);
+  }, [compileForRun, loadHistory]);
 
   useLayoutEffect(() => {
     if (!pendingFlipRef.current) {
@@ -296,7 +296,7 @@ export function EditorView() {
     })();
   };
 
-  const runPreviewCompile = async (options?: { force?: boolean; clearPreview?: boolean }) => {
+  const runPreviewCompile = useCallback(async (options?: { force?: boolean; clearPreview?: boolean }) => {
     const currentSignature = `${filename}\n${latex}`;
     if (!options?.force && currentSignature === lastCompiledPreviewSignature) {
       return;
@@ -337,7 +337,7 @@ export function EditorView() {
       setIsPreviewFailed(true);
       setIsPreviewLoading(false);
     }
-  };
+  }, [filename, latex, lastCompiledPreviewSignature]);
 
   useEffect(() => {
     if (!latex.trim()) {
@@ -354,7 +354,7 @@ export function EditorView() {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [latex, filename]);
+  }, [latex, filename, runPreviewCompile]);
 
   const onToggleEditorMode = () => {
     pendingFlipRef.current = captureEditorFlipState(workspaceRef.current);

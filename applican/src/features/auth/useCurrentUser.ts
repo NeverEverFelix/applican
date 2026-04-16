@@ -1,5 +1,5 @@
 import type { User } from "@supabase/supabase-js";
-import { useAuthSession } from "./AuthSessionContext";
+import { useAuthSession } from "./useAuthSession";
 
 function getDisplayName(user: User | null) {
   if (!user) {

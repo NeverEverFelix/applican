@@ -1,5 +1,5 @@
 import type { User } from "@supabase/supabase-js";
-import { useAuthSession } from "../../features/auth/AuthSessionContext";
+import { useAuthSession } from "../../features/auth/useAuthSession";
 import styles from "./Profile.module.css";
 import { useChangeEmail } from "./changeEmail";
 import { useChangePassword } from "./changePassword";

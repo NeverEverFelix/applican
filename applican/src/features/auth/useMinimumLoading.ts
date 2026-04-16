@@ -19,7 +19,7 @@ export async function ensureMinimumLoadingDuration(
 
 export function useMinimumLoading(isActive: boolean, minDurationMs = AUTH_LOADING_MIN_MS) {
   const [isVisible, setIsVisible] = useState(isActive);
-  const startedAtRef = useRef<number | null>(isActive ? Date.now() : null);
+  const startedAtRef = useRef<number | null>(null);
   const timeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -29,7 +29,11 @@ export function useMinimumLoading(isActive: boolean, minDurationMs = AUTH_LOADIN
         timeoutRef.current = null;
       }
       startedAtRef.current = Date.now();
-      setIsVisible(true);
+      if (!isVisible) {
+        queueMicrotask(() => {
+          setIsVisible(true);
+        });
+      }
       return;
     }
 

@@ -4,7 +4,7 @@ import styles from "./ChangePassword.module.css";
 import pageImage from "../assets/PageImage.png";
 import logo from "../assets/logo.png";
 import AuthLoadingScreen from "../features/auth/AuthLoadingScreen";
-import { useAuthSession } from "../features/auth/AuthSessionContext";
+import { useAuthSession } from "../features/auth/useAuthSession";
 import { getAuthErrorMessage } from "../features/auth/auth";
 import { useMinimumLoading } from "../features/auth/useMinimumLoading";
 import { supabase } from "../lib/supabaseClient";

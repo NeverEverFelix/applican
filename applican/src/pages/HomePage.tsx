@@ -142,7 +142,7 @@ export default function HomePage() {
               />
               <div className={userStyles.stateControlLabelRow}>
                 <p className={userStyles.stateControlLabel}>{item.label}</p>
-                {item.label === "Career Path" || item.label === "Editor" ? (
+                {item.label === "Career Path" || item.label === "Resources" ? (
                   <span className={userStyles.stateControlSoonLabel}>Coming soon</span>
                 ) : null}
               </div>

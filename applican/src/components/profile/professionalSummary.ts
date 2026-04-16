@@ -47,8 +47,6 @@ export function useProfessionalSummary(userId: string | null) {
 
   useEffect(() => {
     if (!userId) {
-      setSummary("");
-      setSavedSummary("");
       hasLoadedRef.current = false;
       return;
     }
@@ -80,7 +78,8 @@ export function useProfessionalSummary(userId: string | null) {
     };
   }, [userId]);
 
-  const isOverLimit = isProfessionalSummaryOverLimit(summary);
+  const visibleSummary = userId ? summary : "";
+  const isOverLimit = isProfessionalSummaryOverLimit(visibleSummary);
 
   const persistSummary = async () => {
     if (!userId || !hasLoadedRef.current || isOverLimit || summary === savedSummary) {
@@ -92,7 +91,7 @@ export function useProfessionalSummary(userId: string | null) {
   };
 
   return {
-    summary,
+    summary: visibleSummary,
     setSummary,
     persistSummary,
     isOverLimit,

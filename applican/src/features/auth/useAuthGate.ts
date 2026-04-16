@@ -1,4 +1,4 @@
-import { useAuthSession } from "./AuthSessionContext";
+import { useAuthSession } from "./useAuthSession";
 import { isEmailVerifiedSession } from "./emailVerification";
 import { useMinimumLoading } from "./useMinimumLoading";
 

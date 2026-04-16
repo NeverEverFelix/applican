@@ -989,6 +989,11 @@
   text-align: center;
 }
 
+.resumeOptimizationsContainer {
+  position: relative;
+  height: 100%;
+}
+
 .resumeScorePill {
   width: 199.15px;
   height: 48px;
@@ -1147,63 +1152,137 @@
 }
 
 .optimizationGroup {
-  margin-bottom: 26px;
+  margin-bottom: 20px;
 }
 
-.optimizationExperienceTitle {
-  margin: 0 0 10px;
+.resumeOptimizationsCanvas {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.projectOptimizationsSection {
+  margin-top: 75px;
+}
+
+.optimizationJobTitle {
+  margin: 0;
   color: #ffffff;
-  font-size: 36px;
+  font-size: 24px;
+  font-weight: 500;
   line-height: 1.1;
 }
 
-.optimizationRoleLine {
-  margin: 0 0 16px;
-  color: #bfbfbf;
-  font-size: 18px;
-  line-height: 1.35;
-}
-
-.optimizationBulletCard {
-  border: 1px solid #222222;
-  border-radius: 12px;
-  padding: 12px 14px;
-  margin-bottom: 10px;
-  background: #101010;
-}
-
-.optimizationOriginalLine {
-  margin: 0 0 10px;
-  color: #b6b6b6;
-  font-size: 15px;
-  line-height: 1.4;
-}
-
-.optimizationActionTag {
-  display: inline-flex;
-  margin-right: 8px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  background: #222222;
+.optimizationAccordionButton {
+  width: 100%;
+  border: 0;
+  background: transparent;
   color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
 }
 
-.optimizationRewrittenLine {
+.optimizationAccordionChevron {
+  flex: 0 0 auto;
+  color: #ffffff;
+  font-size: 28px;
+  font-weight: 400;
+  line-height: 1;
+  transition: transform 200ms ease;
+}
+
+.optimizationAccordionChevronOpen {
+  transform: rotate(45deg);
+}
+
+.optimizationAccordionBody {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 300ms ease;
+}
+
+.optimizationAccordionBodyInner {
+  padding: 12px 0 0;
+}
+
+.optimizationBulletList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.optimizationBulletItem {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #222222;
+  border-radius: 14px;
+  background: #111111;
+  padding: 12px 14px;
+}
+
+.optimizationBulletButton {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #ffffff;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+}
+
+.optimizationBulletLabel {
+  min-width: 0;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.optimizationBulletChevron {
+  flex: 0 0 auto;
+  color: #ffffff;
+  font-size: 20px;
+  line-height: 1;
+  transition: transform 200ms ease;
+}
+
+.optimizationBulletChevronOpen {
+  transform: rotate(45deg);
+}
+
+.optimizationBulletBody {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 300ms ease;
+}
+
+.optimizationBulletBodyInner {
+  padding: 8px 0 0 0;
+}
+
+.optimizationAccordionBodyText {
   margin: 0;
   color: #ffffff;
-  font-size: 18px;
-  line-height: 1.45;
-  font-weight: 600;
+  white-space: pre-wrap;
 }
 
-.optimizationReasonLine {
-  margin: 8px 0 0;
-  color: #9a9a9a;
-  font-size: 14px;
-  line-height: 1.4;
+.optimizationAccordionBodyTextOptimized {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 28px;
+  letter-spacing: 0.01em;
+  color: #ffffff;
 }
 
 .placeholderPanel {

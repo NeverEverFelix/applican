@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePostHog } from "@posthog/react";
+import { layout, prepare } from "@chenglou/pretext";
 import gsap from "gsap";
 import styles from "../applicationTrack.module.css";
 import starIcon from "../../../../assets/Star.png";
@@ -15,7 +16,7 @@ import LoadingScreen from "../../../../screens/loading/LoadingScreen.tsx";
 import WritingText from "../../../../effects/writing-text";
 import TypingText from "../../../../effects/typing-text";
 import ScrollSections from "../../../../effects/ScrollSections";
-import { CardStack } from "../../../../components/cardstack/cardstack";
+import { supabase } from "../../../../lib/supabaseClient";
 
 type ResumeStudioOutput = {
   job: {
@@ -31,88 +32,703 @@ type ResumeStudioOutput = {
     strengths: string[];
     gaps: string[];
   };
-  optimizations: Array<{
-    experience_title: string;
-    role_before: string;
-    role_after: string;
-    bullets: Array<{
-      original: string;
-      rewritten: string;
-      action: "replace" | "add";
-      reason: string;
-    }>;
-  }>;
 };
 
 const RESUME_FILE_DB_NAME = "applican_resume_file_db";
 const RESUME_FILE_STORE_NAME = "resume_files";
 const RESUME_FILE_KEY = "latest_resume";
 const DEFAULT_PAGE_TITLE = "applican";
+const OPTIMIZATIONS_TOP = 117;
+const OPTIMIZATIONS_LEFT = 51;
+const OPTIMIZATIONS_WIDTH = 780;
+const ACCORDION_BODY_FONT = '700 18px "Neue Haas Grotesk Display Pro"';
+const ACCORDION_BODY_LINE_HEIGHT = 28;
 
 function cleanString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function normalizeOptimizations(value: unknown): ResumeStudioOutput["optimizations"] {
-  if (!Array.isArray(value)) {
+type OriginalBulletSection = {
+  title: string;
+  bullets: OptimizationBullet[];
+};
+
+type ProjectBulletSection = {
+  title: string;
+  bullets: OptimizationBullet[];
+};
+
+type OptimizationBullet = {
+  original: string | null;
+  rewritten: string;
+  action: "replace" | "add";
+};
+
+type ParsedExperienceSection = {
+  title: string;
+  bullets: string[];
+};
+
+function isOptimizationBullet(value: OptimizationBullet | null): value is OptimizationBullet {
+  return Boolean(value);
+}
+
+function createOptimizedBullet(
+  original: string | null,
+  rewritten: string,
+  action: "replace" | "add",
+): OptimizationBullet {
+  return { original, rewritten, action };
+}
+
+function createFallbackBullet(text: string): OptimizationBullet {
+  return createOptimizedBullet(null, text, "add");
+}
+
+function normalizeMatchText(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function parseExperienceSections(resumeText: string): ParsedExperienceSection[] {
+  const lines = resumeText
+    .replace(/\f/g, "\n")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const experienceIndex = lines.findIndex((line) => normalizeMatchText(line) === "experience");
+  if (experienceIndex === -1) {
     return [];
   }
 
-  return value
-    .map((entry) => {
-      if (!entry || typeof entry !== "object") {
+  const endIndex = lines.findIndex(
+    (line, index) =>
+      index > experienceIndex &&
+      ["projects", "technical skills", "skills", "education", "certifications"].includes(normalizeMatchText(line)),
+  );
+  const slice = lines.slice(experienceIndex + 1, endIndex === -1 ? undefined : endIndex);
+
+  const sections: ParsedExperienceSection[] = [];
+  let currentTitle = "";
+  let currentBullets: string[] = [];
+  let sawBullet = false;
+
+  const flush = () => {
+    if (!currentTitle || currentBullets.length === 0) {
+      currentTitle = "";
+      currentBullets = [];
+      sawBullet = false;
+      return;
+    }
+
+    sections.push({
+      title: currentTitle,
+      bullets: currentBullets,
+    });
+    currentTitle = "";
+    currentBullets = [];
+    sawBullet = false;
+  };
+
+  for (let index = 0; index < slice.length; index += 1) {
+    const line = slice[index];
+    const isBullet = line.startsWith("•");
+    const nextLine = slice[index + 1] ?? "";
+
+    if (isBullet) {
+      if (!currentTitle) {
+        currentTitle = `Experience ${sections.length + 1}`;
+      }
+      sawBullet = true;
+      currentBullets.push(line.replace(/^•\s*/, "").trim());
+      continue;
+    }
+
+    if (sawBullet) {
+      const lastBulletIndex = currentBullets.length - 1;
+      const nextLineStartsBullet = nextLine.startsWith("•");
+      const looksLikeNextTitle =
+        /^[A-Z]/.test(line) &&
+        !/[,:]/.test(line) &&
+        !nextLineStartsBullet &&
+        !/[–-]/.test(line) &&
+        currentBullets.length > 0;
+      if (lastBulletIndex >= 0 && !looksLikeNextTitle) {
+        currentBullets[lastBulletIndex] = `${currentBullets[lastBulletIndex]} ${line}`.replace(/\s+/g, " ").trim();
+        continue;
+      }
+
+      flush();
+      currentTitle = line;
+      continue;
+    }
+
+    if (!currentTitle) {
+      currentTitle = line;
+    }
+  }
+
+  flush();
+  return sections;
+}
+
+function buildOptimizationSection(optimization: unknown, index: number): OriginalBulletSection | null {
+  if (!optimization || typeof optimization !== "object") {
+    return null;
+  }
+
+  const title =
+    [
+      cleanString((optimization as { experience_title?: unknown }).experience_title),
+      cleanString((optimization as { role_before?: unknown }).role_before),
+      cleanString((optimization as { role_after?: unknown }).role_after),
+    ].find(Boolean) ?? `Experience ${index + 1}`;
+
+  const bullets: OptimizationBullet[] = Array.isArray((optimization as { bullets?: unknown }).bullets)
+    ? ((optimization as { bullets?: unknown }).bullets as unknown[])
+        .map((bullet) => {
+          if (!bullet || typeof bullet !== "object") {
+            return null;
+          }
+
+          const row = bullet as { original?: unknown; rewritten?: unknown; action?: unknown };
+          const original = cleanString(row.original);
+          const rewritten = cleanString(row.rewritten);
+          const action = row.action === "add" ? "add" : "replace";
+
+          if (!original && !rewritten) {
+            return null;
+          }
+
+          return createOptimizedBullet(
+            action === "replace" && original ? original : null,
+            rewritten || original,
+            action,
+          );
+        })
+        .filter(isOptimizationBullet)
+    : [];
+
+  return bullets.length > 0 ? { title, bullets } : null;
+}
+
+function buildFallbackSection(
+  rewrite: unknown,
+  index: number,
+  sourceSection?: ParsedExperienceSection,
+): OriginalBulletSection | null {
+  if (!rewrite || typeof rewrite !== "object") {
+    return null;
+  }
+
+  const title = cleanString((rewrite as { title?: unknown }).title) || `Experience ${index + 1}`;
+  const bullets: OptimizationBullet[] = Array.isArray((rewrite as { bullets?: unknown }).bullets)
+    ? ((rewrite as { bullets?: unknown }).bullets as unknown[])
+        .map((bullet, bulletIndex) => {
+          const text = cleanString(bullet);
+          if (!text) {
+            return null;
+          }
+
+          return createOptimizedBullet(cleanString(sourceSection?.bullets[bulletIndex]) || null, text, "add");
+        })
+        .filter(isOptimizationBullet)
+    : [];
+
+  return bullets.length > 0
+    ? {
+        title,
+        bullets,
+      }
+    : null;
+}
+
+function extractOriginalBulletSections(value: unknown, sourceSections: ParsedExperienceSection[] = []): OriginalBulletSection[] {
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+
+  const root = value as {
+    source_experience_sections?: Array<{
+      title?: unknown;
+      bullets?: unknown;
+    }>;
+    tailored_resume_input?: {
+      experience_rewrites?: Array<{
+        company?: unknown;
+        title?: unknown;
+        bullets?: unknown;
+      }>;
+    };
+    optimizations?: Array<{
+      experience_title?: unknown;
+      role_before?: unknown;
+      role_after?: unknown;
+      bullets?: Array<{
+        original?: unknown;
+        rewritten?: unknown;
+        action?: unknown;
+      }>;
+    }>;
+  };
+
+  const resolvedSourceSections = Array.isArray(root.source_experience_sections)
+    ? root.source_experience_sections
+        .map((section, index) => {
+          if (!section || typeof section !== "object") {
+            return null;
+          }
+
+          const title = cleanString((section as { title?: unknown }).title) || `Experience ${index + 1}`;
+          const bullets = Array.isArray((section as { bullets?: unknown }).bullets)
+            ? ((section as { bullets?: unknown }).bullets as unknown[]).map(cleanString).filter(Boolean)
+            : [];
+
+          return bullets.length > 0 ? { title, bullets } : null;
+        })
+        .filter((section): section is ParsedExperienceSection => Boolean(section))
+    : sourceSections;
+
+  const experienceRewrites = Array.isArray(root.tailored_resume_input?.experience_rewrites)
+    ? root.tailored_resume_input?.experience_rewrites
+    : [];
+  const optimizations = Array.isArray(root.optimizations) ? root.optimizations : [];
+
+  if (resolvedSourceSections.length > 0) {
+    const optimizationSections = optimizations
+      .map((optimization, index) => buildOptimizationSection(optimization, index))
+      .filter((entry): entry is OriginalBulletSection => Boolean(entry && entry.bullets.length > 0));
+
+    return resolvedSourceSections
+      .map((sourceSection, sectionIndex) => {
+        const rewrite = experienceRewrites[sectionIndex];
+        const rewriteBullets =
+          rewrite && typeof rewrite === "object" && Array.isArray((rewrite as { bullets?: unknown }).bullets)
+            ? ((rewrite as { bullets?: unknown }).bullets as unknown[]).map(cleanString)
+            : [];
+        const optimizationSection = optimizationSections[sectionIndex];
+        const title =
+          cleanString(optimizationSection?.title) ||
+          cleanString((rewrite as { title?: unknown } | undefined)?.title) ||
+          cleanString(sourceSection.title) ||
+          `Experience ${sectionIndex + 1}`;
+
+        const bulletCount = Math.max(
+          sourceSection.bullets.length,
+          rewriteBullets.filter(Boolean).length,
+          optimizationSection?.bullets.length ?? 0,
+        );
+
+        const bullets = Array.from({ length: bulletCount }, (_, bulletIndex) => {
+          const sourceOriginal = cleanString(sourceSection.bullets[bulletIndex]);
+          const optimizationBullet = optimizationSection?.bullets[bulletIndex] ?? null;
+          const rewritten =
+            cleanString(optimizationBullet?.rewritten) ||
+            cleanString(rewriteBullets[bulletIndex]) ||
+            sourceOriginal;
+
+          if (!sourceOriginal && !rewritten) {
+            return null;
+          }
+
+          return {
+            original: sourceOriginal || null,
+            rewritten: rewritten || sourceOriginal,
+            action: optimizationBullet?.action ?? "replace",
+          };
+        }).filter((bullet): bullet is OptimizationBullet => Boolean(bullet));
+
+        return bullets.length > 0 ? { title, bullets } : null;
+      })
+      .filter((entry): entry is OriginalBulletSection => Boolean(entry));
+  }
+
+  if (optimizations.length > 0) {
+    const optimizationSections = optimizations
+      .map((optimization, index) => buildOptimizationSection(optimization, index))
+      .filter((entry): entry is OriginalBulletSection => Boolean(entry && entry.bullets.length > 0));
+
+    const mergedSections = experienceRewrites
+      .map((rewrite, rewriteIndex) => {
+        const fallbackSection = buildFallbackSection(rewrite, rewriteIndex, resolvedSourceSections[rewriteIndex]);
+        if (!fallbackSection) {
+          return null;
+        }
+
+        const optimizationSection = optimizationSections[rewriteIndex];
+        if (!optimizationSection) {
+          return fallbackSection;
+        }
+
+        return {
+          title: optimizationSection.title || fallbackSection.title,
+          bullets: fallbackSection.bullets.map((fallbackBullet, bulletIndex) => {
+            const optimizationBullet = optimizationSection.bullets[bulletIndex];
+            if (!optimizationBullet) {
+              return fallbackBullet;
+            }
+
+            return {
+              original:
+                cleanString(resolvedSourceSections[rewriteIndex]?.bullets[bulletIndex]) ||
+                cleanString(optimizationBullet.original) ||
+                fallbackBullet.original,
+              rewritten: cleanString(optimizationBullet.rewritten) || fallbackBullet.rewritten,
+              action: optimizationBullet.action,
+            };
+          }),
+        };
+      })
+      .filter((entry): entry is OriginalBulletSection => Boolean(entry));
+
+    const unmatchedOptimizationSections = optimizationSections.slice(experienceRewrites.length);
+    return [...mergedSections, ...unmatchedOptimizationSections];
+  }
+
+  return experienceRewrites
+    .map((rewrite, index) => buildFallbackSection(rewrite, index, resolvedSourceSections[index]))
+    .filter((entry): entry is OriginalBulletSection => Boolean(entry && entry.bullets.length > 0));
+}
+
+function extractProjectBulletSections(value: unknown): ProjectBulletSection[] {
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+
+  const root = value as {
+    project_optimizations?: Array<{
+      name?: unknown;
+      bullets?: Array<{
+        original?: unknown;
+        rewritten?: unknown;
+        action?: unknown;
+      }>;
+    }>;
+    tailored_resume_input?: {
+      projects_rewrites?: Array<{
+        name?: unknown;
+        bullets?: unknown;
+      }>;
+    };
+  };
+
+  const projects = Array.isArray(root.tailored_resume_input?.projects_rewrites)
+    ? root.tailored_resume_input?.projects_rewrites
+    : [];
+  const projectOptimizations = Array.isArray(root.project_optimizations) ? root.project_optimizations : [];
+
+  if (projectOptimizations.length > 0) {
+    return projectOptimizations
+      .map((project, index) => {
+        if (!project || typeof project !== "object") {
+          return null;
+        }
+
+        const title = cleanString((project as { name?: unknown }).name) || `Project ${index + 1}`;
+        const bullets: OptimizationBullet[] = Array.isArray((project as { bullets?: unknown }).bullets)
+          ? ((project as { bullets?: unknown }).bullets as unknown[])
+              .map((bullet) => {
+                if (!bullet || typeof bullet !== "object") {
+                  return null;
+                }
+
+                const row = bullet as { original?: unknown; rewritten?: unknown; action?: unknown };
+                const original = cleanString(row.original);
+                const rewritten = cleanString(row.rewritten);
+                const action = row.action === "add" ? "add" : "replace";
+
+                if (!original && !rewritten) {
+                  return null;
+                }
+
+                return createOptimizedBullet(
+                  action === "replace" && original ? original : null,
+                  rewritten || original,
+                  action,
+                );
+              })
+              .filter(isOptimizationBullet)
+          : [];
+
+        return {
+          title,
+          bullets,
+        };
+      })
+      .filter((entry): entry is ProjectBulletSection => Boolean(entry));
+  }
+
+  return projects
+    .map((project, index) => {
+      if (!project || typeof project !== "object") {
         return null;
       }
 
-      const optimization = entry as {
-        experience_title?: unknown;
-        role_before?: unknown;
-        role_after?: unknown;
-        bullets?: unknown;
-      };
-
-      const bullets = Array.isArray(optimization.bullets)
-        ? optimization.bullets
+      const title = cleanString((project as { name?: unknown }).name) || `Project ${index + 1}`;
+      const bullets: OptimizationBullet[] = Array.isArray((project as { bullets?: unknown }).bullets)
+        ? ((project as { bullets?: unknown }).bullets as unknown[])
             .map((bullet) => {
-              if (!bullet || typeof bullet !== "object") {
+              const text = cleanString(bullet);
+              if (!text) {
                 return null;
               }
 
-              const row = bullet as {
-                original?: unknown;
-                rewritten?: unknown;
-                action?: unknown;
-                reason?: unknown;
-              };
-
-              const rewritten = cleanString(row.rewritten);
-              if (!rewritten) {
-                return null;
-              }
-              const action: "replace" | "add" = row.action === "add" ? "add" : "replace";
-
-              return {
-                original: cleanString(row.original),
-                rewritten,
-                action,
-                reason: cleanString(row.reason),
-              };
+              return createFallbackBullet(text);
             })
-            .filter((bullet): bullet is NonNullable<typeof bullet> => Boolean(bullet))
+            .filter(isOptimizationBullet)
         : [];
 
-      if (bullets.length === 0) {
-        return null;
-      }
-
       return {
-        experience_title: cleanString(optimization.experience_title),
-        role_before: cleanString(optimization.role_before),
-        role_after: cleanString(optimization.role_after),
+        title,
         bullets,
       };
     })
-    .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+    .filter((entry): entry is ProjectBulletSection => Boolean(entry));
+}
+
+function OptimizationSectionAccordion({ section }: { section: OriginalBulletSection }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const innerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const node = innerRef.current;
+    if (!node || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const updateHeight = () => {
+      const bodyEl = bodyRef.current;
+      if (!bodyEl) {
+        return;
+      }
+
+      if (isOpen) {
+        bodyEl.style.maxHeight = `${node.scrollHeight}px`;
+      } else {
+        bodyEl.style.maxHeight = "0px";
+        bodyEl.style.overflow = "hidden";
+      }
+    };
+
+    updateHeight();
+    const observer = new ResizeObserver(() => {
+      updateHeight();
+    });
+    observer.observe(node);
+
+    return () => observer.disconnect();
+  }, [isOpen]);
+
+  useEffect(() => {
+    const bodyEl = bodyRef.current;
+    const innerEl = innerRef.current;
+    if (!bodyEl) {
+      return;
+    }
+
+    if (!isOpen) {
+      if (innerEl) {
+        bodyEl.style.maxHeight = `${innerEl.scrollHeight}px`;
+        void bodyEl.offsetHeight;
+      }
+      bodyEl.style.maxHeight = "0px";
+      bodyEl.style.overflow = "hidden";
+      return;
+    }
+
+    bodyEl.style.maxHeight = `${innerEl?.scrollHeight ?? 0}px`;
+    bodyEl.style.overflow = "hidden";
+
+    const timeoutId = window.setTimeout(() => {
+      if (!bodyRef.current || !isOpen) {
+        return;
+      }
+
+      bodyRef.current.style.maxHeight = "none";
+      bodyRef.current.style.overflow = "visible";
+    }, 320);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isOpen, section.bullets.length]);
+
+  return (
+    <section className={styles.optimizationGroup}>
+      <button
+        type="button"
+        className={styles.optimizationAccordionButton}
+        onClick={() => setIsOpen((current) => !current)}
+        aria-expanded={isOpen}
+      >
+        <span className={styles.optimizationJobTitle}>{section.title}</span>
+        <span
+          className={[
+            styles.optimizationAccordionChevron,
+            isOpen ? styles.optimizationAccordionChevronOpen : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          aria-hidden="true"
+        >
+          +
+        </span>
+      </button>
+
+      <div ref={bodyRef} className={styles.optimizationAccordionBody}>
+        <div ref={innerRef} className={styles.optimizationAccordionBodyInner}>
+          <div className={styles.optimizationBulletList}>
+            {section.bullets.map((bullet, index) => (
+              <OptimizationBulletAccordion
+                key={`${section.title}-${index}`}
+                original={bullet.original}
+                rewritten={bullet.rewritten}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function OptimizationBulletAccordion({
+  original,
+  rewritten,
+}: {
+  original: string | null;
+  rewritten: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const innerRef = useRef<HTMLDivElement | null>(null);
+  const [contentWidth, setContentWidth] = useState(0);
+  const prepared = useMemo(
+    () => prepare(rewritten, ACCORDION_BODY_FONT, { whiteSpace: "pre-wrap" }),
+    [rewritten],
+  );
+
+  useEffect(() => {
+    const node = innerRef.current;
+    if (!node || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const updateWidth = () => {
+      setContentWidth(node.getBoundingClientRect().width);
+    };
+
+    updateWidth();
+    const observer = new ResizeObserver(() => {
+      updateWidth();
+    });
+    observer.observe(node);
+
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const bodyEl = bodyRef.current;
+    const innerEl = innerRef.current;
+    if (!bodyEl) {
+      return;
+    }
+
+    if (!isOpen || contentWidth <= 0) {
+      if (innerEl) {
+        bodyEl.style.maxHeight = `${innerEl.scrollHeight}px`;
+        void bodyEl.offsetHeight;
+      }
+      bodyEl.style.maxHeight = "0px";
+      bodyEl.style.overflow = "hidden";
+      return;
+    }
+
+    const { height } = layout(prepared, contentWidth, ACCORDION_BODY_LINE_HEIGHT);
+    const computedStyles = innerEl ? window.getComputedStyle(innerEl) : null;
+    const paddingTop = computedStyles ? Number.parseFloat(computedStyles.paddingTop) || 0 : 0;
+    const paddingBottom = computedStyles ? Number.parseFloat(computedStyles.paddingBottom) || 0 : 0;
+    bodyEl.style.maxHeight = `${height + paddingTop + paddingBottom}px`;
+    bodyEl.style.overflow = "hidden";
+
+    const timeoutId = window.setTimeout(() => {
+      if (!bodyRef.current || !isOpen) {
+        return;
+      }
+
+      bodyRef.current.style.maxHeight = "none";
+      bodyRef.current.style.overflow = "visible";
+    }, 320);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [contentWidth, isOpen, prepared]);
+
+  const label = cleanString(original) || rewritten;
+
+  return (
+    <div className={styles.optimizationBulletItem}>
+      <button
+        type="button"
+        className={styles.optimizationBulletButton}
+        onClick={() => setIsOpen((current) => !current)}
+        aria-expanded={isOpen}
+      >
+        <span className={styles.optimizationBulletLabel}>{label}</span>
+        <span
+          className={[
+            styles.optimizationBulletChevron,
+            isOpen ? styles.optimizationBulletChevronOpen : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          aria-hidden="true"
+        >
+          +
+        </span>
+      </button>
+
+      <div ref={bodyRef} className={styles.optimizationBulletBody}>
+        <div ref={innerRef} className={styles.optimizationBulletBodyInner}>
+          <p className={styles.optimizationAccordionBodyText}>
+            <strong className={styles.optimizationAccordionBodyTextOptimized}>{rewritten}</strong>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ResumeOptimizationsPanel({
+  sections,
+  projectSections,
+}: {
+  sections: OriginalBulletSection[];
+  projectSections: ProjectBulletSection[];
+}) {
+  return (
+    <div
+      className={styles.resumeOptimizationsCanvas}
+      style={{
+        top: `${OPTIMIZATIONS_TOP}px`,
+        left: `${OPTIMIZATIONS_LEFT}px`,
+        width: `${OPTIMIZATIONS_WIDTH}px`,
+      }}
+    >
+      {sections.map((section, index) => (
+        <OptimizationSectionAccordion key={`${section.title}-${index}`} section={section} />
+      ))}
+      {projectSections.length > 0 ? (
+        <div className={styles.projectOptimizationsSection}>
+          {projectSections.map((section, index) => (
+            <OptimizationSectionAccordion key={`project-${section.title}-${index}`} section={section} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function openResumeFileDb(): Promise<IDBDatabase> {
@@ -190,8 +806,7 @@ function toResumeStudioOutput(value: unknown): ResumeStudioOutput | null {
     !maybe.match ||
     typeof maybe.match !== "object" ||
     !maybe.analysis ||
-    typeof maybe.analysis !== "object" ||
-    !Array.isArray(maybe.optimizations)
+    typeof maybe.analysis !== "object"
   ) {
     return null;
   }
@@ -225,7 +840,6 @@ function toResumeStudioOutput(value: unknown): ResumeStudioOutput | null {
       strengths: analysis.strengths.filter((item): item is string => typeof item === "string"),
       gaps: analysis.gaps.filter((item): item is string => typeof item === "string"),
     },
-    optimizations: normalizeOptimizations(maybe.optimizations),
   };
 }
 
@@ -264,10 +878,18 @@ export function ResumeStudioView() {
   const [jobDescriptionValidationError, setJobDescriptionValidationError] = useState("");
   const [resumeValidationError, setResumeValidationError] = useState("");
   const [revealedAnalysisCount, setRevealedAnalysisCount] = useState(0);
+  const [persistedRunId, setPersistedRunId] = useState("");
+  const [experienceSourceSections, setExperienceSourceSections] = useState<ParsedExperienceSection[]>([]);
   const { submitResumeRun, isSubmitting, errorMessage, progressMessage, progressPercent, createdRun } = useCreateResumeRun();
 
   const currentRunOutput = createdRun?.row.output ?? persistedRunOutput;
+  const currentRunId = createdRun?.row.id ?? persistedRunId;
   const parsedOutput = useMemo(() => toResumeStudioOutput(currentRunOutput), [currentRunOutput]);
+  const originalBulletSections = useMemo(
+    () => extractOriginalBulletSections(currentRunOutput, experienceSourceSections),
+    [currentRunOutput, experienceSourceSections],
+  );
+  const projectBulletSections = useMemo(() => extractProjectBulletSections(currentRunOutput), [currentRunOutput]);
   const hasResult = Boolean(parsedOutput);
   const hasRunOutput = currentRunOutput !== null && currentRunOutput !== undefined;
   const shouldShowResults = showComputedResults && hasResult;
@@ -341,6 +963,7 @@ export function ResumeStudioView() {
         if (!isActive || latestRun?.output === null || latestRun?.output === undefined) {
           return;
         }
+        setPersistedRunId(latestRun.id);
         setPersistedRunOutput(latestRun.output);
       } catch {
         // Ignore hydration failures and use local persisted output.
@@ -351,6 +974,36 @@ export function ResumeStudioView() {
       isActive = false;
     };
   }, [createdRun?.row.output, setPersistedRunOutput]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    if (!currentRunId) {
+      setExperienceSourceSections([]);
+      return () => {
+        isActive = false;
+      };
+    }
+
+    void (async () => {
+      const { data, error } = await supabase
+        .from("resume_documents")
+        .select("text")
+        .eq("run_id", currentRunId)
+        .maybeSingle();
+
+      if (!isActive || error) {
+        return;
+      }
+
+      const resumeText = typeof data?.text === "string" ? data.text : "";
+      setExperienceSourceSections(parseExperienceSections(resumeText));
+    })();
+
+    return () => {
+      isActive = false;
+    };
+  }, [currentRunId]);
 
   const validateJobDescription = (value: string) => {
     if (value.trim().length > MIN_JOB_DESCRIPTION_LENGTH) {
@@ -771,7 +1424,10 @@ export function ResumeStudioView() {
                 content: (
                   <div className={styles.resumeOptimizationsContainer}>
                     <h3 className={styles.resumeOptimizationsTitle}>Resume Optimizations</h3>
-                    <CardStack optimizations={parsedOutput?.optimizations ?? []} />
+                    <ResumeOptimizationsPanel
+                      sections={originalBulletSections}
+                      projectSections={projectBulletSections}
+                    />
                   </div>
                 ),
               },
@@ -879,21 +1535,6 @@ export function ResumeStudioView() {
             </>
           ) : null}
 
-          <div className={styles.resumeAnalysisSeparatorWrap}>
-            <div className={styles.resumeAnalysisBottomSeparator} aria-hidden="true" />
-          </div>
-
-          <div
-            className={[
-              styles.resumeOptimizationsContainer,
-              isAnalysisCollapsed ? styles.resumeOptimizationsContainerExpanded : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            <h3 className={styles.resumeOptimizationsTitle}>Resume Optimizations</h3>
-            <CardStack optimizations={parsedOutput?.optimizations ?? []} />
-          </div>
         </section>
       )}
     </div>

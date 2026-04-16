@@ -1,12 +1,7 @@
-import { createContext, useCallback, useContext, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import type { ReactNode } from "react";
 import LoginScreenTransition, { type LoginScreenTransitionHandle } from "./MorphTransition";
-
-type LoginTransitionContextValue = {
-  runLoginTransition: (callbacks?: { onCovered?: () => void; onComplete?: () => void }) => void;
-};
-
-const LoginTransitionContext = createContext<LoginTransitionContextValue | null>(null);
+import { LoginTransitionContext } from "./loginTransitionContext";
 
 export function LoginTransitionProvider({ children }: { children: ReactNode }) {
   const transitionRef = useRef<LoginScreenTransitionHandle | null>(null);
@@ -31,14 +26,4 @@ export function LoginTransitionProvider({ children }: { children: ReactNode }) {
       <LoginScreenTransition ref={transitionRef} />
     </LoginTransitionContext.Provider>
   );
-}
-
-export function useLoginTransition() {
-  const context = useContext(LoginTransitionContext);
-
-  if (!context) {
-    throw new Error("useLoginTransition must be used within a LoginTransitionProvider");
-  }
-
-  return context;
 }
