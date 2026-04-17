@@ -156,7 +156,7 @@ export default function HomePage() {
             <UserInfoCard user={{ name: currentUserName, plan: currentUserPlan }} />
           </div>
         ) : null}
-        <ApplicationTracker selectedView={selectedView} />
+        <ApplicationTracker selectedView={selectedView} onSelectView={onSelectView} />
       </div>
       <AppModal open={isUpgradeModalOpen} onClose={closeUpgradeModalAndOpenMenu} />
     </div>

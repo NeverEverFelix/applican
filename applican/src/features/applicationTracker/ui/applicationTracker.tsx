@@ -6,9 +6,10 @@ import { ApplicationTrackerContent } from "./applicationTrackerContent";
 
 type ApplicationTrackerProps = {
   selectedView: PickerView;
+  onSelectView: (view: PickerView) => void;
 };
 
-export default function ApplicationTracker({ selectedView }: ApplicationTrackerProps) {
+export default function ApplicationTracker({ selectedView, onSelectView }: ApplicationTrackerProps) {
   const studioVariant = getStudioContainerVariant(selectedView);
   const [selectedStatus, setSelectedStatus] = useState<ApplicationTrackerStatus>("all");
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -62,6 +63,7 @@ export default function ApplicationTracker({ selectedView }: ApplicationTrackerP
         selectedView={selectedView}
         selectedStatus={selectedStatus}
         onSelectStatus={setSelectedStatus}
+        onSelectView={onSelectView}
       />
     </div>
   );

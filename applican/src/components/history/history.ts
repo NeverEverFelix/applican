@@ -4,7 +4,9 @@ export type HistoryCardData = {
   role: string;
   company: string;
   location: string;
+  industry: string;
   createdAt: string;
+  appliedAt: string;
   submittedAtIso?: string;
   score: number;
   experienceNeeded: string;
@@ -21,7 +23,9 @@ export const historyCardSeed: HistoryCardData = {
   role: "Senior Product Designer",
   company: "Figma",
   location: "San Francisco, CA",
+  industry: "Design Software",
   createdAt: "Mar 11, 2026",
+  appliedAt: "Mar 14, 2026",
   score: 92,
   experienceNeeded: "5 years",
   jobType: "Hybrid",
@@ -37,7 +41,9 @@ export const historyCardsMock: HistoryCardData[] = [
     role: "Product Designer",
     company: "Notion",
     location: "New York, NY",
+    industry: "Productivity Software",
     createdAt: "Mar 9, 2026",
+    appliedAt: "Mar 10, 2026",
     score: 88,
     experienceNeeded: "4 years",
     jobType: "Remote",
@@ -50,7 +56,9 @@ export const historyCardsMock: HistoryCardData[] = [
     role: "Senior UX Designer",
     company: "Airbnb",
     location: "San Francisco, CA",
+    industry: "Travel",
     createdAt: "Mar 7, 2026",
+    appliedAt: "Mar 8, 2026",
     score: 90,
     experienceNeeded: "6 years",
     jobType: "Onsite",

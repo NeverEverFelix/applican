@@ -1,9 +1,11 @@
+import { useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { useAuthSession } from "../../features/auth/useAuthSession";
 import styles from "./Profile.module.css";
 import { useChangeEmail } from "./changeEmail";
 import { useChangePassword } from "./changePassword";
 import { useProfessionalSummary } from "./professionalSummary";
+import cancelIcon from "../../assets/cancel.svg";
 
 function getNameParts(user: User | null) {
   const fullName =
@@ -24,9 +26,14 @@ function getNameParts(user: User | null) {
   };
 }
 
-export default function Profile() {
+type ProfileProps = {
+  onClose?: () => void;
+};
+
+export default function Profile({ onClose }: ProfileProps) {
   const { session } = useAuthSession();
   const user = session?.user ?? null;
+  const [isSummaryFocused, setIsSummaryFocused] = useState(false);
   const { firstName, lastName } = getNameParts(user);
   const email = user?.email ?? "";
   const { summary, setSummary, persistSummary, isOverLimit } = useProfessionalSummary(user?.id ?? null);
@@ -52,6 +59,14 @@ export default function Profile() {
 
   return (
     <section className={styles.profileView}>
+      <button
+        type="button"
+        className={styles.dismissButton}
+        onClick={onClose}
+        aria-label="Close profile and return to Resume Studio"
+      >
+        <img src={cancelIcon} alt="" className={styles.dismissIcon} />
+      </button>
       <div className={styles.profileColumn}>
         <div className={styles.nameRow}>
           <input type="text" className={styles.firstNameTextbox} defaultValue={firstName} />
@@ -82,7 +97,7 @@ export default function Profile() {
           <span
             className={[
               styles.professionalSummaryPlaceholder,
-              summary.length > 0 ? styles.professionalSummaryPlaceholderHidden : "",
+              isSummaryFocused || summary.length > 0 ? styles.professionalSummaryPlaceholderHidden : "",
             ]
               .join(" ")
               .trim()}
@@ -93,7 +108,9 @@ export default function Profile() {
             className={[styles.professionalSummaryTextbox, isOverLimit ? styles.professionalSummaryTextboxInvalid : ""].join(" ").trim()}
             value={summary}
             onChange={(event) => setSummary(event.target.value)}
+            onFocus={() => setIsSummaryFocused(true)}
             onBlur={() => {
+              setIsSummaryFocused(false);
               void persistSummary();
             }}
           />

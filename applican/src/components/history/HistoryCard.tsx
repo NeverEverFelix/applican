@@ -1,6 +1,7 @@
 import styles from "./HistoryCard.module.css";
 import { historyCardSeed, type HistoryCardData } from "./history";
 import applicanCreamIcon from "../../assets/resume-icons/applican-cream-resume-icon.svg";
+import clockIcon from "../../assets/clock.svg";
 
 type HistoryCardProps = {
   data?: HistoryCardData;
@@ -15,8 +16,11 @@ export default function HistoryCard({
   isResumeIconDisabled = false,
   showSummary = true,
 }: HistoryCardProps) {
-  const { role, company, location, score, experienceNeeded, jobType, createdAt, analysisSummary } = data;
-  const locationDisplay = `${company} - ${location}`;
+  const { role, company, location, industry, score, experienceNeeded, jobType, createdAt, appliedAt, analysisSummary } =
+    data;
+  const titleDisplay = `${company} - ${role}`;
+  const locationDisplay =
+    location.trim().toLowerCase() === "unknown location" || location.trim() === "" ? "Location: N/A" : location;
   const isIconClickable = Boolean(onResumeIconClick);
 
   return (
@@ -38,7 +42,7 @@ export default function HistoryCard({
         </button>
 
         <div className={styles.titleLocationContainer}>
-          <p className={styles.titleText}>{role}</p>
+          <p className={styles.titleText}>{titleDisplay}</p>
           <p className={styles.locationText}>{locationDisplay}</p>
         </div>
       </div>
@@ -46,13 +50,20 @@ export default function HistoryCard({
       <div className={styles.contentStack}>
         <div className={styles.infoPillsContainer}>
           <div className={styles.pillRowTop}>
-            <span className={[styles.infoPill, styles.resumeScorePill].join(" ")}>{`Resume Score: ${score}`}</span>
+            <span className={[styles.infoPill, styles.resumeScorePill].join(" ")}>{`${score}% Match`}</span>
             <span className={[styles.infoPill, styles.analysisSubmittedPill].join(" ")}>{`Date: ${createdAt}`}</span>
             <span className={[styles.infoPill, styles.yearsExperiencePill].join(" ")}>{`Experience: ${experienceNeeded}`}</span>
           </div>
 
           <div className={styles.pillRowBottom}>
+            <span className={[styles.infoPill, styles.industryPill].join(" ")}>{`Industry: ${industry}`}</span>
             <span className={[styles.infoPill, styles.jobStatusPill].join(" ")}>{`Job Type: ${jobType}`}</span>
+            <span className={[styles.infoPill, styles.appliedDatePill].join(" ")}>
+              <span className={styles.appliedDateContent}>
+                <img src={clockIcon} alt="" className={styles.appliedDateIcon} />
+                <span>{`Applied: ${appliedAt}`}</span>
+              </span>
+            </span>
           </div>
         </div>
         {showSummary ? (

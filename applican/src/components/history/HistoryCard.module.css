@@ -119,10 +119,10 @@
 .infoPill {
   border-radius: 100px;
   border: 2px solid rgba(180, 180, 180, 0.25);
-  padding: 0 12px;
-  font-size: 14px;
+  padding: 0 16px;
+  font-size: 21px;
   font-weight: 500;
-  line-height: 1;
+  line-height: 1.05;
   color: #000000;
   display: inline-flex;
   align-items: center;
@@ -130,27 +130,33 @@
   text-align: center;
   box-sizing: border-box;
   white-space: nowrap;
+  letter-spacing: -0.01em;
 }
 
 .resumeScorePill {
   width: 205px;
-  height: 53px;
-  background: #34c66a;
+  height: 59px;
+  background: #257e3e;
   border: none;
   justify-content: center;
+  color: #1ed760;
 }
 
 .industryPill {
-  width: 227px;
-  height: 53px;
+  width: auto;
+  min-height: 59px;
+  height: 59px;
   background: #daf3e2;
   border: none;
   color: #257e3e;
+  padding-inline: 22px;
+  flex: 0 0 auto;
 }
 
 .analysisSubmittedPill {
   width: 253px;
-  height: 51px;
+  height: 59px;
+  padding-inline: 22px;
 }
 
 .jobClassificationPill {
@@ -159,13 +165,41 @@
 }
 
 .yearsExperiencePill {
-  width: 185px;
-  height: 51px;
+  width: auto;
+  min-height: 59px;
+  height: 59px;
+  padding-inline: 22px;
+  flex: 0 0 auto;
 }
 
 .jobStatusPill {
-  width: 155px;
-  height: 51px;
+  width: auto;
+  min-height: 59px;
+  height: 59px;
+  padding-inline: 22px;
+  flex: 0 0 auto;
+}
+
+.appliedDatePill {
+  width: auto;
+  min-height: 59px;
+  height: 59px;
+  padding-inline: 22px;
+  flex: 0 0 auto;
+}
+
+.appliedDateContent {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.appliedDateIcon {
+  width: 20px;
+  height: 20px;
+  display: block;
+  flex: 0 0 auto;
 }
 
 .analysisContainer {

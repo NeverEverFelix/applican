@@ -411,9 +411,8 @@ function ApplicationTrackerView({
   );
 }
 
-const STUDIO_CONTENT_BY_VIEW: Record<Exclude<PickerView, "Application Tracker">, ComponentType> = {
+const STUDIO_CONTENT_BY_VIEW: Record<Exclude<PickerView, "Application Tracker" | "Profile">, ComponentType> = {
   "Resume Studio": ResumeStudioView,
-  Profile,
   History: HistoryView,
   "Career Path": CareerPathView,
   Editor: EditorView,
@@ -424,15 +423,21 @@ type ApplicationTrackerContentProps = {
   selectedView: PickerView;
   selectedStatus: ApplicationTrackerStatus;
   onSelectStatus: (status: ApplicationTrackerStatus) => void;
+  onSelectView: (view: PickerView) => void;
 };
 
 export function ApplicationTrackerContent({
   selectedView,
   selectedStatus,
   onSelectStatus,
+  onSelectView,
 }: ApplicationTrackerContentProps) {
   if (selectedView === "Application Tracker") {
     return <ApplicationTrackerView selectedStatus={selectedStatus} onSelectStatus={onSelectStatus} />;
+  }
+
+  if (selectedView === "Profile") {
+    return <Profile onClose={() => onSelectView("Resume Studio")} />;
   }
 
   const SelectedView = STUDIO_CONTENT_BY_VIEW[selectedView];

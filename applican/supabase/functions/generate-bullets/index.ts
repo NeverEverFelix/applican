@@ -260,6 +260,7 @@ type ModelOutput = {
   company: string;
   title: string;
   location: string;
+  industry: string;
   experience_needed: string;
   job_type: string;
   match_score: number;
@@ -300,6 +301,7 @@ type ResumeStudioOutput = {
     company: string;
     title: string;
     location: string;
+    industry: string;
     experience_needed: string;
     job_type: "remote" | "hybrid" | "onsite" | "unknown";
   };
@@ -799,6 +801,7 @@ function normalizeModelOutput(raw: unknown, model: string, requestId: string, re
   const summary = cleanString(data.match_summary, "Resume has partial overlap with the job requirements.");
   const jobCompany = cleanString(data.company, "Unknown Company");
   const jobTitle = cleanString(data.title, "Target Role");
+  const industry = cleanString(data.industry, "Not specified");
   const jobType = normalizeJobType(data.job_type);
   const experienceNeeded = cleanString(data.experience_needed, "Not specified");
 
@@ -822,6 +825,7 @@ function normalizeModelOutput(raw: unknown, model: string, requestId: string, re
       company: jobCompany,
       title: jobTitle,
       location: cleanString(data.location, "Unknown Location"),
+      industry,
       experience_needed: experienceNeeded,
       job_type: jobType,
     },
@@ -902,6 +906,9 @@ function buildJsonSchema() {
           type: "string",
         },
         location: {
+          type: "string",
+        },
+        industry: {
           type: "string",
         },
         experience_needed: {
@@ -1085,6 +1092,7 @@ function buildJsonSchema() {
         "company",
         "title",
         "location",
+        "industry",
         "experience_needed",
         "job_type",
         "match_score",
@@ -1130,7 +1138,7 @@ async function callOpenAI(
             "You are a resume optimization assistant.",
             "Return only valid JSON matching the schema.",
             "Score how well resume text matches the job description from 0-100.",
-            "Extract the company name, role title, and location from the job description.",
+            "Extract the company name, role title, location, and industry from the job description.",
             "Extract the required experience (for example, '5+ years') and job type (remote, hybrid, onsite, unknown).",
             "Provide exactly 3 strengths and exactly 2 gaps.",
             "Provide structured optimization rewrites that are concise and ATS-friendly.",
@@ -1142,7 +1150,7 @@ async function callOpenAI(
           content: [
             `Job description:\n${jobDescription}`,
             `Resume text:\n${resumeText || "[No extractable text available]"}`,
-            "Infer company and role title from the job description when possible.",
+            "Infer company, role title, and industry from the job description when possible.",
             "For optimization bullets and project_optimizations bullets, use action='replace' for edits to existing bullets and action='add' for new bullets.",
             "Each project_optimizations entry must preserve the source project name and pair each original project bullet with its improved rewritten version.",
             "For experience_rewrites and projects_rewrites, provide concise, measurable, ATS-friendly bullets.",
@@ -1328,6 +1336,7 @@ serve(async (req) => {
         company: output.job.company,
         job_title: output.job.title,
         location: output.job.location,
+        industry: output.job.industry,
         experience_needed: output.job.experience_needed,
         job_type: output.job.job_type,
         job_description: runJobDescription,
