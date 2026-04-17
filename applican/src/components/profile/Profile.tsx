@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { usePostHog } from "@posthog/react";
 import type { User } from "@supabase/supabase-js";
 import { useAuthSession } from "../../features/auth/useAuthSession";
 import styles from "./Profile.module.css";
 import { useChangeEmail } from "./changeEmail";
 import { useChangePassword } from "./changePassword";
 import { useProfessionalSummary } from "./professionalSummary";
+import { createPortalSession } from "../../features/billing/api/createPortalSession";
 import cancelIcon from "../../assets/cancel.svg";
 
 function getNameParts(user: User | null) {
@@ -31,11 +33,16 @@ type ProfileProps = {
 };
 
 export default function Profile({ onClose }: ProfileProps) {
+  const posthog = usePostHog();
   const { session } = useAuthSession();
   const user = session?.user ?? null;
   const [isSummaryFocused, setIsSummaryFocused] = useState(false);
+  const [isBillingPortalPending, setIsBillingPortalPending] = useState(false);
+  const [billingPortalError, setBillingPortalError] = useState("");
   const { firstName, lastName } = getNameParts(user);
   const email = user?.email ?? "";
+  const userPlan = typeof user?.app_metadata?.plan === "string" ? user.app_metadata.plan.trim().toLowerCase() : "";
+  const hasCancelableSubscription = userPlan === "pro";
   const { summary, setSummary, persistSummary, isOverLimit } = useProfessionalSummary(user?.id ?? null);
   const {
     emailDraft,
@@ -53,8 +60,28 @@ export default function Profile({ onClose }: ProfileProps) {
   const handleResetPassword = () => {
     void submitChangePassword();
   };
-  const handleCancelSubscription = () => {
-    // Placeholder for future cancel-subscription flow.
+  const handleCancelSubscription = async () => {
+    if (!hasCancelableSubscription || isBillingPortalPending) {
+      return;
+    }
+
+    setBillingPortalError("");
+    setIsBillingPortalPending(true);
+    posthog?.capture("billing_portal_clicked", { source: "profile_cancel_subscription" });
+
+    try {
+      const portalUrl = await createPortalSession();
+      window.location.assign(portalUrl);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to open billing portal.";
+      setBillingPortalError(message);
+      posthog?.capture("billing_portal_open_failed", {
+        source: "profile_cancel_subscription",
+        message,
+      });
+    } finally {
+      setIsBillingPortalPending(false);
+    }
   };
 
   return (
@@ -123,9 +150,20 @@ export default function Profile({ onClose }: ProfileProps) {
         >
           {isChangingPassword ? "sending..." : "change password"}
         </button>
-        <button type="button" className={styles.cancelSubscriptionLink} onClick={handleCancelSubscription}>
-          cancel subscription
+        <button
+          type="button"
+          className={styles.cancelSubscriptionLink}
+          onClick={() => void handleCancelSubscription()}
+          disabled={!hasCancelableSubscription || isBillingPortalPending}
+          aria-disabled={!hasCancelableSubscription || isBillingPortalPending}
+        >
+          {hasCancelableSubscription
+            ? isBillingPortalPending
+              ? "opening billing portal..."
+              : "cancel subscription"
+            : "no active subscription"}
         </button>
+        {billingPortalError ? <p className={styles.billingPortalError}>{billingPortalError}</p> : null}
       </div>
     </section>
   );

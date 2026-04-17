@@ -978,14 +978,14 @@ export function ResumeStudioView() {
   useEffect(() => {
     let isActive = true;
 
-    if (!currentRunId) {
-      setExperienceSourceSections([]);
-      return () => {
-        isActive = false;
-      };
-    }
-
     void (async () => {
+      if (!currentRunId) {
+        if (isActive) {
+          setExperienceSourceSections([]);
+        }
+        return;
+      }
+
       const { data, error } = await supabase
         .from("resume_documents")
         .select("text")

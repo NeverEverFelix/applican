@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import styles from "./ChangePassword.module.css";
-import pageImage from "../assets/PageImage.png";
+import pageImage from "../assets/PageImage.svg";
 import logo from "../assets/logo.png";
 import AuthLoadingScreen from "../features/auth/AuthLoadingScreen";
 import { useAuthSession } from "../features/auth/useAuthSession";

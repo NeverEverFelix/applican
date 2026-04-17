@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import SignupForm from "./SignupForm";
+import type { ContinueResult } from "./useSignupFlow";
 import type { UseSignupFlow } from "./useSignupFlow";
 
 afterEach(() => {
@@ -9,6 +10,8 @@ afterEach(() => {
 });
 
 function createFlow(overrides: Partial<UseSignupFlow> = {}): UseSignupFlow {
+  const onContinue = vi.fn<() => ContinueResult>(() => ({ status: "invalid_details" }));
+
   return {
     step: "details",
     email: "",
@@ -26,7 +29,7 @@ function createFlow(overrides: Partial<UseSignupFlow> = {}): UseSignupFlow {
     onNameBlur: vi.fn(),
     onJobRoleChange: vi.fn(),
     onPasswordChange: vi.fn(),
-    onContinue: vi.fn(() => ({ status: "invalid_details" })),
+    onContinue,
     goToDetailsStep: vi.fn(),
     reset: vi.fn(),
     ...overrides,
@@ -51,7 +54,7 @@ describe("SignupForm", () => {
       name: "Ada Lovelace",
       jobRole: "Engineer",
       isEmailValid: true,
-      onContinue: vi.fn(() => ({
+      onContinue: vi.fn<() => ContinueResult>(() => ({
         status: "advanced_to_password",
         normalizedEmail: "user@example.com",
       })),

@@ -189,4 +189,17 @@
   appearance: none;
   font-size: 21px;
   color: #ec2542;
+  cursor: pointer;
+}
+
+.cancelSubscriptionLink:disabled {
+  color: rgb(255 255 255 / 35%);
+  cursor: not-allowed;
+}
+
+.billingPortalError {
+  margin: -26px 0 0;
+  font-size: 16px;
+  line-height: 1.4;
+  color: #ec2542;
 }

@@ -1,7 +1,7 @@
 import styles from "./SignupPage.module.css";
 import logo from "../assets/logo.png";
 import googleIcon from "../assets/GoogleIcon.png";
-import pageImage from "../assets/PageImage.png";
+import pageImage from "../assets/PageImage.svg";
 import SignupForm from "../features/auth/SignupForm";
 import AuthLoadingScreen from "../features/auth/AuthLoadingScreen";
 import { useSignupFlow } from "../features/auth/useSignupFlow";

@@ -40,9 +40,11 @@ function createFile(contents = "resume", name = "resume.pdf") {
 }
 
 describe("createResumeRun", () => {
+  const requestId = "123e4567-e89b-12d3-a456-426614174000";
+
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue("request-123");
+    vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue(requestId);
   });
 
   afterEach(() => {
@@ -91,9 +93,9 @@ describe("createResumeRun", () => {
   it("creates a queued resume run after upload succeeds", async () => {
     const row = {
       id: "run-1",
-      request_id: "request-123",
+      request_id: requestId,
       user_id: "user-1",
-      resume_path: "user-1/request-123-resume.pdf",
+      resume_path: `user-1/${requestId}/resume.pdf`,
       resume_filename: "resume.pdf",
       job_description: "Software engineer role",
       status: RESUME_RUN_STATUS.QUEUED,
@@ -110,7 +112,7 @@ describe("createResumeRun", () => {
     });
     uploadResumeToStorageMock.mockResolvedValue({
       bucket: "Resumes",
-      path: "user-1/request-123-resume.pdf",
+      path: `user-1/${requestId}/resume.pdf`,
       filename: "resume.pdf",
     });
     insertResumeRunMock.mockResolvedValue(row);
@@ -123,12 +125,12 @@ describe("createResumeRun", () => {
     expect(uploadResumeToStorageMock).toHaveBeenCalledWith({
       file: expect.any(File),
       userId: "user-1",
-      requestId: "request-123",
+      requestId,
     });
     expect(insertResumeRunMock).toHaveBeenCalledWith({
-      request_id: "request-123",
+      request_id: requestId,
       user_id: "user-1",
-      resume_path: "user-1/request-123-resume.pdf",
+      resume_path: `user-1/${requestId}/resume.pdf`,
       resume_filename: "resume.pdf",
       job_description: "Software engineer role",
       status: RESUME_RUN_STATUS.QUEUED,
@@ -137,12 +139,12 @@ describe("createResumeRun", () => {
       output: null,
     });
     expect(captureEventMock).toHaveBeenCalledWith("resume_upload_succeeded", {
-      request_id: "request-123",
+      request_id: requestId,
       file_name: "resume.pdf",
       file_size: 6,
     });
     expect(result).toEqual({
-      requestId: "request-123",
+      requestId,
       row,
     });
   });
@@ -164,7 +166,7 @@ describe("createResumeRun", () => {
     ).rejects.toThrow("storage failed");
 
     expect(captureEventMock).toHaveBeenCalledWith("resume_upload_failed", {
-      request_id: "request-123",
+      request_id: requestId,
       file_name: "resume.pdf",
       file_size: 6,
       error_message: "storage failed",

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
 import LoginForm from "./LoginForm";
+import type { ContinueResult } from "./useLoginFlow";
 import type { UseLoginFlow } from "./useLoginFlow";
 
 afterEach(() => {
@@ -10,6 +11,8 @@ afterEach(() => {
 });
 
 function createFlow(overrides: Partial<UseLoginFlow> = {}): UseLoginFlow {
+  const onContinue = vi.fn<() => ContinueResult>(() => ({ status: "invalid_email" }));
+
   return {
     step: "email",
     email: "",
@@ -18,7 +21,7 @@ function createFlow(overrides: Partial<UseLoginFlow> = {}): UseLoginFlow {
     isEmailInvalid: false,
     onEmailChange: vi.fn(),
     onPasswordChange: vi.fn(),
-    onContinue: vi.fn(() => ({ status: "invalid_email" })),
+    onContinue,
     goToEmailStep: vi.fn(),
     reset: vi.fn(),
     ...overrides,
@@ -43,7 +46,7 @@ describe("LoginForm", () => {
     const flow = createFlow({
       email: "user@example.com",
       isEmailValid: true,
-      onContinue: vi.fn(() => ({
+      onContinue: vi.fn<() => ContinueResult>(() => ({
         status: "advanced_to_password",
         normalizedEmail: "user@example.com",
       })),

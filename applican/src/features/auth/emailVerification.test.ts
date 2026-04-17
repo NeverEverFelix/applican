@@ -29,7 +29,7 @@ describe("isEmailVerifiedSession", () => {
   it("returns true for non-email auth providers", () => {
     const session = createSession({
       app_metadata: { provider: "google" },
-      email_confirmed_at: null,
+      email_confirmed_at: undefined,
     });
 
     expect(isEmailVerifiedSession(session)).toBe(true);
@@ -47,7 +47,7 @@ describe("isEmailVerifiedSession", () => {
   it("returns false for email users without confirmation", () => {
     const session = createSession({
       app_metadata: { provider: "email" },
-      email_confirmed_at: null,
+      email_confirmed_at: undefined,
     });
 
     expect(isEmailVerifiedSession(session)).toBe(false);
