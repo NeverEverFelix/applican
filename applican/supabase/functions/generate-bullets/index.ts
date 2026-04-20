@@ -417,8 +417,241 @@ type ParsedExperienceSection = {
   bullets: string[];
 };
 
-function normalizeMatchText(value: string): string {
-  return value.toLowerCase().replace(/\s+/g, " ").trim();
+type SectionMatchCandidate = {
+  titleCandidates: string[];
+  bulletCandidates: string[];
+};
+
+const EXPERIENCE_SECTION_HEADERS = new Set([
+  "experience",
+  "professional experience",
+  "work experience",
+  "relevant experience",
+  "employment history",
+  "career history",
+]);
+
+const NON_EXPERIENCE_SECTION_HEADERS = new Set([
+  "summary",
+  "professional summary",
+  "projects",
+  "project experience",
+  "technical skills",
+  "skills",
+  "education",
+  "certifications",
+  "awards",
+  "publications",
+  "leadership",
+  "activities",
+  "volunteer experience",
+  "community involvement",
+]);
+
+function normalizeHeadingText(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function normalizeBulletText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/^[^a-z0-9]+/, "")
+    .replace(/[^a-z0-9%/$+.]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isBulletLine(line: string): boolean {
+  return /^[•●◦▪▸▹►\-\*]\s*/.test(line.trim());
+}
+
+function stripBulletPrefix(line: string): string {
+  return line.replace(/^[•●◦▪▸▹►\-\*]\s*/, "").trim();
+}
+
+function isExperienceSectionHeader(line: string): boolean {
+  const normalized = normalizeHeadingText(line);
+  return EXPERIENCE_SECTION_HEADERS.has(normalized);
+}
+
+function isNonExperienceSectionHeader(line: string): boolean {
+  const normalized = normalizeHeadingText(line);
+  return NON_EXPERIENCE_SECTION_HEADERS.has(normalized);
+}
+
+function looksLikeExperienceTitle(line: string, nextLine: string, hasBullets: boolean): boolean {
+  if (!line) {
+    return false;
+  }
+
+  if (isBulletLine(line) || isExperienceSectionHeader(line) || isNonExperienceSectionHeader(line)) {
+    return false;
+  }
+
+  if (isBulletLine(nextLine)) {
+    return true;
+  }
+
+  if (!hasBullets) {
+    return false;
+  }
+
+  return (
+    line.length <= 120 &&
+    !/[.!?]$/.test(line) &&
+    /^[A-Z0-9]/.test(line) &&
+    !/^[([]/.test(line)
+  );
+}
+
+function collectUnique(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function createSourceSectionCandidate(section: ParsedExperienceSection): SectionMatchCandidate {
+  return {
+    titleCandidates: collectUnique([normalizeHeadingText(section.title)]),
+    bulletCandidates: collectUnique(section.bullets.map(normalizeBulletText)),
+  };
+}
+
+function createOptimizationSectionCandidate(
+  optimization: ResumeStudioOutput["optimizations"][number] | null | undefined,
+): SectionMatchCandidate {
+  return {
+    titleCandidates: collectUnique([
+      normalizeHeadingText(cleanString(optimization?.experience_title)),
+      normalizeHeadingText(cleanString(optimization?.role_before)),
+      normalizeHeadingText(cleanString(optimization?.role_after)),
+    ]),
+    bulletCandidates: collectUnique(
+      (optimization?.bullets ?? []).map((bullet) => normalizeBulletText(cleanString(bullet.original))),
+    ),
+  };
+}
+
+function createRewriteSectionCandidate(
+  rewrite: TailoredResumeInput["experience_rewrites"][number] | null | undefined,
+): SectionMatchCandidate {
+  return {
+    titleCandidates: collectUnique([normalizeHeadingText(cleanString(rewrite?.title))]),
+    bulletCandidates: [],
+  };
+}
+
+function scoreSectionMatch(sourceSection: ParsedExperienceSection, candidate: SectionMatchCandidate): number {
+  const sourceCandidate = createSourceSectionCandidate(sourceSection);
+  let score = 0;
+
+  if (
+    sourceCandidate.titleCandidates.some((sourceTitle) =>
+      candidate.titleCandidates.some((candidateTitle) => candidateTitle && candidateTitle === sourceTitle)
+    )
+  ) {
+    score += 100;
+  } else if (
+    sourceCandidate.titleCandidates.some((sourceTitle) =>
+      candidate.titleCandidates.some((candidateTitle) =>
+        candidateTitle &&
+        sourceTitle &&
+        (candidateTitle.includes(sourceTitle) || sourceTitle.includes(candidateTitle))
+      )
+    )
+  ) {
+    score += 60;
+  }
+
+  const sourceBullets = new Set(sourceCandidate.bulletCandidates);
+  for (const bulletCandidate of candidate.bulletCandidates) {
+    if (bulletCandidate && sourceBullets.has(bulletCandidate)) {
+      score += 15;
+    }
+  }
+
+  return score;
+}
+
+function matchSourceSections(
+  sourceSections: ParsedExperienceSection[],
+  candidates: SectionMatchCandidate[],
+): Array<number | null> {
+  const pairs: Array<{ candidateIndex: number; sourceIndex: number; score: number }> = [];
+
+  candidates.forEach((candidate, candidateIndex) => {
+    sourceSections.forEach((sourceSection, sourceIndex) => {
+      const score = scoreSectionMatch(sourceSection, candidate);
+      if (score > 0) {
+        pairs.push({ candidateIndex, sourceIndex, score });
+      }
+    });
+  });
+
+  pairs.sort((left, right) => {
+    if (right.score !== left.score) {
+      return right.score - left.score;
+    }
+    if (left.candidateIndex !== right.candidateIndex) {
+      return left.candidateIndex - right.candidateIndex;
+    }
+    return left.sourceIndex - right.sourceIndex;
+  });
+
+  const matches = Array.from({ length: candidates.length }, () => null as number | null);
+  const usedSourceIndices = new Set<number>();
+
+  for (const pair of pairs) {
+    if (matches[pair.candidateIndex] !== null || usedSourceIndices.has(pair.sourceIndex)) {
+      continue;
+    }
+
+    matches[pair.candidateIndex] = pair.sourceIndex;
+    usedSourceIndices.add(pair.sourceIndex);
+  }
+
+  return matches;
+}
+
+function findBestSourceBulletIndex(
+  sourceBullets: string[],
+  candidateOriginal: string,
+  usedSourceIndices: Set<number>,
+): number {
+  const normalizedCandidate = normalizeBulletText(candidateOriginal);
+  if (!normalizedCandidate) {
+    return -1;
+  }
+
+  let bestIndex = -1;
+  let bestScore = 0;
+
+  sourceBullets.forEach((sourceBullet, sourceIndex) => {
+    if (usedSourceIndices.has(sourceIndex)) {
+      return;
+    }
+
+    const normalizedSource = normalizeBulletText(sourceBullet);
+    if (!normalizedSource) {
+      return;
+    }
+
+    let score = 0;
+    if (normalizedSource === normalizedCandidate) {
+      score = 100;
+    } else if (
+      normalizedSource.length >= 12 &&
+      normalizedCandidate.length >= 12 &&
+      (normalizedSource.includes(normalizedCandidate) || normalizedCandidate.includes(normalizedSource))
+    ) {
+      score = 70;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestIndex = sourceIndex;
+    }
+  });
+
+  return bestIndex;
 }
 
 function parseExperienceSections(resumeText: string): ParsedExperienceSection[] {
@@ -428,7 +661,7 @@ function parseExperienceSections(resumeText: string): ParsedExperienceSection[] 
     .map((line) => line.trim())
     .filter(Boolean);
 
-  const experienceIndex = lines.findIndex((line) => normalizeMatchText(line) === "experience");
+  const experienceIndex = lines.findIndex((line) => isExperienceSectionHeader(line));
   if (experienceIndex === -1) {
     return [];
   }
@@ -436,7 +669,7 @@ function parseExperienceSections(resumeText: string): ParsedExperienceSection[] 
   const endIndex = lines.findIndex(
     (line, index) =>
       index > experienceIndex &&
-      ["projects", "technical skills", "skills", "education", "certifications"].includes(normalizeMatchText(line)),
+      isNonExperienceSectionHeader(line),
   );
   const slice = lines.slice(experienceIndex + 1, endIndex === -1 ? undefined : endIndex);
 
@@ -463,7 +696,7 @@ function parseExperienceSections(resumeText: string): ParsedExperienceSection[] 
 
   for (let index = 0; index < slice.length; index += 1) {
     const line = slice[index];
-    const isBullet = line.startsWith("•");
+    const isBullet = isBulletLine(line);
     const nextLine = slice[index + 1] ?? "";
 
     if (isBullet) {
@@ -471,19 +704,13 @@ function parseExperienceSections(resumeText: string): ParsedExperienceSection[] 
         currentTitle = `Experience ${sections.length + 1}`;
       }
       sawBullet = true;
-      currentBullets.push(line.replace(/^•\s*/, "").trim());
+      currentBullets.push(stripBulletPrefix(line));
       continue;
     }
 
     if (sawBullet) {
       const lastBulletIndex = currentBullets.length - 1;
-      const nextLineStartsBullet = nextLine.startsWith("•");
-      const looksLikeNextTitle =
-        /^[A-Z]/.test(line) &&
-        !/[,:]/.test(line) &&
-        !nextLineStartsBullet &&
-        !/[–-]/.test(line) &&
-        currentBullets.length > 0;
+      const looksLikeNextTitle = looksLikeExperienceTitle(line, nextLine, currentBullets.length > 0);
       if (lastBulletIndex >= 0 && !looksLikeNextTitle) {
         currentBullets[lastBulletIndex] = `${currentBullets[lastBulletIndex]} ${line}`.replace(/\s+/g, " ").trim();
         continue;
@@ -513,10 +740,35 @@ function rebuildExperienceOptimizations(
     return optimizations.length > 0 ? optimizations : [];
   }
 
+  const optimizationMatches = matchSourceSections(
+    sourceSections,
+    optimizations.map((optimization) => createOptimizationSectionCandidate(optimization)),
+  );
+  const rewriteMatches = matchSourceSections(
+    sourceSections,
+    experienceRewrites.map((rewrite) => createRewriteSectionCandidate(rewrite)),
+  );
+
+  const optimizationBySourceIndex = new Map<number, ResumeStudioOutput["optimizations"][number]>();
+  optimizationMatches.forEach((sourceIndex, optimizationIndex) => {
+    if (sourceIndex === null) {
+      return;
+    }
+    optimizationBySourceIndex.set(sourceIndex, optimizations[optimizationIndex]);
+  });
+
+  const rewriteBySourceIndex = new Map<number, TailoredResumeInput["experience_rewrites"][number]>();
+  rewriteMatches.forEach((sourceIndex, rewriteIndex) => {
+    if (sourceIndex === null) {
+      return;
+    }
+    rewriteBySourceIndex.set(sourceIndex, experienceRewrites[rewriteIndex]);
+  });
+
   const rebuiltSections = sourceSections
     .map((sourceSection, sectionIndex) => {
-      const optimization = optimizations[sectionIndex] ?? null;
-      const rewrite = experienceRewrites[sectionIndex] ?? null;
+      const optimization = optimizationBySourceIndex.get(sectionIndex) ?? null;
+      const rewrite = rewriteBySourceIndex.get(sectionIndex) ?? null;
       const rewriteBullets = rewrite?.bullets ?? [];
       const optimizationBullets = optimization?.bullets ?? [];
       const title =
@@ -531,34 +783,83 @@ function rebuildExperienceOptimizations(
         cleanString(rewrite?.title) ||
         cleanString(sourceSection.title) ||
         title;
-      const maxBullets = Math.max(sourceSection.bullets.length, rewriteBullets.length, optimizationBullets.length);
+      const mappedOptimizationBullets = Array.from(
+        { length: sourceSection.bullets.length },
+        () => null as ResumeStudioOutput["optimizations"][number]["bullets"][number] | null,
+      );
+      const usedSourceBulletIndices = new Set<number>();
+      const additionalOptimizationBullets: ResumeStudioOutput["optimizations"][number]["bullets"] = [];
 
-      const bullets = Array.from({ length: maxBullets }, (_, bulletIndex) => {
-        const sourceOriginal = cleanString(sourceSection.bullets[bulletIndex]);
-        const optimizationBullet = optimizationBullets[bulletIndex];
-        const rewritten =
-          cleanString(optimizationBullet?.rewritten) ||
-          cleanString(rewriteBullets[bulletIndex]) ||
-          sourceOriginal;
-
-        if (!sourceOriginal && !rewritten) {
-          return null;
+      optimizationBullets.forEach((optimizationBullet) => {
+        if (optimizationBullet.action === "add") {
+          additionalOptimizationBullets.push(optimizationBullet);
+          return;
         }
 
-        return {
-          action: optimizationBullet?.action ?? "replace",
-          original: sourceOriginal,
-          rewritten: rewritten || sourceOriginal,
-          reason: cleanString(optimizationBullet?.reason),
-        };
-      }).filter((bullet): bullet is NonNullable<typeof bullet> => Boolean(bullet));
+        const matchedSourceIndex = findBestSourceBulletIndex(
+          sourceSection.bullets,
+          cleanString(optimizationBullet.original),
+          usedSourceBulletIndices,
+        );
 
-      return bullets.length > 0
+        if (matchedSourceIndex === -1) {
+          return;
+        }
+
+        mappedOptimizationBullets[matchedSourceIndex] = optimizationBullet;
+        usedSourceBulletIndices.add(matchedSourceIndex);
+      });
+
+      const bullets = sourceSection.bullets
+        .map((sourceOriginal, bulletIndex) => {
+          const optimizationBullet = mappedOptimizationBullets[bulletIndex];
+          const rewriteBullet = cleanString(rewriteBullets[bulletIndex]);
+          const rewritten =
+            cleanString(optimizationBullet?.rewritten) ||
+            rewriteBullet ||
+            cleanString(sourceOriginal);
+
+          if (!sourceOriginal && !rewritten) {
+            return null;
+          }
+
+          return {
+            action: optimizationBullet?.action ?? "replace",
+            original: cleanString(sourceOriginal),
+            rewritten: rewritten || cleanString(sourceOriginal),
+            reason: cleanString(optimizationBullet?.reason),
+          };
+        })
+        .filter((bullet): bullet is NonNullable<typeof bullet> => Boolean(bullet));
+
+      const appendedRewriteBullets = rewriteBullets
+        .slice(sourceSection.bullets.length)
+        .map((bullet) => cleanString(bullet))
+        .filter(Boolean)
+        .map((bullet) => ({
+          action: "add" as const,
+          original: "",
+          rewritten: bullet,
+          reason: "",
+        }));
+
+      const appendedOptimizationBullets = additionalOptimizationBullets
+        .map((bullet) => ({
+          action: bullet.action,
+          original: cleanString(bullet.original),
+          rewritten: cleanString(bullet.rewritten),
+          reason: cleanString(bullet.reason),
+        }))
+        .filter((bullet) => bullet.rewritten);
+
+      const mergedBullets = [...bullets, ...appendedRewriteBullets, ...appendedOptimizationBullets];
+
+      return mergedBullets.length > 0
         ? {
             experience_title: title,
             role_before: cleanString(sourceSection.title) || title,
             role_after: roleAfter,
-            bullets,
+            bullets: mergedBullets,
           }
         : null;
     })
@@ -1117,6 +1418,7 @@ async function callOpenAI(
   requestId: string,
 ): Promise<ResumeStudioOutput> {
   const model = Deno.env.get("OPENAI_MODEL") ?? "gpt-4.1-mini";
+  const sourceExperienceSections = parseExperienceSections(resumeText);
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -1142,6 +1444,8 @@ async function callOpenAI(
             "Extract the required experience (for example, '5+ years') and job type (remote, hybrid, onsite, unknown).",
             "Provide exactly 3 strengths and exactly 2 gaps.",
             "Provide structured optimization rewrites that are concise and ATS-friendly.",
+            "Preserve every source experience section in the same order they are provided unless a section is truly empty.",
+            "For each experience optimization, keep role_before equal to the source section title and use original values copied exactly from the provided source bullet text when action='replace'.",
             "Also return selected_skills, experience_rewrites, project_optimizations, projects_rewrites, and education to support resume LaTeX generation.",
           ].join(" "),
         },
@@ -1150,8 +1454,12 @@ async function callOpenAI(
           content: [
             `Job description:\n${jobDescription}`,
             `Resume text:\n${resumeText || "[No extractable text available]"}`,
+            `Source experience sections JSON:\n${JSON.stringify(sourceExperienceSections)}`,
             "Infer company, role title, and industry from the job description when possible.",
             "For optimization bullets and project_optimizations bullets, use action='replace' for edits to existing bullets and action='add' for new bullets.",
+            "Return one experience optimization entry for each source experience section, in the same order as the source experience sections JSON.",
+            "When action='replace', original must exactly match one source bullet from the corresponding source experience section.",
+            "Do not invent extra experience sections. If a source bullet should remain mostly unchanged, still return it mapped to the same source section instead of moving it elsewhere.",
             "Each project_optimizations entry must preserve the source project name and pair each original project bullet with its improved rewritten version.",
             "For experience_rewrites and projects_rewrites, provide concise, measurable, ATS-friendly bullets.",
             "If education details are missing in resume text, return empty strings for school/degree/grad_date.",

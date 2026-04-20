@@ -39,8 +39,8 @@ export default function UserMenu({
   const isMenuOpen = open ?? internalOpen;
   const shouldShowUpgrade = userPlan !== "pro";
   const menuItems = shouldShowUpgrade
-    ? (["Profile", "Upgrade", "History", "Settings", "Sign out"] as const)
-    : (["Profile", "Billing", "History", "Settings", "Sign out"] as const);
+    ? (["Profile", "Upgrade", "History", "Sign out"] as const)
+    : (["Profile", "Billing", "History", "Sign out"] as const);
   const handleOpenChange = (nextOpen: boolean) => {
     setInternalOpen(nextOpen);
     if (nextOpen) {

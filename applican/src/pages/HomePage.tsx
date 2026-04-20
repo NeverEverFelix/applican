@@ -48,8 +48,8 @@ export default function HomePage() {
   const pickerItems: Array<{ label: PickerView; iconSrc: string }> = [
     { label: "Resume Studio", iconSrc: starIcon },
     { label: "Application Tracker", iconSrc: hamburgerIcon },
-    { label: "Career Path", iconSrc: careerPathIcon },
     { label: "Editor", iconSrc: starIcon },
+    { label: "Career Path", iconSrc: careerPathIcon },
     { label: "Resources", iconSrc: resourcesIcon },
   ];
   const isProUser = currentUserPlan === "pro";

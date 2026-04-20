@@ -3,8 +3,8 @@ export const STUDIO_VIEWS = [
   "Application Tracker",
   "Profile",
   "History",
-  "Career Path",
   "Editor",
+  "Career Path",
   "Resources",
 ] as const;
 

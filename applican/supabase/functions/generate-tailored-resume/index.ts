@@ -183,6 +183,10 @@ function cleanString(value: unknown, fallback = ""): string {
   return trimmed || fallback;
 }
 
+function normalizeHeadingText(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
 function normalizeList(value: unknown, maxItems = 12): string[] {
   if (!Array.isArray(value)) {
     return [];
@@ -311,6 +315,42 @@ function deriveExperienceFromOptimizations(value: unknown, fallbackCompany: stri
     .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
 }
 
+function mergeExperienceRewrites(
+  modelExperience: TailoredResumeInput["experience_rewrites"],
+  optimizationExperience: TailoredResumeInput["experience_rewrites"],
+): TailoredResumeInput["experience_rewrites"] {
+  if (modelExperience.length === 0) {
+    return optimizationExperience;
+  }
+
+  if (optimizationExperience.length === 0) {
+    return modelExperience;
+  }
+
+  const modelByNormalizedTitle = new Map(
+    modelExperience.map((entry) => [normalizeHeadingText(entry.title), entry] as const),
+  );
+
+  const merged = optimizationExperience.map((entry) => {
+    const normalizedTitle = normalizeHeadingText(entry.title);
+    const modelEntry = modelByNormalizedTitle.get(normalizedTitle);
+    if (!modelEntry) {
+      return entry;
+    }
+
+    return {
+      company: modelEntry.company || entry.company,
+      title: modelEntry.title || entry.title,
+      bullets: modelEntry.bullets.length > 0 ? modelEntry.bullets : entry.bullets,
+    };
+  });
+
+  const mergedTitles = new Set(merged.map((entry) => normalizeHeadingText(entry.title)));
+  const unmatchedModelEntries = modelExperience.filter((entry) => !mergedTitles.has(normalizeHeadingText(entry.title)));
+
+  return [...merged, ...unmatchedModelEntries];
+}
+
 function parseTailoredResumeInput(runOutput: unknown, resumeText: string): TailoredResumeInput {
   const output = runOutput && typeof runOutput === "object" ? (runOutput as Record<string, unknown>) : {};
   const tailored = output.tailored_resume_input && typeof output.tailored_resume_input === "object"
@@ -331,7 +371,7 @@ function parseTailoredResumeInput(runOutput: unknown, resumeText: string): Tailo
 
   const modelExperience = normalizeExperienceRewrites(tailored.experience_rewrites);
   const fallbackOptimizations = deriveExperienceFromOptimizations(output.optimizations, targetCompany);
-  const experienceRewrites = modelExperience.length > 0 ? modelExperience : fallbackOptimizations;
+  const experienceRewrites = mergeExperienceRewrites(modelExperience, fallbackOptimizations);
 
   return {
     target_role: targetRole,
