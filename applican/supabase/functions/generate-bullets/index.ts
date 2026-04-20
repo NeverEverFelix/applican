@@ -479,29 +479,82 @@ function isNonExperienceSectionHeader(line: string): boolean {
   return NON_EXPERIENCE_SECTION_HEADERS.has(normalized);
 }
 
-function looksLikeExperienceTitle(line: string, nextLine: string, hasBullets: boolean): boolean {
-  if (!line) {
+function looksLikeDateRange(line: string): boolean {
+  const normalized = cleanString(line);
+  if (!normalized) {
     return false;
   }
 
-  if (isBulletLine(line) || isExperienceSectionHeader(line) || isNonExperienceSectionHeader(line)) {
+  return /(?:jan|feb|mar|apr|may|jun|july?|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{4}\s*[–-]\s*(?:present|current|(?:jan|feb|mar|apr|may|jun|july?|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{4})/i.test(normalized) ||
+    /(?:jan|feb|mar|apr|may|jun|july?|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{4}/i.test(normalized);
+}
+
+function looksLikeLocationLine(line: string): boolean {
+  const normalized = cleanString(line);
+  if (!normalized) {
     return false;
   }
 
-  if (isBulletLine(nextLine)) {
-    return true;
+  return /^(remote|hybrid|onsite)$/i.test(normalized) ||
+    /^[A-Z][a-z]+(?:[\s-][A-Z][a-z]+)*,\s*[A-Z]{2}$/.test(normalized);
+}
+
+function looksLikeExperienceTitle(line: string): boolean {
+  const normalized = cleanString(line);
+  if (!normalized) {
+    return false;
   }
 
-  if (!hasBullets) {
+  if (
+    isBulletLine(normalized) ||
+    isExperienceSectionHeader(normalized) ||
+    isNonExperienceSectionHeader(normalized) ||
+    looksLikeDateRange(normalized) ||
+    looksLikeLocationLine(normalized)
+  ) {
     return false;
   }
 
   return (
-    line.length <= 120 &&
-    !/[.!?]$/.test(line) &&
-    /^[A-Z0-9]/.test(line) &&
-    !/^[([]/.test(line)
+    normalized.length <= 120 &&
+    !/[.!?]$/.test(normalized) &&
+    !normalized.includes(",") &&
+    /^[A-Z0-9]/.test(normalized) &&
+    !/^[([]/.test(normalized)
   );
+}
+
+function looksLikeNewExperienceEntry(
+  line: string,
+  nextLine: string,
+  nextNextLine: string,
+  nextThirdLine: string,
+): boolean {
+  if (!looksLikeExperienceTitle(line)) {
+    return false;
+  }
+
+  if (isBulletLine(nextLine)) {
+    return false;
+  }
+
+  if (looksLikeDateRange(nextLine)) {
+    return true;
+  }
+
+  if (!nextLine) {
+    return false;
+  }
+
+  if (!isBulletLine(nextLine) && isBulletLine(nextNextLine)) {
+    return true;
+  }
+
+  if (!isBulletLine(nextLine) && !isBulletLine(nextNextLine) && isBulletLine(nextThirdLine)) {
+    return true;
+  }
+
+  return false;
 }
 
 function collectUnique(values: string[]): string[] {
@@ -676,13 +729,13 @@ function parseExperienceSections(resumeText: string): ParsedExperienceSection[] 
   const sections: ParsedExperienceSection[] = [];
   let currentTitle = "";
   let currentBullets: string[] = [];
-  let sawBullet = false;
+  let headerLines: string[] = [];
 
   const flush = () => {
     if (!currentTitle || currentBullets.length === 0) {
       currentTitle = "";
       currentBullets = [];
-      sawBullet = false;
+      headerLines = [];
       return;
     }
     sections.push({
@@ -691,39 +744,45 @@ function parseExperienceSections(resumeText: string): ParsedExperienceSection[] 
     });
     currentTitle = "";
     currentBullets = [];
-    sawBullet = false;
+    headerLines = [];
+  };
+
+  const ensureCurrentTitle = () => {
+    if (currentTitle) {
+      return;
+    }
+
+    const derivedTitle = headerLines.find((line) => looksLikeExperienceTitle(line));
+    currentTitle = derivedTitle || `Experience ${sections.length + 1}`;
   };
 
   for (let index = 0; index < slice.length; index += 1) {
     const line = slice[index];
     const isBullet = isBulletLine(line);
     const nextLine = slice[index + 1] ?? "";
+    const nextNextLine = slice[index + 2] ?? "";
+    const nextThirdLine = slice[index + 3] ?? "";
 
     if (isBullet) {
-      if (!currentTitle) {
-        currentTitle = `Experience ${sections.length + 1}`;
-      }
-      sawBullet = true;
+      ensureCurrentTitle();
       currentBullets.push(stripBulletPrefix(line));
       continue;
     }
 
-    if (sawBullet) {
+    if (currentBullets.length > 0) {
       const lastBulletIndex = currentBullets.length - 1;
-      const looksLikeNextTitle = looksLikeExperienceTitle(line, nextLine, currentBullets.length > 0);
-      if (lastBulletIndex >= 0 && !looksLikeNextTitle) {
+      const startsNewEntry = looksLikeNewExperienceEntry(line, nextLine, nextNextLine, nextThirdLine);
+      if (lastBulletIndex >= 0 && !startsNewEntry) {
         currentBullets[lastBulletIndex] = `${currentBullets[lastBulletIndex]} ${line}`.replace(/\s+/g, " ").trim();
         continue;
       }
 
       flush();
-      currentTitle = line;
+      headerLines.push(line);
       continue;
     }
 
-    if (!currentTitle) {
-      currentTitle = line;
-    }
+    headerLines.push(line);
   }
 
   flush();
