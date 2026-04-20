@@ -98,7 +98,7 @@ serve(async (req) => {
 
     const session = await stripe.billingPortal.sessions.create({
       customer: stripeCustomerId,
-      return_url: `${appUrl}/`,
+      return_url: `${appUrl}/app`,
     });
 
     if (!session.url) {

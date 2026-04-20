@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import styles from "./HomePage.module.css";
 import starIcon from "../assets/Star.png";
 import hamburgerIcon from "../assets/Hamburger.png";
@@ -43,6 +43,7 @@ export default function HomePage() {
     useUpgradeGate();
   const showLoading = useMinimumLoading(isLoggingOut);
   const navigate = useNavigate();
+  const location = useLocation();
   const currentUserName = useCurrentUserName();
   const currentUserPlan = useCurrentUserPlan();
   const pickerItems: Array<{ label: PickerView; iconSrc: string }> = [
@@ -89,6 +90,40 @@ export default function HomePage() {
     const portalUrl = await createPortalSession();
     window.location.assign(portalUrl);
   };
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const checkoutState = searchParams.get("checkout");
+    if (!checkoutState) {
+      return;
+    }
+
+    const nextSearchParams = new URLSearchParams(location.search);
+    nextSearchParams.delete("checkout");
+    nextSearchParams.delete("session_id");
+    const nextSearch = nextSearchParams.toString();
+
+    if (checkoutState === "success") {
+      void supabase.auth.refreshSession().finally(() => {
+        navigate(
+          {
+            pathname: location.pathname,
+            search: nextSearch ? `?${nextSearch}` : "",
+          },
+          { replace: true },
+        );
+      });
+      return;
+    }
+
+    navigate(
+      {
+        pathname: location.pathname,
+        search: nextSearch ? `?${nextSearch}` : "",
+      },
+      { replace: true },
+    );
+  }, [location.pathname, location.search, navigate]);
 
   if (showLoading) {
     return <AuthLoadingScreen />;

@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import Stripe from "npm:stripe@18.0.0";
 
-const FUNCTION_NAME = "create-checkout-session";
+const FUNCTION_NAME = "cancel-subscription";
 const BILLING_CUSTOMERS_TABLE = "billing_customers";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -52,6 +52,22 @@ function parseBearerToken(authHeader: string | null): string {
   return token;
 }
 
+function getCancelableSubscription(subscriptions: Stripe.Subscription[]) {
+  return subscriptions.find((subscription) => {
+    if (subscription.cancel_at_period_end) {
+      return false;
+    }
+
+    return (
+      subscription.status === "active" ||
+      subscription.status === "trialing" ||
+      subscription.status === "past_due" ||
+      subscription.status === "unpaid" ||
+      subscription.status === "incomplete"
+    );
+  });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -65,8 +81,6 @@ serve(async (req) => {
     const supabaseUrl = getEnv("SUPABASE_URL");
     const serviceRoleKey = getEnv("SUPABASE_SERVICE_ROLE_KEY");
     const stripeSecretKey = getEnv("STRIPE_SECRET_KEY");
-    const stripeProPriceId = getEnv("STRIPE_PRO_PRICE_ID");
-    const appUrl = getEnv("APP_URL");
     const authHeader = req.headers.get("Authorization");
     const accessToken = parseBearerToken(authHeader);
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
@@ -91,33 +105,37 @@ serve(async (req) => {
       throw new HttpError(500, "BILLING_CUSTOMER_LOOKUP_FAILED", customerError.message);
     }
 
-    const knownStripeCustomerId =
+    const stripeCustomerId =
       typeof customerRow?.stripe_customer_id === "string" ? customerRow.stripe_customer_id.trim() : "";
 
-    const session = await stripe.checkout.sessions.create({
-      mode: "subscription",
-      billing_address_collection: "auto",
-      line_items: [{ price: stripeProPriceId, quantity: 1 }],
-      client_reference_id: user.id,
-      customer: knownStripeCustomerId || undefined,
-      customer_email: knownStripeCustomerId ? undefined : user.email ?? undefined,
-      success_url: `${appUrl}/app?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/app?checkout=cancel`,
-      metadata: {
-        user_id: user.id,
-      },
-      subscription_data: {
-        metadata: {
-          user_id: user.id,
-        },
-      },
-    });
-
-    if (!session.url) {
-      throw new HttpError(500, "CHECKOUT_SESSION_CREATE_FAILED", "Stripe did not return a checkout url.");
+    if (!stripeCustomerId) {
+      throw new HttpError(404, "BILLING_CUSTOMER_NOT_FOUND", "No Stripe customer found for this user.");
     }
 
-    return jsonResponse({ url: session.url, function: FUNCTION_NAME }, 200);
+    const subscriptions = await stripe.subscriptions.list({
+      customer: stripeCustomerId,
+      status: "all",
+      limit: 10,
+    });
+    const subscription = getCancelableSubscription(subscriptions.data);
+
+    if (!subscription) {
+      throw new HttpError(404, "SUBSCRIPTION_NOT_FOUND", "No active subscription found for this user.");
+    }
+
+    const updatedSubscription = await stripe.subscriptions.update(subscription.id, {
+      cancel_at_period_end: true,
+    });
+
+    return jsonResponse(
+      {
+        canceled_at_period_end: updatedSubscription.cancel_at_period_end,
+        current_period_end: updatedSubscription.current_period_end,
+        subscription_id: updatedSubscription.id,
+        function: FUNCTION_NAME,
+      },
+      200,
+    );
   } catch (error) {
     if (!(error instanceof HttpError) && error && typeof error === "object") {
       const stripeMessage = "message" in error && typeof error.message === "string" ? error.message : "";

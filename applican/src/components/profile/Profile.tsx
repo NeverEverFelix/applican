@@ -6,7 +6,7 @@ import styles from "./Profile.module.css";
 import { useChangeEmail } from "./changeEmail";
 import { useChangePassword } from "./changePassword";
 import { useProfessionalSummary } from "./professionalSummary";
-import { createPortalSession } from "../../features/billing/api/createPortalSession";
+import { cancelSubscription } from "../../features/billing/api/cancelSubscription";
 import cancelIcon from "../../assets/cancel.svg";
 
 function getNameParts(user: User | null) {
@@ -37,8 +37,9 @@ export default function Profile({ onClose }: ProfileProps) {
   const { session } = useAuthSession();
   const user = session?.user ?? null;
   const [isSummaryFocused, setIsSummaryFocused] = useState(false);
-  const [isBillingPortalPending, setIsBillingPortalPending] = useState(false);
-  const [billingPortalError, setBillingPortalError] = useState("");
+  const [isCancellationPending, setIsCancellationPending] = useState(false);
+  const [cancellationState, setCancellationState] = useState<"idle" | "scheduled">("idle");
+  const [cancellationError, setCancellationError] = useState("");
   const { firstName, lastName } = getNameParts(user);
   const email = user?.email ?? "";
   const userPlan = typeof user?.app_metadata?.plan === "string" ? user.app_metadata.plan.trim().toLowerCase() : "";
@@ -61,26 +62,29 @@ export default function Profile({ onClose }: ProfileProps) {
     void submitChangePassword();
   };
   const handleCancelSubscription = async () => {
-    if (!hasCancelableSubscription || isBillingPortalPending) {
+    if (!hasCancelableSubscription || isCancellationPending || cancellationState === "scheduled") {
       return;
     }
 
-    setBillingPortalError("");
-    setIsBillingPortalPending(true);
-    posthog?.capture("billing_portal_clicked", { source: "profile_cancel_subscription" });
+    setCancellationError("");
+    setIsCancellationPending(true);
+    posthog?.capture("subscription_cancel_clicked", { source: "profile_cancel_subscription" });
 
     try {
-      const portalUrl = await createPortalSession();
-      window.location.assign(portalUrl);
+      await cancelSubscription();
+      setCancellationState("scheduled");
+      posthog?.capture("subscription_cancel_scheduled", {
+        source: "profile_cancel_subscription",
+      });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to open billing portal.";
-      setBillingPortalError(message);
-      posthog?.capture("billing_portal_open_failed", {
+      const message = error instanceof Error ? error.message : "Failed to cancel subscription.";
+      setCancellationError(message);
+      posthog?.capture("subscription_cancel_failed", {
         source: "profile_cancel_subscription",
         message,
       });
     } finally {
-      setIsBillingPortalPending(false);
+      setIsCancellationPending(false);
     }
   };
 
@@ -154,16 +158,21 @@ export default function Profile({ onClose }: ProfileProps) {
           type="button"
           className={styles.cancelSubscriptionLink}
           onClick={() => void handleCancelSubscription()}
-          disabled={!hasCancelableSubscription || isBillingPortalPending}
-          aria-disabled={!hasCancelableSubscription || isBillingPortalPending}
+          disabled={!hasCancelableSubscription || isCancellationPending || cancellationState === "scheduled"}
+          aria-disabled={!hasCancelableSubscription || isCancellationPending || cancellationState === "scheduled"}
         >
           {hasCancelableSubscription
-            ? isBillingPortalPending
-              ? "opening billing portal..."
-              : "cancel subscription"
+            ? cancellationState === "scheduled"
+              ? "cancellation scheduled"
+              : isCancellationPending
+                ? "scheduling cancellation..."
+                : "cancel subscription"
             : "no active subscription"}
         </button>
-        {billingPortalError ? <p className={styles.billingPortalError}>{billingPortalError}</p> : null}
+        {cancellationState === "scheduled" ? (
+          <p className={styles.billingPortalError}>Your subscription will cancel at the end of the current billing period.</p>
+        ) : null}
+        {cancellationError ? <p className={styles.billingPortalError}>{cancellationError}</p> : null}
       </div>
     </section>
   );
