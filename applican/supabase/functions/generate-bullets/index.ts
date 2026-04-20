@@ -1,6 +1,17 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import * as Sentry from "npm:@sentry/deno";
+import {
+  cleanOptimizationBulletText as cleanBulletText,
+  cleanOptimizationSectionTitle,
+  deriveSourceExperienceSectionsFromExperienceRewrites,
+  deriveSourceExperienceSectionsFromOptimizations,
+  extractResumeOptimizationPresentationSections,
+  looksLikeSerializedPayload,
+  normalizeHeadingText,
+  type ResumeOptimizationPresentationSection,
+} from "../../../src/lib/resumeOptimizations.ts";
+import { buildParserDebug, parseExperienceSections, type ParsedExperienceSection } from "./parser.ts";
 
 const RUNS_TABLE = "resume_runs";
 const DOCUMENTS_TABLE = "resume_documents";
@@ -337,11 +348,29 @@ type ResumeStudioOutput = {
   source_experience_sections: Array<{
     title: string;
     bullets: string[];
+    header_lines?: string[];
   }>;
+  optimization_sections: ResumeOptimizationPresentationSection[];
   meta: {
     model: string;
     generated_at: string;
     request_id: string;
+    parser_version?: string;
+  };
+  debug?: {
+    parser: {
+      experience_header_found: boolean;
+      section_count: number;
+      experience_slice_preview: string[];
+      source_experience_sections: Array<{
+        title: string;
+        bullets: string[];
+        header_lines: string[];
+      }>;
+    };
+    model: {
+      raw_response: unknown;
+    };
   };
   tailored_resume_input: TailoredResumeInput;
   // Backward-compatible fields used by older clients.
@@ -401,7 +430,7 @@ function normalizeList(value: unknown): string[] {
   }
   return value
     .map((item) => cleanString(item))
-    .filter(Boolean);
+    .filter((item) => item && !looksLikeSerializedPayload(item));
 }
 
 function normalizeFixedCount(items: string[], size: number): string[] {
@@ -412,45 +441,10 @@ function normalizeFixedCount(items: string[], size: number): string[] {
   return result;
 }
 
-type ParsedExperienceSection = {
-  title: string;
-  bullets: string[];
-};
-
 type SectionMatchCandidate = {
   titleCandidates: string[];
   bulletCandidates: string[];
 };
-
-const EXPERIENCE_SECTION_HEADERS = new Set([
-  "experience",
-  "professional experience",
-  "work experience",
-  "relevant experience",
-  "employment history",
-  "career history",
-]);
-
-const NON_EXPERIENCE_SECTION_HEADERS = new Set([
-  "summary",
-  "professional summary",
-  "projects",
-  "project experience",
-  "technical skills",
-  "skills",
-  "education",
-  "certifications",
-  "awards",
-  "publications",
-  "leadership",
-  "activities",
-  "volunteer experience",
-  "community involvement",
-]);
-
-function normalizeHeadingText(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
-}
 
 function normalizeBulletText(value: string): string {
   return value
@@ -461,101 +455,6 @@ function normalizeBulletText(value: string): string {
     .trim();
 }
 
-function isBulletLine(line: string): boolean {
-  return /^[•●◦▪▸▹►\-\*]\s*/.test(line.trim());
-}
-
-function stripBulletPrefix(line: string): string {
-  return line.replace(/^[•●◦▪▸▹►\-\*]\s*/, "").trim();
-}
-
-function isExperienceSectionHeader(line: string): boolean {
-  const normalized = normalizeHeadingText(line);
-  return EXPERIENCE_SECTION_HEADERS.has(normalized);
-}
-
-function isNonExperienceSectionHeader(line: string): boolean {
-  const normalized = normalizeHeadingText(line);
-  return NON_EXPERIENCE_SECTION_HEADERS.has(normalized);
-}
-
-function looksLikeDateRange(line: string): boolean {
-  const normalized = cleanString(line);
-  if (!normalized) {
-    return false;
-  }
-
-  return /(?:jan|feb|mar|apr|may|jun|july?|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{4}\s*[–-]\s*(?:present|current|(?:jan|feb|mar|apr|may|jun|july?|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{4})/i.test(normalized) ||
-    /(?:jan|feb|mar|apr|may|jun|july?|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{4}/i.test(normalized);
-}
-
-function looksLikeLocationLine(line: string): boolean {
-  const normalized = cleanString(line);
-  if (!normalized) {
-    return false;
-  }
-
-  return /^(remote|hybrid|onsite)$/i.test(normalized) ||
-    /^[A-Z][a-z]+(?:[\s-][A-Z][a-z]+)*,\s*[A-Z]{2}$/.test(normalized);
-}
-
-function looksLikeExperienceTitle(line: string): boolean {
-  const normalized = cleanString(line);
-  if (!normalized) {
-    return false;
-  }
-
-  if (
-    isBulletLine(normalized) ||
-    isExperienceSectionHeader(normalized) ||
-    isNonExperienceSectionHeader(normalized) ||
-    looksLikeDateRange(normalized) ||
-    looksLikeLocationLine(normalized)
-  ) {
-    return false;
-  }
-
-  return (
-    normalized.length <= 120 &&
-    !/[.!?]$/.test(normalized) &&
-    !normalized.includes(",") &&
-    /^[A-Z0-9]/.test(normalized) &&
-    !/^[([]/.test(normalized)
-  );
-}
-
-function looksLikeNewExperienceEntry(
-  line: string,
-  nextLine: string,
-  nextNextLine: string,
-  nextThirdLine: string,
-): boolean {
-  if (!looksLikeExperienceTitle(line)) {
-    return false;
-  }
-
-  if (isBulletLine(nextLine)) {
-    return false;
-  }
-
-  if (looksLikeDateRange(nextLine)) {
-    return true;
-  }
-
-  if (!nextLine) {
-    return false;
-  }
-
-  if (!isBulletLine(nextLine) && isBulletLine(nextNextLine)) {
-    return true;
-  }
-
-  if (!isBulletLine(nextLine) && !isBulletLine(nextNextLine) && isBulletLine(nextThirdLine)) {
-    return true;
-  }
-
-  return false;
-}
 
 function collectUnique(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
@@ -573,12 +472,12 @@ function createOptimizationSectionCandidate(
 ): SectionMatchCandidate {
   return {
     titleCandidates: collectUnique([
-      normalizeHeadingText(cleanString(optimization?.experience_title)),
-      normalizeHeadingText(cleanString(optimization?.role_before)),
-      normalizeHeadingText(cleanString(optimization?.role_after)),
+      normalizeHeadingText(cleanOptimizationSectionTitle(optimization?.experience_title)),
+      normalizeHeadingText(cleanOptimizationSectionTitle(optimization?.role_before)),
+      normalizeHeadingText(cleanOptimizationSectionTitle(optimization?.role_after)),
     ]),
     bulletCandidates: collectUnique(
-      (optimization?.bullets ?? []).map((bullet) => normalizeBulletText(cleanString(bullet.original))),
+      (optimization?.bullets ?? []).map((bullet) => normalizeBulletText(cleanBulletText(bullet.original))),
     ),
   };
 }
@@ -707,94 +606,15 @@ function findBestSourceBulletIndex(
   return bestIndex;
 }
 
-function parseExperienceSections(resumeText: string): ParsedExperienceSection[] {
-  const lines = resumeText
-    .replace(/\f/g, "\n")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  const experienceIndex = lines.findIndex((line) => isExperienceSectionHeader(line));
-  if (experienceIndex === -1) {
-    return [];
-  }
-
-  const endIndex = lines.findIndex(
-    (line, index) =>
-      index > experienceIndex &&
-      isNonExperienceSectionHeader(line),
-  );
-  const slice = lines.slice(experienceIndex + 1, endIndex === -1 ? undefined : endIndex);
-
-  const sections: ParsedExperienceSection[] = [];
-  let currentTitle = "";
-  let currentBullets: string[] = [];
-  let headerLines: string[] = [];
-
-  const flush = () => {
-    if (!currentTitle || currentBullets.length === 0) {
-      currentTitle = "";
-      currentBullets = [];
-      headerLines = [];
-      return;
-    }
-    sections.push({
-      title: currentTitle,
-      bullets: currentBullets,
-    });
-    currentTitle = "";
-    currentBullets = [];
-    headerLines = [];
-  };
-
-  const ensureCurrentTitle = () => {
-    if (currentTitle) {
-      return;
-    }
-
-    const derivedTitle = headerLines.find((line) => looksLikeExperienceTitle(line));
-    currentTitle = derivedTitle || `Experience ${sections.length + 1}`;
-  };
-
-  for (let index = 0; index < slice.length; index += 1) {
-    const line = slice[index];
-    const isBullet = isBulletLine(line);
-    const nextLine = slice[index + 1] ?? "";
-    const nextNextLine = slice[index + 2] ?? "";
-    const nextThirdLine = slice[index + 3] ?? "";
-
-    if (isBullet) {
-      ensureCurrentTitle();
-      currentBullets.push(stripBulletPrefix(line));
-      continue;
-    }
-
-    if (currentBullets.length > 0) {
-      const lastBulletIndex = currentBullets.length - 1;
-      const startsNewEntry = looksLikeNewExperienceEntry(line, nextLine, nextNextLine, nextThirdLine);
-      if (lastBulletIndex >= 0 && !startsNewEntry) {
-        currentBullets[lastBulletIndex] = `${currentBullets[lastBulletIndex]} ${line}`.replace(/\s+/g, " ").trim();
-        continue;
-      }
-
-      flush();
-      headerLines.push(line);
-      continue;
-    }
-
-    headerLines.push(line);
-  }
-
-  flush();
-  return sections;
-}
 
 function rebuildExperienceOptimizations(
   optimizations: ResumeStudioOutput["optimizations"],
   experienceRewrites: TailoredResumeInput["experience_rewrites"],
-  resumeText: string,
+  sourceSections: Array<{
+    title: string;
+    bullets: string[];
+  }>,
 ): ResumeStudioOutput["optimizations"] {
-  const sourceSections = parseExperienceSections(resumeText);
   if (sourceSections.length === 0) {
     return optimizations.length > 0 ? optimizations : [];
   }
@@ -831,14 +651,16 @@ function rebuildExperienceOptimizations(
       const rewriteBullets = rewrite?.bullets ?? [];
       const optimizationBullets = optimization?.bullets ?? [];
       const title =
-        cleanString(optimization?.experience_title) ||
-        cleanString(optimization?.role_before) ||
-        cleanString(optimization?.role_after) ||
+        cleanOptimizationSectionTitle(optimization?.experience_title) ||
+        cleanOptimizationSectionTitle(optimization?.role_before) ||
+        cleanOptimizationSectionTitle(optimization?.role_after) ||
         cleanString(rewrite?.title) ||
         cleanString(sourceSection.title) ||
         `Experience ${sectionIndex + 1}`;
       const roleAfter =
-        cleanString(optimization?.role_after) ||
+        cleanOptimizationSectionTitle(optimization?.role_after) ||
+        cleanOptimizationSectionTitle(optimization?.role_before) ||
+        cleanOptimizationSectionTitle(optimization?.experience_title) ||
         cleanString(rewrite?.title) ||
         cleanString(sourceSection.title) ||
         title;
@@ -857,7 +679,7 @@ function rebuildExperienceOptimizations(
 
         const matchedSourceIndex = findBestSourceBulletIndex(
           sourceSection.bullets,
-          cleanString(optimizationBullet.original),
+          cleanBulletText(optimizationBullet.original),
           usedSourceBulletIndices,
         );
 
@@ -874,7 +696,7 @@ function rebuildExperienceOptimizations(
           const optimizationBullet = mappedOptimizationBullets[bulletIndex];
           const rewriteBullet = cleanString(rewriteBullets[bulletIndex]);
           const rewritten =
-            cleanString(optimizationBullet?.rewritten) ||
+            cleanBulletText(optimizationBullet?.rewritten) ||
             rewriteBullet ||
             cleanString(sourceOriginal);
 
@@ -905,8 +727,8 @@ function rebuildExperienceOptimizations(
       const appendedOptimizationBullets = additionalOptimizationBullets
         .map((bullet) => ({
           action: bullet.action,
-          original: cleanString(bullet.original),
-          rewritten: cleanString(bullet.rewritten),
+          original: cleanBulletText(bullet.original),
+          rewritten: cleanBulletText(bullet.rewritten),
           reason: cleanString(bullet.reason),
         }))
         .filter((bullet) => bullet.rewritten);
@@ -916,7 +738,7 @@ function rebuildExperienceOptimizations(
       return mergedBullets.length > 0
         ? {
             experience_title: title,
-            role_before: cleanString(sourceSection.title) || title,
+            role_before: cleanOptimizationSectionTitle(sourceSection.title) || cleanString(sourceSection.title) || title,
             role_after: roleAfter,
             bullets: mergedBullets,
           }
@@ -957,14 +779,14 @@ function normalizeOptimizations(value: unknown): ResumeStudioOutput["optimizatio
                 action?: unknown;
                 reason?: unknown;
               };
-              const rewritten = cleanString(b.rewritten);
+              const rewritten = cleanBulletText(b.rewritten);
               if (!rewritten) {
                 return null;
               }
 
               const action = b.action === "add" ? "add" : "replace";
               return {
-                original: cleanString(b.original),
+                original: cleanBulletText(b.original),
                 rewritten,
                 action,
                 reason: cleanString(b.reason),
@@ -977,10 +799,15 @@ function normalizeOptimizations(value: unknown): ResumeStudioOutput["optimizatio
         return null;
       }
 
+      const experienceTitle = cleanOptimizationSectionTitle(row.experience_title);
+      const roleBefore = cleanOptimizationSectionTitle(row.role_before);
+      const roleAfter = cleanOptimizationSectionTitle(row.role_after);
+      const stableTitle = experienceTitle || roleBefore || roleAfter || "Experience";
+
       return {
-        experience_title: cleanString(row.experience_title, "Experience"),
-        role_before: cleanString(row.role_before),
-        role_after: cleanString(row.role_after),
+        experience_title: stableTitle,
+        role_before: roleBefore || stableTitle,
+        role_after: roleAfter || roleBefore || stableTitle,
         bullets,
       };
     })
@@ -1028,8 +855,8 @@ function normalizeProjectOptimizations(
                 reason?: unknown;
               };
               const action = b.action === "add" ? "add" : "replace";
-              const original = cleanString(b.original);
-              const rewritten = cleanString(b.rewritten);
+              const original = cleanBulletText(b.original);
+              const rewritten = cleanBulletText(b.rewritten);
               const reason = cleanString(b.reason);
               if (!original && !rewritten) {
                 return null;
@@ -1139,7 +966,11 @@ function deriveExperienceRewritesFromOptimizations(
       }
       return {
         company: fallbackCompany || "Unknown Company",
-        title: cleanString(optimization.role_after || optimization.role_before || optimization.experience_title, "Experience"),
+        title:
+          cleanOptimizationSectionTitle(optimization.role_after) ||
+          cleanOptimizationSectionTitle(optimization.role_before) ||
+          cleanOptimizationSectionTitle(optimization.experience_title) ||
+          "Experience",
         bullets: bullets.slice(0, 8),
       };
     })
@@ -1152,7 +983,7 @@ function normalizeModelOutput(raw: unknown, model: string, requestId: string, re
   }
 
   const data = raw as Partial<ModelOutput>;
-  const sourceExperienceSections = parseExperienceSections(resumeText);
+  const parsedSourceExperienceSections = parseExperienceSections(resumeText);
   const strengths = normalizeFixedCount(normalizeList(data.strengths), 3);
   const gaps = normalizeFixedCount(normalizeList(data.gaps), 2);
   const normalizedOptimizations = normalizeOptimizations(data.optimizations);
@@ -1168,15 +999,39 @@ function normalizeModelOutput(raw: unknown, model: string, requestId: string, re
   const selectedSkills = normalizeSkills(data.selected_skills);
   const modelExperienceRewrites = normalizeExperienceRewrites(data.experience_rewrites);
   const modelProjectsRewrites = normalizeProjectsRewrites(data.projects_rewrites);
+  const fallbackSourceExperienceSections =
+    deriveSourceExperienceSectionsFromOptimizations(normalizedOptimizations).length > 0
+      ? deriveSourceExperienceSectionsFromOptimizations(normalizedOptimizations)
+      : deriveSourceExperienceSectionsFromExperienceRewrites(modelExperienceRewrites);
+  const sourceExperienceSections =
+    parsedSourceExperienceSections.length > 0
+      ? parsedSourceExperienceSections
+      : fallbackSourceExperienceSections;
   const optimizations = rebuildExperienceOptimizations(
     normalizedOptimizations,
     modelExperienceRewrites,
-    resumeText,
+    sourceExperienceSections,
   );
   const experienceRewrites =
     modelExperienceRewrites.length > 0
       ? modelExperienceRewrites
       : deriveExperienceRewritesFromOptimizations(optimizations, jobCompany);
+  const finalizedDerivedSourceExperienceSections = deriveSourceExperienceSectionsFromOptimizations(optimizations);
+  const finalizedSourceExperienceSections =
+    parsedSourceExperienceSections.length > 0
+      ? parsedSourceExperienceSections
+      : finalizedDerivedSourceExperienceSections.length > 0
+        ? finalizedDerivedSourceExperienceSections
+        : deriveSourceExperienceSectionsFromExperienceRewrites(experienceRewrites);
+  const optimizationSections = extractResumeOptimizationPresentationSections({
+    source_experience_sections: sourceExperienceSections,
+    optimizations: normalizedOptimizations,
+    project_optimizations: projectOptimizations,
+    tailored_resume_input: {
+      experience_rewrites: modelExperienceRewrites,
+      projects_rewrites: modelProjectsRewrites,
+    },
+  });
 
   const rewrittenBullets = optimizations.flatMap((opt) => opt.bullets.map((bullet) => bullet.rewritten));
 
@@ -1200,11 +1055,19 @@ function normalizeModelOutput(raw: unknown, model: string, requestId: string, re
     },
     optimizations,
     project_optimizations: projectOptimizations,
-    source_experience_sections: sourceExperienceSections,
+    source_experience_sections: finalizedSourceExperienceSections,
+    optimization_sections: optimizationSections,
     meta: {
       model,
       generated_at: new Date().toISOString(),
       request_id: requestId,
+      parser_version: "experience_parser_v2",
+    },
+    debug: {
+      parser: buildParserDebug(resumeText, parsedSourceExperienceSections),
+      model: {
+        raw_response: raw,
+      },
     },
     tailored_resume_input: {
       target_role: jobTitle,
@@ -1696,26 +1559,40 @@ serve(async (req) => {
       throw new HttpError(500, "RUN_UPDATE_FAILED", updateError?.message ?? "Could not update run.");
     }
 
-    const { error: analysisRunUpsertError } = await adminClient.from(ANALYSIS_RUNS_TABLE).upsert(
-      {
-        run_id: runId,
-        user_id: authenticatedUserId,
-        company: output.job.company,
-        job_title: output.job.title,
-        location: output.job.location,
-        industry: output.job.industry,
-        experience_needed: output.job.experience_needed,
-        job_type: output.job.job_type,
-        job_description: runJobDescription,
-        score: output.match.score,
-        analysis_summary: output.match.summary,
-        positives: output.analysis.strengths,
-        negatives: output.analysis.gaps,
-      },
+    const analysisRunPayload = {
+      run_id: runId,
+      user_id: authenticatedUserId,
+      company: output.job.company,
+      job_title: output.job.title,
+      location: output.job.location,
+      industry: output.job.industry,
+      experience_needed: output.job.experience_needed,
+      job_type: output.job.job_type,
+      job_description: runJobDescription,
+      score: output.match.score,
+      analysis_summary: output.match.summary,
+      positives: output.analysis.strengths,
+      negatives: output.analysis.gaps,
+    };
+
+    let { error: analysisRunUpsertError } = await adminClient.from(ANALYSIS_RUNS_TABLE).upsert(
+      analysisRunPayload,
       {
         onConflict: "run_id",
       },
     );
+
+    if (analysisRunUpsertError?.message?.includes("industry")) {
+      const { industry: _industry, ...legacyAnalysisRunPayload } = analysisRunPayload;
+      const fallbackResult = await adminClient.from(ANALYSIS_RUNS_TABLE).upsert(
+        legacyAnalysisRunPayload,
+        {
+          onConflict: "run_id",
+        },
+      );
+      analysisRunUpsertError = fallbackResult.error;
+    }
+
     if (analysisRunUpsertError) {
       throw new HttpError(500, "ANALYSIS_RUN_SAVE_FAILED", analysisRunUpsertError.message);
     }
