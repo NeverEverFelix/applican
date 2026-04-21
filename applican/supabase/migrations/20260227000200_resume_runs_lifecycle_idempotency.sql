@@ -8,6 +8,14 @@ begin
     where request_id is null;
 
     update public.resume_runs
+    set status = 'extracting'
+    where status = 'processing';
+
+    update public.resume_runs
+    set status = 'extracted'
+    where status = 'success';
+
+    update public.resume_runs
     set status = 'queued'
     where status is null or btrim(status) = '';
 
@@ -24,8 +32,11 @@ begin
       drop constraint if exists resume_runs_status_valid;
 
     alter table public.resume_runs
+      drop constraint if exists resume_runs_status_check;
+
+    alter table public.resume_runs
       add constraint resume_runs_status_valid
-      check (status in ('queued', 'processing', 'success', 'failed'));
+      check (status in ('queued', 'extracting', 'extracted', 'failed'));
 
     create unique index if not exists resume_runs_user_id_request_id_uidx
     on public.resume_runs (user_id, request_id);

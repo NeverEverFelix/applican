@@ -1524,6 +1524,7 @@ serve(async (req) => {
 
     const { data: rawCreditResult, error: creditError } = await adminClient.rpc(CONSUME_ANALYSIS_CREDIT_RPC, {
       p_user_id: authenticatedUserId,
+      p_run_id: runId,
     });
     if (creditError) {
       throw new HttpError(500, "ANALYSIS_CREDIT_CHECK_FAILED", creditError.message);

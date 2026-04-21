@@ -495,7 +495,7 @@ export function ResumeStudioView() {
           setUploadedFileName(persistedFile.name);
           setRestoreNotice(
             initialSnapshot.jobDescription.trim()
-              ? "Restored your previous draft, including the uploaded resume."
+              ? "Restored your previous draft."
               : "Restored your uploaded resume from your previous session.",
           );
           return;
