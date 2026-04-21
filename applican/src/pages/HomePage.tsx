@@ -145,10 +145,9 @@ export default function HomePage() {
         />
         <div className={userStyles.stateControlStack}>
           {pickerItems.map((item) => (
-            <div
+            <button
+              type="button"
               key={item.label}
-              role="button"
-              tabIndex={0}
               className={[
                 userStyles.stateControlItem,
                 selectedView === item.label ? userStyles.stateControlItemActive : "",
@@ -156,12 +155,6 @@ export default function HomePage() {
                 .filter(Boolean)
                 .join(" ")}
               onClick={() => onSelectView(item.label)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  onSelectView(item.label);
-                }
-              }}
               aria-pressed={selectedView === item.label}
             >
               <img
@@ -181,7 +174,7 @@ export default function HomePage() {
                   <span className={userStyles.stateControlSoonLabel}>Coming soon</span>
                 ) : null}
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </div>

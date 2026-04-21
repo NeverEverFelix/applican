@@ -44,6 +44,7 @@
 .stateControlItem {
   width: 216px;
   height: 44px;
+  border: 0;
   border-radius: 10px;
   display: flex;
   align-items: center;
@@ -53,12 +54,20 @@
   color: #ffffff;
   text-decoration: none;
   background-color: transparent;
+  cursor: pointer;
+  text-align: left;
+  appearance: none;
+  outline: none;
 }
 
 .stateControlItemActive {
   height: 42px;
   border-radius: 8px;
   background: linear-gradient(90deg, #292929 0%, #1f1f1f 100%);
+}
+
+.stateControlItem:focus-visible {
+  box-shadow: 0 0 0 3px rgb(63 134 255 / 45%);
 }
 
 .stateControlIcon {
@@ -115,4 +124,9 @@
 .logoutButton:disabled {
   opacity: 0.75;
   cursor: not-allowed;
+}
+
+.logoutButton:focus-visible {
+  outline: 2px solid #3f86ff;
+  outline-offset: 2px;
 }

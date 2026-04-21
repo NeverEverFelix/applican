@@ -43,9 +43,105 @@ const DEFAULT_PAGE_TITLE = "applican";
 const OPTIMIZATIONS_TOP = 117;
 const OPTIMIZATIONS_LEFT = 51;
 const OPTIMIZATIONS_WIDTH = 780;
+const MIN_JOB_DESCRIPTION_LENGTH = 200;
+const MAX_RESUME_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const VALID_RESUME_EXTENSIONS = [".pdf", ".doc", ".docx"];
+const JOB_DESCRIPTION_ERROR_TEXT = "Job description should be longer than 200 characters.";
 
 function cleanString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function formatFileSize(sizeInBytes: number): string {
+  const sizeInMegabytes = sizeInBytes / (1024 * 1024);
+  return `${sizeInMegabytes.toFixed(sizeInMegabytes >= 10 ? 0 : 1)} MB`;
+}
+
+function validateResumeFile(file: File | null): string {
+  if (!file) {
+    return "Please upload a resume file in PDF or Word format.";
+  }
+
+  if (!file.name.trim()) {
+    return "Resume file name is missing.";
+  }
+
+  if (file.size <= 0) {
+    return "Resume file appears to be empty.";
+  }
+
+  if (file.size > MAX_RESUME_FILE_SIZE_BYTES) {
+    return `Resume file must be ${formatFileSize(MAX_RESUME_FILE_SIZE_BYTES)} or smaller.`;
+  }
+
+  const lowerFileName = file.name.toLowerCase();
+  const hasValidExtension = VALID_RESUME_EXTENSIONS.some((extension) => lowerFileName.endsWith(extension));
+  if (!hasValidExtension) {
+    return "Please upload a valid resume file (.pdf, .doc, or .docx).";
+  }
+
+  return "";
+}
+
+function classifyGenerationError(errorMessage: string): {
+  tone: "error" | "warning";
+  retryable: boolean;
+  message: string;
+} {
+  const normalized = errorMessage.trim();
+  const lowerMessage = normalized.toLowerCase();
+
+  if (!normalized) {
+    return {
+      tone: "error",
+      retryable: false,
+      message: "",
+    };
+  }
+
+  if (lowerMessage.includes("free plan limit reached") || lowerMessage.includes("analysis limit reached")) {
+    return {
+      tone: "error",
+      retryable: false,
+      message: normalized,
+    };
+  }
+
+  if (
+    lowerMessage.includes("network error") ||
+    lowerMessage.includes("failed to fetch") ||
+    lowerMessage.includes("edge function unreachable") ||
+    lowerMessage.includes("offline") ||
+    lowerMessage.includes("still queued") ||
+    lowerMessage.includes("still processing") ||
+    lowerMessage.includes("failed to upload resume") ||
+    lowerMessage.includes("failed to check resume extraction status")
+  ) {
+    return {
+      tone: "warning",
+      retryable: true,
+      message: `${normalized} Your draft is still saved, so you can try again in a moment.`,
+    };
+  }
+
+  if (
+    lowerMessage.includes("please upload") ||
+    lowerMessage.includes("please provide") ||
+    lowerMessage.includes("required") ||
+    lowerMessage.includes("empty")
+  ) {
+    return {
+      tone: "error",
+      retryable: false,
+      message: normalized,
+    };
+  }
+
+  return {
+    tone: "warning",
+    retryable: true,
+    message: `${normalized} Your draft is still saved.`,
+  };
 }
 
 function OptimizationSectionAccordion({ section }: { section: ResumeOptimizationPresentationSection }) {
@@ -230,8 +326,6 @@ function toResumeStudioOutput(value: unknown): ResumeStudioOutput | null {
 
 export function ResumeStudioView() {
   const posthog = usePostHog();
-  const MIN_JOB_DESCRIPTION_LENGTH = 200;
-  const VALID_RESUME_EXTENSIONS = [".pdf", ".doc", ".docx"];
   const ANALYSIS_TYPING_SPEED = 28;
   const ANALYSIS_REVEAL_GAP_MS = 420;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -262,8 +356,16 @@ export function ResumeStudioView() {
   const [isShowingGenerationErrorScreen, setIsShowingGenerationErrorScreen] = useState(false);
   const [jobDescriptionValidationError, setJobDescriptionValidationError] = useState("");
   const [resumeValidationError, setResumeValidationError] = useState("");
+  const [restoreNotice, setRestoreNotice] = useState("");
   const [revealedAnalysisCount, setRevealedAnalysisCount] = useState(0);
-  const { submitResumeRun, isSubmitting, errorMessage, progressMessage, progressPercent, createdRun } = useCreateResumeRun();
+  const { submitResumeRun, retryResumeRun, failedRun, isSubmitting, errorMessage, progressMessage, progressPercent, createdRun } =
+    useCreateResumeRun();
+  const initialRestoreSnapshotRef = useRef({
+    jobDescription,
+    uploadedFileName,
+    hasPersistedOutput: persistedRunOutput !== null && persistedRunOutput !== undefined,
+    showComputedResults,
+  });
 
   const currentRunOutput = createdRun?.row.output ?? persistedRunOutput;
   const parsedOutput = useMemo(() => toResumeStudioOutput(currentRunOutput), [currentRunOutput]);
@@ -278,14 +380,11 @@ export function ResumeStudioView() {
     showComputedResults && hasRunOutput && !hasResult
       ? "Result was generated, but output shape is not UI-compatible yet."
       : "";
-  const generationErrorText =
-    errorMessage.trim() ||
-    "We failed to generate resume improvements. Press X to retry.";
+  const generationErrorFeedback = classifyGenerationError(errorMessage);
   const isJobDescriptionValid = jobDescription.trim().length > MIN_JOB_DESCRIPTION_LENGTH;
   const shouldShowValidatedJobDescriptionStyle = isJobDescriptionValid;
   const shouldShowInvalidJobDescriptionStyle = Boolean(jobDescriptionValidationError);
   const isResumeValid = selectedFile !== null;
-  const jobDescriptionErrorText = "Job description should be longer than 200 characters";
   const analysisSequence = useMemo(
     () =>
       parsedOutput
@@ -361,7 +460,7 @@ export function ResumeStudioView() {
       return true;
     }
 
-    setJobDescriptionValidationError(jobDescriptionErrorText);
+    setJobDescriptionValidationError(JOB_DESCRIPTION_ERROR_TEXT);
     return false;
   };
 
@@ -379,21 +478,54 @@ export function ResumeStudioView() {
       return;
     }
 
-    setJobDescriptionValidationError(jobDescriptionErrorText);
+    setJobDescriptionValidationError(JOB_DESCRIPTION_ERROR_TEXT);
   };
 
   useEffect(() => {
     let isActive = true;
+    const initialSnapshot = initialRestoreSnapshotRef.current;
 
     void (async () => {
       try {
         const persistedFile = await loadPersistedResumeFile();
-        if (!isActive || !persistedFile) return;
+        if (!isActive) return;
 
-        setSelectedFile(persistedFile);
-        setUploadedFileName(persistedFile.name);
+        if (persistedFile) {
+          setSelectedFile(persistedFile);
+          setUploadedFileName(persistedFile.name);
+          setRestoreNotice(
+            initialSnapshot.jobDescription.trim()
+              ? "Restored your previous draft, including the uploaded resume."
+              : "Restored your uploaded resume from your previous session.",
+          );
+          return;
+        }
+
+        if (initialSnapshot.uploadedFileName.trim()) {
+          setUploadedFileName("");
+          setResumeValidationError("We restored your draft, but your saved resume file expired. Please upload it again.");
+          setRestoreNotice("Restored your previous draft. Re-upload your resume to continue.");
+          return;
+        }
+
+        if (initialSnapshot.jobDescription.trim()) {
+          setRestoreNotice("Restored your previous draft.");
+          return;
+        }
+
+        if (initialSnapshot.hasPersistedOutput || initialSnapshot.showComputedResults) {
+          setRestoreNotice("Restored your previous analysis.");
+        }
       } catch {
-        // Ignore persistence read issues and continue with normal flow.
+        if (!isActive) {
+          return;
+        }
+
+        if (initialSnapshot.uploadedFileName.trim()) {
+          setUploadedFileName("");
+          setResumeValidationError("We couldn't restore your saved resume file. Please upload it again.");
+          setRestoreNotice("Restored your previous draft. Re-upload your resume to continue.");
+        }
       }
     })();
 
@@ -476,14 +608,12 @@ export function ResumeStudioView() {
     if (!files || files.length === 0) return;
 
     const nextFile = files[0];
-    const lowerFileName = nextFile.name.toLowerCase();
-    const hasValidExtension = VALID_RESUME_EXTENSIONS.some((extension) => lowerFileName.endsWith(extension));
+    const validationError = validateResumeFile(nextFile);
 
-    if (!hasValidExtension) {
+    if (validationError) {
       void clearPersistedResumeFile();
       setSelectedFile(null);
-      setUploadedFileName(nextFile.name);
-      setResumeValidationError("Please upload a valid resume file (.pdf, .doc, or .docx).");
+      setResumeValidationError(validationError);
       return;
     }
 
@@ -491,6 +621,7 @@ export function ResumeStudioView() {
     setSelectedFile(nextFile);
     setUploadedFileName(nextFile.name);
     setResumeValidationError("");
+    setRestoreNotice("");
   };
 
   const wait = (ms: number) =>
@@ -499,21 +630,46 @@ export function ResumeStudioView() {
     });
 
   const onGenerateResult = async () => {
-    if (!isResumeValid) {
-      setResumeValidationError("Please upload a valid resume file (.pdf, .doc, or .docx).");
-    } else {
-      setResumeValidationError("");
-    }
+    const resumeError = validateResumeFile(selectedFile);
+    setResumeValidationError(resumeError);
 
     const isJobValidForSubmission = validateJobDescription(jobDescription);
 
-    if (!isJobValidForSubmission || !isResumeValid) return;
+    if (!isJobValidForSubmission || Boolean(resumeError)) return;
 
     setIsShowingGenerationErrorScreen(false);
     setIsShowingProgressScreen(true);
+    setRestoreNotice("");
 
     const result = await submitResumeRun({ file: selectedFile, jobDescription });
+    await wait(220);
+    setIsShowingProgressScreen(false);
 
+    if (result.ok) {
+      setShouldRenderAnalysisCompleteScreen(true);
+      setIsShowingAnalysisCompleteScreen(true);
+      await wait(2500);
+      setIsShowingAnalysisCompleteScreen(false);
+      await wait(360);
+      setPersistedRunOutput(result.createdRun.row.output);
+      setRevealedAnalysisCount(0);
+      setShowComputedResults(true);
+      return;
+    }
+
+    setIsShowingGenerationErrorScreen(true);
+  };
+
+  const onRetryGenerateResult = async () => {
+    if (!failedRun) {
+      return onGenerateResult();
+    }
+
+    setIsShowingGenerationErrorScreen(false);
+    setIsShowingProgressScreen(true);
+    setRestoreNotice("");
+
+    const result = await retryResumeRun();
     await wait(220);
     setIsShowingProgressScreen(false);
 
@@ -542,6 +698,7 @@ export function ResumeStudioView() {
     setIsShowingGenerationErrorScreen(false);
     setJobDescriptionValidationError("");
     setResumeValidationError("");
+    setRestoreNotice("");
     setSelectedFile(null);
     setJobDescription("");
     setUploadedFileName("");
@@ -590,20 +747,34 @@ export function ResumeStudioView() {
             <button
               type="button"
               className={styles.generationErrorButton}
-              onClick={() => void onGenerateResult()}
-              aria-label="Retry generation"
+              onClick={() => void onRetryGenerateResult()}
+              aria-label="Try again"
             >
-              <img src={errorScreenIcon} alt="Generation failed. Press to try again." className={styles.generationErrorButtonImage} />
+              <img src={errorScreenIcon} alt="Try again" className={styles.generationErrorButtonImage} />
             </button>
           </div>
           <div className={styles.generationErrorSubtextContainer}>
-            <p className={styles.generationErrorSubtext}>
-              {generationErrorText}
+            <p
+              className={
+                generationErrorFeedback.tone === "warning"
+                  ? `${styles.generationErrorSubtext} ${styles.generationErrorSubtextWarning}`
+                  : styles.generationErrorSubtext
+              }
+              role="alert"
+            >
+              {generationErrorFeedback.message
+                ? `${generationErrorFeedback.message} Press X to try again.`
+                : "We failed to generate resume improvements. Press X to try again."}
             </p>
           </div>
         </section>
       ) : !shouldShowResults ? (
         <>
+          {restoreNotice ? (
+            <p className={styles.statusInfo} role="status" aria-live="polite">
+              {restoreNotice}
+            </p>
+          ) : null}
           <div className={styles.jobInputWrapper}>
             <img src={jobDescriptionIcon} alt="" aria-hidden="true" className={styles.jobInputIcon} />
             <input
@@ -617,7 +788,7 @@ export function ResumeStudioView() {
                 .join(" ")}
               placeholder={
                 shouldShowInvalidJobDescriptionStyle
-                  ? "Job description should be longer than 200 characters"
+                  ? JOB_DESCRIPTION_ERROR_TEXT
                   : "Paste a job description..."
               }
               value={jobDescription}
@@ -627,19 +798,12 @@ export function ResumeStudioView() {
             />
           </div>
 
-          <div
-            role="button"
-            tabIndex={0}
+          <button
+            type="button"
             className={[styles.uploadBox, uploadedFileName ? styles.fileUploaded : "", isDragging ? styles.dragging : ""]
               .filter(Boolean)
               .join(" ")}
             onClick={() => fileInputRef.current?.click()}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                fileInputRef.current?.click();
-              }
-            }}
             onDragOver={(event) => event.preventDefault()}
             onDragEnter={(event) => {
               event.preventDefault();
@@ -651,6 +815,7 @@ export function ResumeStudioView() {
               setIsDragging(false);
               selectFile(event.dataTransfer.files);
             }}
+            aria-label={uploadedFileName ? `Replace uploaded resume ${uploadedFileName}` : "Upload resume"}
           >
             <span className={[styles.uploadText, resumeValidationError ? styles.uploadTextInvalid : ""].filter(Boolean).join(" ")}>
               {uploadedFileName ? (
@@ -669,21 +834,59 @@ export function ResumeStudioView() {
               accept=".pdf,.doc,.docx"
               onChange={(event) => selectFile(event.target.files)}
             />
-          </div>
+          </button>
 
-            <button
-              type="button"
-              className={styles.generateResultButton}
-              onClick={() => void onGenerateResult()}
-              disabled={isSubmitting || isShowingProgressScreen || isShowingAnalysisCompleteScreen || !isResumeValid || !isJobDescriptionValid}
-            >
+          <button
+            type="button"
+            className={styles.generateResultButton}
+            onClick={() => void onGenerateResult()}
+            disabled={isSubmitting || isShowingProgressScreen || isShowingAnalysisCompleteScreen || !isResumeValid || !isJobDescriptionValid}
+          >
             <img src={starIcon} alt="" aria-hidden="true" className={styles.generateResultButtonIcon} />
             <span>{isSubmitting ? "Generating..." : "Generate Result"}</span>
           </button>
-          {progressMessage ? <p className={styles.statusSuccess}>{progressMessage}</p> : null}
-          {resumeValidationError ? <p className={styles.statusError}>{resumeValidationError}</p> : null}
-          {errorMessage && !isShowingGenerationErrorScreen ? <p className={styles.statusError}>{errorMessage}</p> : null}
-          {outputShapeError ? <p className={styles.statusError}>{outputShapeError}</p> : null}
+          {progressMessage ? (
+            <p className={styles.statusSuccess} role="status" aria-live="polite">
+              {progressMessage}
+            </p>
+          ) : null}
+          {jobDescriptionValidationError ? (
+            <p className={styles.statusError} role="alert">
+              {jobDescriptionValidationError}
+            </p>
+          ) : null}
+          {resumeValidationError ? (
+            <p className={styles.statusError} role="alert">
+              {resumeValidationError}
+            </p>
+          ) : null}
+          {generationErrorFeedback.message ? (
+            <div className={styles.statusActionRow}>
+              <p
+                className={
+                  generationErrorFeedback.tone === "warning" ? styles.statusWarning : styles.statusError
+                }
+                role="alert"
+              >
+                {generationErrorFeedback.message}
+              </p>
+              {generationErrorFeedback.retryable ? (
+                <button
+                  type="button"
+                  className={styles.inlineRetryButton}
+                  onClick={() => void onRetryGenerateResult()}
+                  disabled={isSubmitting || Boolean(jobDescriptionValidationError) || Boolean(resumeValidationError)}
+                >
+                  Try again
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+          {outputShapeError ? (
+            <p className={styles.statusError} role="alert">
+              {outputShapeError}
+            </p>
+          ) : null}
         </>
       ) : useScrollSectionsFlow ? (
         <section className={styles.resumeAnalysisContainer}>

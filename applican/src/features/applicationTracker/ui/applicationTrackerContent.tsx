@@ -83,7 +83,9 @@ function HistoryView() {
   if (isHistoryLoading) {
     return (
       <section className={styles.historyView}>
-        <p className={styles.historyStatusMessage}>Loading history...</p>
+        <p className={styles.historyStatusMessage} role="status" aria-live="polite">
+          Loading history...
+        </p>
       </section>
     );
   }
@@ -91,7 +93,9 @@ function HistoryView() {
   if (historyLoadError) {
     return (
       <section className={styles.historyView}>
-        <p className={styles.historyStatusMessage}>{historyLoadError}</p>
+        <p className={styles.historyStatusMessage} role="alert">
+          {historyLoadError}
+        </p>
       </section>
     );
   }
@@ -99,7 +103,9 @@ function HistoryView() {
   if (historyCards.length === 0) {
     return (
       <section className={styles.historyView}>
-        <p className={styles.historyStatusMessage}>No previous analyses yet.</p>
+        <p className={styles.historyStatusMessage} role="status" aria-live="polite">
+          No previous analyses yet.
+        </p>
       </section>
     );
   }
@@ -165,7 +171,11 @@ function HistoryView() {
 
   return (
     <section className={styles.historyView}>
-      {historyResumeError ? <p className={styles.historyInlineError}>{historyResumeError}</p> : null}
+      {historyResumeError ? (
+        <p className={styles.historyInlineError} role="alert">
+          {historyResumeError}
+        </p>
+      ) : null}
       <div className={styles.historyFlow}>
         <FadeSwipePanels
           className={styles.historyScrollArea}
@@ -487,13 +497,19 @@ function ApplicationTrackerView({
         <div className={styles.trackerGridBody} onScroll={onGridScroll}>
           {errorMessage ? (
             <div className={styles.trackerErrorPanel}>
-              <p className={styles.trackerError}>{errorMessage}</p>
+              <p className={styles.trackerError} role="alert">
+                {errorMessage}
+              </p>
               <button type="button" className={styles.trackerRetryButton} onClick={retryLoad}>
                 Retry
               </button>
             </div>
           ) : null}
-          {downloadError ? <p className={styles.trackerError}>{downloadError}</p> : null}
+          {downloadError ? (
+            <p className={styles.trackerError} role="alert">
+              {downloadError}
+            </p>
+          ) : null}
           {isLoading
             ? Array.from({ length: skeletonRows }).map((_, index) => (
                 <div key={`skeleton-${index}`}>
@@ -513,7 +529,9 @@ function ApplicationTrackerView({
               ))
             : null}
           {!isLoading && !errorMessage && applicationRows.length === 0 ? (
-            <p className={styles.trackerEmptyMessage}>No applications yet for this filter.</p>
+            <p className={styles.trackerEmptyMessage} role="status" aria-live="polite">
+              No applications yet for this filter.
+            </p>
           ) : null}
           {!isLoading && !errorMessage
             ? applicationRows.map((row) => (
@@ -562,7 +580,9 @@ function ApplicationTrackerView({
               ))
             : null}
           {!isLoading && (isFetchingMore || showTrailingLoadState) ? (
-            <p className={styles.trackerLoadState}>Loading more applications...</p>
+            <p className={styles.trackerLoadState} role="status" aria-live="polite">
+              Loading more applications...
+            </p>
           ) : null}
         </div>
       </section>

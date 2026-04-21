@@ -6,12 +6,14 @@ const {
   captureEventMock,
   createResumeRunMock,
   invokeGenerateBulletsMock,
+  requeueResumeRunMock,
   waitForRunExtractionMock,
 } = vi.hoisted(() => ({
   captureExceptionMock: vi.fn(),
   captureEventMock: vi.fn(),
   createResumeRunMock: vi.fn(),
   invokeGenerateBulletsMock: vi.fn(),
+  requeueResumeRunMock: vi.fn(),
   waitForRunExtractionMock: vi.fn(),
 }));
 
@@ -29,6 +31,10 @@ vi.mock("../api/createResumeRun", () => ({
 
 vi.mock("../api/invokeGenerateBullets", () => ({
   invokeGenerateBullets: invokeGenerateBulletsMock,
+}));
+
+vi.mock("../api/requeueResumeRun", () => ({
+  requeueResumeRun: requeueResumeRunMock,
 }));
 
 vi.mock("../api/waitForRunExtraction", () => ({
@@ -240,6 +246,71 @@ describe("useCreateResumeRun", () => {
     expect(invokeGenerateBulletsMock).toHaveBeenCalledTimes(2);
     expect(captureExceptionMock).not.toHaveBeenCalled();
     expect(submitResult).toEqual({
+      ok: true,
+      createdRun: {
+        requestId: "request-1",
+        row: generatedRun,
+      },
+    });
+  });
+
+  it("retries the failed run without creating a duplicate run", async () => {
+    const file = new File(["resume"], "resume.pdf", { type: "application/pdf" });
+    const created = {
+      requestId: "request-1",
+      row: {
+        id: "run-1",
+        request_id: "request-1",
+        user_id: "user-1",
+        resume_path: "resume.pdf",
+        resume_filename: "resume.pdf",
+        job_description: "Software engineer",
+        status: "queued",
+        error_code: null,
+        error_message: null,
+        output: null,
+        created_at: "2026-04-16T00:00:00.000Z",
+        updated_at: "2026-04-16T00:00:00.000Z",
+      },
+    };
+    const generatedRun = {
+      ...created.row,
+      status: "extracted",
+      output: { bullets: ["A"] },
+    };
+
+    createResumeRunMock.mockResolvedValue(created);
+    waitForRunExtractionMock
+      .mockRejectedValueOnce(new Error("worker offline"))
+      .mockResolvedValueOnce(undefined);
+    requeueResumeRunMock.mockResolvedValue(created);
+    invokeGenerateBulletsMock.mockResolvedValue({ run: generatedRun });
+
+    const { result } = renderHook(() => useCreateResumeRun());
+
+    await act(async () => {
+      await result.current.submitResumeRun({
+        file,
+        jobDescription: "Software engineer",
+      });
+    });
+
+    let retryResult:
+      | Awaited<ReturnType<typeof result.current.retryResumeRun>>
+      | undefined;
+
+    await act(async () => {
+      retryResult = await result.current.retryResumeRun();
+    });
+
+    expect(createResumeRunMock).toHaveBeenCalledTimes(1);
+    expect(requeueResumeRunMock).toHaveBeenCalledWith({ runId: "run-1" });
+    expect(waitForRunExtractionMock).toHaveBeenCalledTimes(2);
+    expect(invokeGenerateBulletsMock).toHaveBeenCalledWith({
+      runId: "run-1",
+      requestId: "request-1",
+    });
+    expect(retryResult).toEqual({
       ok: true,
       createdRun: {
         requestId: "request-1",

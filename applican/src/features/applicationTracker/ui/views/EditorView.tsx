@@ -422,7 +422,11 @@ export function EditorView() {
         </button>
       </div>
 
-      {errorMessage ? <p className={styles.statusError}>{errorMessage}</p> : null}
+      {errorMessage ? (
+        <p className={styles.statusError} role="alert">
+          {errorMessage}
+        </p>
+      ) : null}
       {compileLog ? <pre className={styles.outputPanel}>{compileLog}</pre> : null}
 
       <div

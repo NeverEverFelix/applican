@@ -118,6 +118,12 @@
   box-sizing: border-box;
 }
 
+.editorInput:focus-visible {
+  outline: 2px solid #3f86ff;
+  outline-offset: 2px;
+  border-color: #3f86ff;
+}
+
 .editorButton,
 .editorButtonSecondary {
   height: 36px;
@@ -133,6 +139,20 @@
 .editorButton:hover,
 .editorButtonSecondary:hover {
   border-color: #3e3e3e;
+}
+
+.editorButton:focus-visible,
+.editorButtonSecondary:focus-visible,
+.editorModeToggleButton:focus-visible,
+.editorDownloadIconButton:focus-visible,
+.trackerRetryButton:focus-visible,
+.trackerStatusButton:focus-visible,
+.trackerResumeDownloadButton:focus-visible,
+.trackerHeaderCheckbox:focus-visible,
+.trackerRowCheckbox:focus-visible,
+.statusPill:focus-visible {
+  outline: 2px solid #3f86ff;
+  outline-offset: 2px;
 }
 
 .editorButton:disabled {
@@ -704,6 +724,10 @@
   line-height: 27.5px;
 }
 
+.generationErrorSubtextWarning {
+  color: #f2c66d;
+}
+
 .jobInputWrapper {
   width: 638px;
   height: 48px;
@@ -739,7 +763,15 @@
 }
 
 .jobDescriptionInput:focus {
-  border-color: #3a3a3a;
+  border-color: transparent;
+  outline: none;
+  box-shadow: none;
+}
+
+.jobDescriptionInput:focus-visible {
+  outline: none;
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .jobDescriptionInputValidated {
@@ -785,9 +817,18 @@
   cursor: not-allowed;
 }
 
+.generateResultButton:focus-visible,
+.uploadBox:focus-visible,
+.generationErrorButton:focus-visible,
+.analysisCollapseButton:focus-visible {
+  outline: 2px solid #3f86ff;
+  outline-offset: 2px;
+}
+
 .uploadBox {
   width: 638px;
   height: 192px;
+  border: 0;
   border-radius: 12px;
   position: relative;
   display: flex;
@@ -797,6 +838,8 @@
   background-color: transparent;
   cursor: pointer;
   transition: none;
+  appearance: none;
+  outline: none;
 }
 
 .uploadBox::before {
@@ -845,12 +888,57 @@
   text-align: left;
 }
 
+.statusWarning,
+.statusInfo {
+  width: 638px;
+  margin: 0;
+  font-size: 13px;
+  text-align: left;
+}
+
+.statusWarning {
+  color: #f2c66d;
+}
+
+.statusInfo {
+  color: #8bc7ff;
+}
+
 .statusSuccess {
   width: 638px;
   margin: 0;
   color: #72d88a;
   font-size: 13px;
   text-align: left;
+}
+
+.statusActionRow {
+  width: 638px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.inlineRetryButton {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid #2a313b;
+  border-radius: 8px;
+  background: #151a1f;
+  color: #d9e2ef;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.inlineRetryButton:focus-visible {
+  outline: 2px solid #3f86ff;
+  outline-offset: 2px;
+}
+
+.inlineRetryButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .outputPanel {
@@ -941,11 +1029,6 @@
   justify-content: center;
   cursor: pointer;
   z-index: 3;
-}
-
-.analysisCollapseButton:focus,
-.analysisCollapseButton:focus-visible {
-  outline: none;
 }
 
 .analysisCollapseIcon {
@@ -1416,15 +1499,7 @@
   font-size: 16px;
   line-height: 1;
   gap: 12px;
-  outline: none;
-  box-shadow: none;
   cursor: pointer;
-}
-
-.statusPill:focus,
-.statusPill:focus-visible {
-  outline: none;
-  box-shadow: none;
 }
 
 .statusPillSelected {

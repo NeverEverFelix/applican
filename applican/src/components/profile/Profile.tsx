@@ -100,15 +100,16 @@ export default function Profile({ onClose }: ProfileProps) {
       </button>
       <div className={styles.profileColumn}>
         <div className={styles.nameRow}>
-          <input type="text" className={styles.firstNameTextbox} defaultValue={firstName} />
-          <input type="text" className={styles.lastNameTextbox} defaultValue={lastName} />
+          <input type="text" className={styles.firstNameTextbox} defaultValue={firstName} aria-label="First name" />
+          <input type="text" className={styles.lastNameTextbox} defaultValue={lastName} aria-label="Last name" />
         </div>
         <div className={styles.emailRow}>
           <input
-            type="text"
+            type="email"
             className={styles.emailTextbox}
             value={emailDraft}
             onChange={(event) => setEmailDraft(event.target.value)}
+            aria-label="Email address"
           />
           <button
             type="button"
@@ -120,6 +121,7 @@ export default function Profile({ onClose }: ProfileProps) {
               .join(" ")
               .trim()}
             onClick={() => void submitChangeEmail()}
+            disabled={!canChangeEmail}
           >
             change email
           </button>
@@ -144,6 +146,7 @@ export default function Profile({ onClose }: ProfileProps) {
               setIsSummaryFocused(false);
               void persistSummary();
             }}
+            aria-label="Professional summary"
           />
         </div>
         <button
@@ -170,9 +173,15 @@ export default function Profile({ onClose }: ProfileProps) {
             : "no active subscription"}
         </button>
         {cancellationState === "scheduled" ? (
-          <p className={styles.billingPortalError}>Your subscription will cancel at the end of the current billing period.</p>
+          <p className={styles.billingPortalError} role="status" aria-live="polite">
+            Your subscription will cancel at the end of the current billing period.
+          </p>
         ) : null}
-        {cancellationError ? <p className={styles.billingPortalError}>{cancellationError}</p> : null}
+        {cancellationError ? (
+          <p className={styles.billingPortalError} role="alert">
+            {cancellationError}
+          </p>
+        ) : null}
       </div>
     </section>
   );

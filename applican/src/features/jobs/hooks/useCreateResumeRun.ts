@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 import { captureEvent } from "../../../posthog";
 import { createResumeRun } from "../api/createResumeRun";
 import { invokeGenerateBullets } from "../api/invokeGenerateBullets";
+import { requeueResumeRun } from "../api/requeueResumeRun";
 import { waitForRunExtraction } from "../api/waitForRunExtraction";
 import type { CreateResumeRunResult } from "../model/types";
 
@@ -12,7 +13,9 @@ type UseCreateResumeRunResult = {
   progressMessage: string;
   progressPercent: number;
   createdRun: CreateResumeRunResult | null;
+  failedRun: CreateResumeRunResult | null;
   submitResumeRun: (params: { file: File | null; jobDescription: string }) => Promise<SubmitResumeRunResult>;
+  retryResumeRun: () => Promise<SubmitResumeRunResult>;
 };
 
 type SubmitResumeRunResult =
@@ -70,26 +73,18 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
   const [progressMessage, setProgressMessage] = useState("");
   const [progressPercent, setProgressPercent] = useState(0);
   const [createdRun, setCreatedRun] = useState<CreateResumeRunResult | null>(null);
+  const [failedRun, setFailedRun] = useState<CreateResumeRunResult | null>(null);
 
-  const submitResumeRun = useCallback(
-    async ({ file, jobDescription }: { file: File | null; jobDescription: string }) => {
+  const executeRun = useCallback(
+    async (created: CreateResumeRunResult) => {
       setIsSubmitting(true);
       setErrorMessage("");
-      setProgressMessage("Uploading resume...");
-      setProgressPercent(8);
+      setProgressMessage("Waiting for extraction service...");
+      setProgressPercent(28);
       setCreatedRun(null);
 
       try {
-        const created = await createResumeRun({ file, jobDescription });
-        setProgressPercent(28);
-        captureEvent("run_created", {
-          run_id: created.row.id,
-          request_id: created.requestId,
-          has_job_description: Boolean(jobDescription.trim()),
-          has_resume_file: Boolean(file),
-        });
-
-        setProgressMessage("Waiting for extraction service...");
+        setFailedRun(created);
         setProgressPercent(42);
         captureEvent("extract_started", {
           run_id: created.row.id,
@@ -141,11 +136,13 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
         };
         setProgressPercent(100);
         setCreatedRun(nextRun);
+        setFailedRun(null);
         return { ok: true as const, createdRun: nextRun };
       } catch (error) {
         Sentry.captureException(error, {
           tags: { feature: "resume_studio", action: "submit_resume_run" },
         });
+        setFailedRun(created);
         const message = toErrorMessage(error);
         setErrorMessage(message);
         return { ok: false as const, errorMessage: message };
@@ -157,12 +154,75 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
     [],
   );
 
+  const submitResumeRun = useCallback(
+    async ({ file, jobDescription }: { file: File | null; jobDescription: string }) => {
+      setIsSubmitting(true);
+      setErrorMessage("");
+      setProgressMessage("Uploading resume...");
+      setProgressPercent(8);
+      setCreatedRun(null);
+      setFailedRun(null);
+
+      try {
+        const created = await createResumeRun({ file, jobDescription });
+        captureEvent("run_created", {
+          run_id: created.row.id,
+          request_id: created.requestId,
+          has_job_description: Boolean(jobDescription.trim()),
+          has_resume_file: Boolean(file),
+        });
+        return await executeRun(created);
+      } catch (error) {
+        Sentry.captureException(error, {
+          tags: { feature: "resume_studio", action: "submit_resume_run" },
+        });
+        const message = toErrorMessage(error);
+        setErrorMessage(message);
+        setProgressMessage("");
+        setIsSubmitting(false);
+        return { ok: false as const, errorMessage: message };
+      }
+    },
+    [executeRun],
+  );
+
+  const retryResumeRun = useCallback(async () => {
+    if (!failedRun) {
+      return {
+        ok: false as const,
+        errorMessage: "Failed to retry resume run: no previous run is available.",
+      };
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage("");
+    setProgressMessage("Waiting for extraction service...");
+    setProgressPercent(28);
+    setCreatedRun(null);
+
+    try {
+      const retried = await requeueResumeRun({ runId: failedRun.row.id });
+      return await executeRun(retried);
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { feature: "resume_studio", action: "retry_resume_run" },
+      });
+      const message = toErrorMessage(error);
+      setErrorMessage(message);
+      setProgressMessage("");
+      setIsSubmitting(false);
+      return { ok: false as const, errorMessage: message };
+    }
+  }, [executeRun, failedRun]);
+
   return {
     isSubmitting,
     errorMessage,
     progressMessage,
     progressPercent,
     createdRun,
+    failedRun,
     submitResumeRun,
+    retryResumeRun,
   };
 }
