@@ -1,28 +1,36 @@
 /* src/pages/LoginPage.module.css */
 
 .container {
-  min-height: 100vh;
+  --page-padding: clamp(16px, 2vw, 24px);
+  --panel-height: min(992px, calc(100svh - (var(--page-padding) * 2)));
+  --panel-radius: clamp(40px, calc(var(--panel-height) * 0.0625), 62px);
+  --panel-inner-padding: clamp(24px, calc(var(--panel-height) * 0.0484), 48px);
+  --panel-offset: clamp(96px, calc(var(--panel-height) * 0.244), 242px);
+  --section-gap: clamp(24px, calc(var(--panel-height) * 0.0484), 48px);
+  height: 100svh;
   display: grid;
   grid-template-columns: 588px 840px;
   gap: 16px;
   align-items: center;
   justify-content: start;
-  padding: 24px;
+  padding: var(--page-padding);
   background: #151515;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 /* Card */
 .form {
   width: 588px;
-  height: 992px;
-  border-radius: 62px;
+  height: var(--panel-height);
+  border-radius: var(--panel-radius);
   background: #000;
 
   display: flex;
   flex-direction: column;
   align-items: center;
 
-  padding: 48px;
+  padding: var(--panel-inner-padding);
   box-sizing: border-box;
 }
 
@@ -31,7 +39,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-top: 242px;
+  margin-top: var(--panel-offset);
 }
 
 .main {
@@ -39,7 +47,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-top: 48px; /* controlled gap from header -> main */
+  margin-top: var(--section-gap); /* controlled gap from header -> main */
 }
 
 .footer {
@@ -48,7 +56,7 @@
   flex-direction: column;
   align-items: center;
   margin-top: auto; /* KEY: pushes footer toward bottom of fixed-height card */
-  padding-bottom: 242px;
+  padding-bottom: var(--panel-offset);
 }
 
 /* Elements */
@@ -247,7 +255,7 @@
 .passwordStepActions {
   width: 100%;
   margin-top: auto;
-  padding-bottom: 242px;
+  padding-bottom: var(--panel-offset);
   display: flex;
   justify-content: center;
 }
@@ -264,8 +272,8 @@
 /* Right-side asset */
 .assetContainer {
   width: 840px;
-  height: 992px;
-  border-radius: 62px;
+  height: var(--panel-height);
+  border-radius: var(--panel-radius);
   background: #000;
   overflow: hidden;
 }

@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import AuthLoadingScreen from "../features/auth/AuthLoadingScreen";
 import { ensureMinimumLoadingDuration, useMinimumLoading } from "../features/auth/useMinimumLoading";
 import { captureEvent } from "../posthog";
+import { useDocumentScrollLock } from "../hooks/useDocumentScrollLock";
 
 export default function LoginPage() {
   const flow = useLoginFlow();
@@ -18,6 +19,7 @@ export default function LoginPage() {
   const [authError, setAuthError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const showLoading = useMinimumLoading(isSubmitting);
+  useDocumentScrollLock();
 
   const handlePasswordSubmit = async ({
     email,

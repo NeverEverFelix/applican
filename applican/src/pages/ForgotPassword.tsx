@@ -7,6 +7,7 @@ import AuthLoadingScreen from "../features/auth/AuthLoadingScreen";
 import { getAuthErrorMessage } from "../features/auth/auth";
 import { normalizeEmail, validateEmail } from "../features/auth/validateEmail";
 import { useMinimumLoading } from "../features/auth/useMinimumLoading";
+import { useDocumentScrollLock } from "../hooks/useDocumentScrollLock";
 import { supabase } from "../lib/supabaseClient";
 
 const passwordResetRedirectUrl = `${window.location.origin}/change-password`;
@@ -24,6 +25,7 @@ export default function ForgotPassword() {
   const inputClassName = `${styles.email} ${isEmailInvalid ? styles.emailInvalid : ""}`.trim();
   const canSubmit = emailValidation.isValid && !isSubmitting;
   const showLoading = useMinimumLoading(isSubmitting);
+  useDocumentScrollLock();
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -54,7 +56,7 @@ export default function ForgotPassword() {
     } finally {
       setIsSubmitting(false);
     }
-  }
+  };
 
   if (showLoading) {
     return <AuthLoadingScreen />;

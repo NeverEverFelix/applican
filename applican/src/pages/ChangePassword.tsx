@@ -7,6 +7,7 @@ import AuthLoadingScreen from "../features/auth/AuthLoadingScreen";
 import { useAuthSession } from "../features/auth/useAuthSession";
 import { getAuthErrorMessage } from "../features/auth/auth";
 import { useMinimumLoading } from "../features/auth/useMinimumLoading";
+import { useDocumentScrollLock } from "../hooks/useDocumentScrollLock";
 import { supabase } from "../lib/supabaseClient";
 
 const SUCCESS_REDIRECT_DELAY_MS = 1500;
@@ -31,6 +32,7 @@ export default function ChangePassword() {
   const recoveryError = hashParams.get("error_description") ?? searchParams.get("error_description") ?? "";
   const canSubmit = password.trim().length > 0 && Boolean(session) && !isSubmitting;
   const showLoading = useMinimumLoading(isChecking || isSubmitting);
+  useDocumentScrollLock();
 
   useEffect(() => {
     if (recoveryError) {

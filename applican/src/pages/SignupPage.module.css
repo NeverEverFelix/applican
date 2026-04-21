@@ -1,33 +1,33 @@
 /* src/pages/SignupPage.module.css */
 
 .container {
-  min-height: 100vh;
+  --page-padding: clamp(16px, 2vw, 24px);
+  --panel-height: min(992px, calc(100svh - (var(--page-padding) * 2)));
+  --panel-radius: clamp(40px, calc(var(--panel-height) * 0.0625), 62px);
+  --panel-inner-padding: clamp(24px, calc(var(--panel-height) * 0.0484), 48px);
+  --panel-offset: clamp(64px, calc(var(--panel-height) * 0.1089), 108px);
+  --section-gap: clamp(24px, calc(var(--panel-height) * 0.0484), 48px);
+  --input-gap: clamp(24px, calc(var(--panel-height) * 0.0484), 48px);
+  height: 100svh;
   display: grid;
-
-  /* FIX: column sizes match visual layout */
   grid-template-columns: 840px 588px;
-
-  /* REQUIRED 16px gap */
   gap: 16px;
-
   align-items: center;
   justify-content: center;
-
-  padding: 24px;
+  padding: var(--page-padding);
   background: #ffffff;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 /* =========================
    LEFT IMAGE CARD
    ========================= */
 .assetContainer {
-  height: 992px;
-  border-radius: 62px;
+  height: var(--panel-height);
+  border-radius: var(--panel-radius);
   background: #000;
   overflow: hidden;
-
-  /* FIX: grid owns width */
   width: 100%;
 }
 
@@ -42,18 +42,16 @@
    RIGHT FORM CARD
    ========================= */
 .form {
-  height: 992px;
-  border-radius: 62px;
+  height: var(--panel-height);
+  border-radius: var(--panel-radius);
   background: #0D0D0D;
 
   display: flex;
   flex-direction: column;
   align-items: center;
 
-  padding: 48px;
+  padding: var(--panel-inner-padding);
   box-sizing: border-box;
-
-  /* FIX: grid owns width */
   width: 100%;
 }
 
@@ -64,7 +62,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-top: 108px;
+  margin-top: var(--panel-offset);
 }
 
 .main {
@@ -72,7 +70,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-top: 48px;
+  margin-top: var(--section-gap);
 }
 
 .footer {
@@ -81,7 +79,7 @@
   flex-direction: column;
   align-items: center;
   margin-top: auto;
-  padding-bottom: 108px;
+  padding-bottom: var(--panel-offset);
 }
 
 /* =========================
@@ -91,7 +89,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 48px;
+  gap: var(--input-gap);
   width: 100%;
 }
 
@@ -296,7 +294,7 @@
 .passwordStepActions {
   width: 100%;
   margin-top: auto;
-  padding-bottom: 108px;
+  padding-bottom: var(--panel-offset);
   display: flex;
   justify-content: center;
 }

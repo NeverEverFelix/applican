@@ -10,9 +10,12 @@ const {
   rangeMock,
   orderMock,
   eqQueryMock,
+  countResultsQueue,
   selectQueryMock,
   updateEqMock,
   updateMock,
+  deleteInMock,
+  deleteMock,
   fromMock,
 } = vi.hoisted(() => {
   const channel = {
@@ -29,9 +32,12 @@ const {
     rangeMock: vi.fn(),
     orderMock: vi.fn(),
     eqQueryMock: vi.fn(),
+    countResultsQueue: [] as Array<{ count: number; error: null }>,
     selectQueryMock: vi.fn(),
     updateEqMock: vi.fn(),
     updateMock: vi.fn(),
+    deleteInMock: vi.fn(),
+    deleteMock: vi.fn(),
     fromMock: vi.fn(),
   };
 });
@@ -72,22 +78,37 @@ function createApplication(
 describe("useApplications", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    countResultsQueue.length = 0;
 
     channelOnMock.mockReturnValue(channelMock);
     channelSubscribeMock.mockReturnValue(channelMock);
 
     orderMock.mockReturnValue({ range: rangeMock });
     eqQueryMock.mockReturnValue({ order: orderMock });
-    selectQueryMock.mockReturnValue({ eq: eqQueryMock });
+    selectQueryMock.mockImplementation((_columns?: string, options?: { count?: string; head?: boolean }) => {
+      if (options?.head) {
+        const chain = {
+          eq: vi.fn(() => chain),
+          or: vi.fn(() => chain),
+          then: (resolve: (value: { count: number; error: null }) => void) =>
+            resolve(countResultsQueue.shift() ?? { count: 0, error: null }),
+        };
+        return { eq: vi.fn(() => chain) };
+      }
+      return { eq: eqQueryMock };
+    });
 
     updateEqMock.mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
     updateMock.mockReturnValue({ eq: updateEqMock });
+    deleteInMock.mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
+    deleteMock.mockReturnValue({ in: deleteInMock });
 
     fromMock.mockImplementation((table: string) => {
       if (table === "applications") {
         return {
           select: selectQueryMock,
           update: updateMock,
+          delete: deleteMock,
         };
       }
 
@@ -101,6 +122,13 @@ describe("useApplications", () => {
   });
 
   it("loads applications, computes counts, and unsubscribes on cleanup", async () => {
+    countResultsQueue.push(
+      { count: 3, error: null },
+      { count: 1, error: null },
+      { count: 1, error: null },
+      { count: 0, error: null },
+    );
+
     rangeMock.mockResolvedValue({
       data: [
         createApplication({
@@ -110,6 +138,10 @@ describe("useApplications", () => {
         createApplication({
           id: "app-2",
           status: APPLICATION_STATUS.INTERVIEW_1,
+        }),
+        createApplication({
+          id: "app-3",
+          status: APPLICATION_STATUS.READY_TO_APPLY,
         }),
       ],
       error: null,
@@ -121,9 +153,9 @@ describe("useApplications", () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    expect(result.current.applications).toHaveLength(2);
+    expect(result.current.applications).toHaveLength(3);
     expect(result.current.counts).toEqual({
-      all: 2,
+      all: 3,
       applied: 1,
       interview: 1,
       rejected: 0,
@@ -141,6 +173,13 @@ describe("useApplications", () => {
   });
 
   it("optimistically updates status, sets applied date, and rolls back on failure", async () => {
+    countResultsQueue.push(
+      { count: 1, error: null },
+      { count: 0, error: null },
+      { count: 0, error: null },
+      { count: 0, error: null },
+    );
+
     let resolveUpdate!: (value: { error: { message: string } }) => void;
     const updateResultPromise = new Promise<{ error: { message: string } }>((resolve) => {
       resolveUpdate = resolve;
@@ -186,5 +225,51 @@ describe("useApplications", () => {
     expect(result.current.applications[0]?.date_applied).toBeNull();
     expect(result.current.errorMessage).toBe("Failed to update status: write failed");
     expect(result.current.isUpdating("app-1")).toBe(false);
+  });
+
+  it("optimistically deletes applications and keeps them removed on success", async () => {
+    countResultsQueue.push(
+      { count: 2, error: null },
+      { count: 0, error: null },
+      { count: 0, error: null },
+      { count: 0, error: null },
+    );
+
+    let resolveDelete!: (value: { error: null }) => void;
+    const deleteResultPromise = new Promise<{ error: null }>((resolve) => {
+      resolveDelete = resolve;
+    });
+    const deleteUserEqMock = vi.fn().mockReturnValue(deleteResultPromise);
+    deleteInMock.mockReturnValue({ eq: deleteUserEqMock });
+
+    rangeMock.mockResolvedValue({
+      data: [createApplication(), createApplication({ id: "app-2", company: "Beta" })],
+      error: null,
+    });
+
+    const { result } = renderHook(() => useApplications());
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    let deletePromise!: Promise<boolean>;
+    await act(async () => {
+      deletePromise = result.current.deleteApplications(["app-1", "app-2"]);
+    });
+
+    expect(result.current.isDeleting).toBe(true);
+    expect(result.current.applications).toHaveLength(0);
+
+    await act(async () => {
+      resolveDelete({ error: null });
+      await deletePromise;
+    });
+
+    expect(deleteMock).toHaveBeenCalledTimes(1);
+    expect(deleteInMock).toHaveBeenCalledWith("id", ["app-1", "app-2"]);
+    expect(deleteUserEqMock).toHaveBeenCalledWith("user_id", "user-1");
+    expect(result.current.isDeleting).toBe(false);
+    expect(result.current.applications).toHaveLength(0);
   });
 });

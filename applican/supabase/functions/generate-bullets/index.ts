@@ -1583,7 +1583,8 @@ serve(async (req) => {
     );
 
     if (analysisRunUpsertError?.message?.includes("industry")) {
-      const { industry: _industry, ...legacyAnalysisRunPayload } = analysisRunPayload;
+      const legacyAnalysisRunPayload = { ...analysisRunPayload };
+      delete legacyAnalysisRunPayload.industry;
       const fallbackResult = await adminClient.from(ANALYSIS_RUNS_TABLE).upsert(
         legacyAnalysisRunPayload,
         {

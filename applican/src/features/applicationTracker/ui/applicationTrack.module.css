@@ -1397,6 +1397,7 @@
   box-sizing: border-box;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: minmax(44px, auto) 30px;
   gap: 12px;
   align-content: start;
 }
@@ -1440,6 +1441,62 @@
   color: inherit;
   font: inherit;
   line-height: 1;
+}
+
+.statusPillActionSlot {
+  --tracker-progress-pill-width: 92px;
+  grid-column: 2 / span 2;
+  grid-row: 2;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: flex-start;
+  justify-items: center;
+  column-gap: 10px;
+  min-height: 30px;
+  width: 100%;
+}
+
+.statusPillActionPill {
+  min-height: 38px;
+  padding: 0 14px;
+  justify-content: center;
+  gap: 8px;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+  pointer-events: none;
+}
+
+.statusPillActionProgress {
+  min-height: 38px;
+  min-width: var(--tracker-progress-pill-width);
+  padding: 0 16px;
+  justify-content: center;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+  pointer-events: none;
+}
+
+.statusPillActionProgressApplied {
+  background: #022d28;
+  color: #31c56c;
+  border-color: transparent;
+}
+
+.statusPillActionPillVisible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.statusPillActionIcon {
+  width: 18px;
+  height: 18px;
 }
 
 .trackerTopDivider {

@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "../../../lib/supabaseClient";
 import {
   APPLICATION_STATUS,
-  getApplicationFilterBucket,
   type ApplicationFilter,
   type ApplicationRow,
   type ApplicationStatus,
@@ -19,18 +18,45 @@ type UseApplicationsResult = {
   retryLoad: () => void;
   loadMore: () => void;
   updateApplicationStatus: (applicationId: string, nextStatus: ApplicationStatus) => Promise<void>;
+  deleteApplications: (applicationIds: string[]) => Promise<boolean>;
   isUpdating: (applicationId: string) => boolean;
+  isDeleting: boolean;
 };
 
 const APPLICATIONS_PAGE_SIZE = 25;
 
-export function useApplications(): UseApplicationsResult {
+type FilterableApplicationsQuery<T> = {
+  eq: (column: string, value: string) => T;
+  or: (filters: string) => T;
+};
+
+function applyFilterToApplicationsQuery<T extends FilterableApplicationsQuery<T>>(query: T, filter: ApplicationFilter) {
+  if (filter === "applied") {
+    return query.eq("status", APPLICATION_STATUS.APPLIED);
+  }
+  if (filter === "interview") {
+    return query.or(`status.eq.${APPLICATION_STATUS.INTERVIEW_1},status.eq.${APPLICATION_STATUS.INTERVIEW_2}`);
+  }
+  if (filter === "rejected") {
+    return query.eq("status", APPLICATION_STATUS.REJECTED);
+  }
+  return query;
+}
+
+export function useApplications(filter: ApplicationFilter = "all"): UseApplicationsResult {
   const [applications, setApplications] = useState<ApplicationRow[]>([]);
+  const [counts, setCounts] = useState<Record<ApplicationFilter, number>>({
+    all: 0,
+    applied: 0,
+    interview: 0,
+    rejected: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [updatingById, setUpdatingById] = useState<Record<string, boolean>>({});
+  const [isDeleting, setIsDeleting] = useState(false);
   const [reloadNonce, setReloadNonce] = useState(0);
   const nextFromRef = useRef(0);
   const userIdRef = useRef<string | null>(null);
@@ -94,12 +120,33 @@ export function useApplications(): UseApplicationsResult {
 
       const from = nextFromRef.current;
       const to = from + APPLICATIONS_PAGE_SIZE - 1;
-      const { data, error } = await supabase
-        .from("applications")
-        .select("*")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .range(from, to);
+      const countsPromise =
+        reset && userId
+          ? Promise.all([
+              supabase.from("applications").select("*", { count: "exact", head: true }).eq("user_id", userId),
+              supabase
+                .from("applications")
+                .select("*", { count: "exact", head: true })
+                .eq("user_id", userId)
+                .eq("status", APPLICATION_STATUS.APPLIED),
+              supabase
+                .from("applications")
+                .select("*", { count: "exact", head: true })
+                .eq("user_id", userId)
+                .or(`status.eq.${APPLICATION_STATUS.INTERVIEW_1},status.eq.${APPLICATION_STATUS.INTERVIEW_2}`),
+              supabase
+                .from("applications")
+                .select("*", { count: "exact", head: true })
+                .eq("user_id", userId)
+                .eq("status", APPLICATION_STATUS.REJECTED),
+            ])
+          : null;
+
+      const applicationsQuery = applyFilterToApplicationsQuery(
+        supabase.from("applications").select("*", { count: "exact" }).eq("user_id", userId),
+        filter,
+      );
+      const { data, error } = await applicationsQuery.order("created_at", { ascending: false }).range(from, to);
 
       if (error) {
         setErrorMessage(`Failed to load applications: ${error.message}`);
@@ -110,6 +157,15 @@ export function useApplications(): UseApplicationsResult {
       }
 
       const rows = (data ?? []) as ApplicationRow[];
+      if (countsPromise) {
+        const [allResult, appliedResult, interviewResult, rejectedResult] = await countsPromise;
+        setCounts({
+          all: allResult.count ?? rows.length,
+          applied: appliedResult.count ?? 0,
+          interview: interviewResult.count ?? 0,
+          rejected: rejectedResult.count ?? 0,
+        });
+      }
       setApplications((prev) => (reset ? rows : [...prev, ...rows]));
       nextFromRef.current = from + rows.length;
       const nextHasMore = rows.length === APPLICATIONS_PAGE_SIZE;
@@ -120,7 +176,7 @@ export function useApplications(): UseApplicationsResult {
       setIsLoading(false);
       setIsFetchingMore(false);
     }
-  }, []);
+  }, [filter]);
 
   useEffect(() => {
     let active = true;
@@ -148,18 +204,6 @@ export function useApplications(): UseApplicationsResult {
     };
   }, [loadPage, reloadNonce]);
 
-  const counts = useMemo<Record<ApplicationFilter, number>>(() => {
-    const applied = applications.filter((item) => getApplicationFilterBucket(item.status) === "applied").length;
-    const interview = applications.filter((item) => getApplicationFilterBucket(item.status) === "interview").length;
-    const rejected = applications.filter((item) => getApplicationFilterBucket(item.status) === "rejected").length;
-    return {
-      all: applications.length,
-      applied,
-      interview,
-      rejected,
-    };
-  }, [applications]);
-
   const updateApplicationStatus = useCallback(async (applicationId: string, nextStatus: ApplicationStatus) => {
     const target = applications.find((item) => item.id === applicationId);
     if (!target || target.status === nextStatus) {
@@ -174,6 +218,7 @@ export function useApplications(): UseApplicationsResult {
 
     const previousStatus = target.status;
     const previousDateApplied = target.date_applied;
+    const previousCounts = counts;
     setErrorMessage(null);
     setUpdatingById((prev) => ({ ...prev, [applicationId]: true }));
     setApplications((prev) =>
@@ -181,6 +226,21 @@ export function useApplications(): UseApplicationsResult {
         item.id === applicationId ? { ...item, status: nextStatus, date_applied: appliedNow } : item,
       ),
     );
+    setCounts((prev) => {
+      const nextCounts = { ...prev };
+      if (previousStatus === APPLICATION_STATUS.APPLIED) nextCounts.applied = Math.max(0, nextCounts.applied - 1);
+      if (previousStatus === APPLICATION_STATUS.INTERVIEW_1 || previousStatus === APPLICATION_STATUS.INTERVIEW_2) {
+        nextCounts.interview = Math.max(0, nextCounts.interview - 1);
+      }
+      if (previousStatus === APPLICATION_STATUS.REJECTED) nextCounts.rejected = Math.max(0, nextCounts.rejected - 1);
+
+      if (nextStatus === APPLICATION_STATUS.APPLIED) nextCounts.applied += 1;
+      if (nextStatus === APPLICATION_STATUS.INTERVIEW_1 || nextStatus === APPLICATION_STATUS.INTERVIEW_2) {
+        nextCounts.interview += 1;
+      }
+      if (nextStatus === APPLICATION_STATUS.REJECTED) nextCounts.rejected += 1;
+      return nextCounts;
+    });
 
     const updatePayload: { status: ApplicationStatus; date_applied?: string } = { status: nextStatus };
     if (shouldSetAppliedDate && appliedNow) {
@@ -201,16 +261,71 @@ export function useApplications(): UseApplicationsResult {
             : item,
         ),
       );
+      setCounts(previousCounts);
       setErrorMessage(`Failed to update status: ${error.message}`);
     }
 
     setUpdatingById((prev) => ({ ...prev, [applicationId]: false }));
-  }, [applications]);
+  }, [applications, counts]);
 
   const isUpdating = useCallback(
     (applicationId: string) => Boolean(updatingById[applicationId]),
     [updatingById],
   );
+
+  const deleteApplications = useCallback(async (applicationIds: string[]) => {
+    const idsToDelete = Array.from(new Set(applicationIds));
+    if (idsToDelete.length === 0 || isDeleting) {
+      return false;
+    }
+
+    const previousApplications = applications;
+    const previousCounts = counts;
+    const nextApplications = applications.filter((application) => !idsToDelete.includes(application.id));
+    const deletedApplications = applications.filter((application) => idsToDelete.includes(application.id));
+
+    setErrorMessage(null);
+    setIsDeleting(true);
+    setApplications(nextApplications);
+    setCounts((prev) => ({
+      all: Math.max(0, prev.all - idsToDelete.length),
+      applied: Math.max(
+        0,
+        prev.applied - deletedApplications.filter((application) => application.status === APPLICATION_STATUS.APPLIED).length,
+      ),
+      interview: Math.max(
+        0,
+        prev.interview -
+          deletedApplications.filter(
+            (application) =>
+              application.status === APPLICATION_STATUS.INTERVIEW_1 || application.status === APPLICATION_STATUS.INTERVIEW_2,
+          ).length,
+      ),
+      rejected: Math.max(
+        0,
+        prev.rejected - deletedApplications.filter((application) => application.status === APPLICATION_STATUS.REJECTED).length,
+      ),
+    }));
+    nextFromRef.current = nextApplications.length;
+
+    const { error } = await supabase
+      .from("applications")
+      .delete()
+      .in("id", idsToDelete)
+      .eq("user_id", userIdRef.current);
+
+    if (error) {
+      setApplications(previousApplications);
+      setCounts(previousCounts);
+      nextFromRef.current = previousApplications.length;
+      setErrorMessage(`Failed to delete applications: ${error.message}`);
+      setIsDeleting(false);
+      return false;
+    }
+
+    setIsDeleting(false);
+    return true;
+  }, [applications, counts, isDeleting]);
 
   const retryLoad = useCallback(() => {
     setReloadNonce((value) => value + 1);
@@ -231,5 +346,7 @@ export function useApplications(): UseApplicationsResult {
     loadMore,
     updateApplicationStatus,
     isUpdating,
+    deleteApplications,
+    isDeleting,
   };
 }

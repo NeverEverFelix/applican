@@ -38,6 +38,9 @@ export function getApplicationFilterBucket(status: string): Exclude<ApplicationF
   if (status === APPLICATION_STATUS.INTERVIEW_1 || status === APPLICATION_STATUS.INTERVIEW_2) {
     return "interview";
   }
+  if (status === APPLICATION_STATUS.APPLIED) {
+    return "applied";
+  }
   return "applied";
 }
 

@@ -3,7 +3,6 @@ import { type ComponentType, type UIEvent, useEffect, useMemo, useRef, useState 
 import {
   APPLICATION_STATUS,
   formatAppliedDate,
-  getApplicationFilterBucket,
   getNextApplicationStatus,
   type ApplicationFilter,
   type ApplicationStatus,
@@ -15,6 +14,7 @@ import type { PickerView } from "./studioContainerView";
 import { ResumeStudioView } from "./views/ResumeStudioView";
 import { EditorView } from "./views/EditorView";
 import downloadIcon from "../../../assets/Download Icon.png";
+import trashIcon from "../../../assets/trash.svg";
 import HistoryCard from "../../../components/history/HistoryCard";
 import HistorySummaryPanel from "../../../components/history/HistorySummaryPanel";
 import type { HistoryCardData } from "../../../components/history/history";
@@ -185,20 +185,46 @@ function ApplicationTrackerView({
   selectedStatus: ApplicationTrackerStatus;
   onSelectStatus: (status: ApplicationTrackerStatus) => void;
 }) {
-  const { applications, counts, isLoading, isFetchingMore, hasMore, errorMessage, retryLoad, loadMore, updateApplicationStatus, isUpdating } =
-    useApplications();
+  const {
+    applications,
+    counts,
+    isLoading,
+    isFetchingMore,
+    hasMore,
+    errorMessage,
+    retryLoad,
+    loadMore,
+    updateApplicationStatus,
+    isUpdating,
+    deleteApplications,
+    isDeleting,
+  } =
+    useApplications(selectedStatus);
   const [downloadingById, setDownloadingById] = useState<Record<string, boolean>>({});
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [showTrailingLoadState, setShowTrailingLoadState] = useState(false);
+  const [selectedApplicationIds, setSelectedApplicationIds] = useState<string[]>([]);
+  const [selectAllScope, setSelectAllScope] = useState<ApplicationTrackerStatus | null>(null);
+  const [isProgressingSelection, setIsProgressingSelection] = useState(false);
   const wasFetchingMoreRef = useRef(false);
   const trailingLoadTimeoutRef = useRef<number | null>(null);
+  const headerCheckboxRef = useRef<HTMLInputElement | null>(null);
   const skeletonRows = 6;
-  const applicationRows = useMemo(() => {
-    if (selectedStatus === "all") {
-      return applications;
-    }
-    return applications.filter((item) => getApplicationFilterBucket(item.status) === selectedStatus);
-  }, [applications, selectedStatus]);
+  const applicationRows = useMemo(() => applications, [applications]);
+  const visibleApplicationIds = useMemo(() => applicationRows.map((row) => row.id), [applicationRows]);
+  const selectedVisibleCount = useMemo(
+    () => visibleApplicationIds.filter((id) => selectedApplicationIds.includes(id)).length,
+    [selectedApplicationIds, visibleApplicationIds],
+  );
+  const hasVisibleRows = visibleApplicationIds.length > 0;
+  const areAllVisibleRowsSelected = hasVisibleRows && selectedVisibleCount === visibleApplicationIds.length;
+  const isHeaderIndeterminate = selectedVisibleCount > 0 && !areAllVisibleRowsSelected;
+  const selectedVisibleApplicationIds = useMemo(
+    () => visibleApplicationIds.filter((id) => selectedApplicationIds.includes(id)),
+    [selectedApplicationIds, visibleApplicationIds],
+  );
+  const showActionPills = selectedVisibleApplicationIds.length > 0;
+  const deletePillLabel = areAllVisibleRowsSelected ? "Delete All" : "Delete";
 
   const getStatusButtonClassName = (status: ApplicationStatus) => {
     if (status === APPLICATION_STATUS.READY_TO_APPLY) return styles.trackerStatusReady;
@@ -278,6 +304,93 @@ function ApplicationTrackerView({
     };
   }, []);
 
+  useEffect(() => {
+    setSelectedApplicationIds((prev) => prev.filter((id) => applications.some((application) => application.id === id)));
+  }, [applications]);
+
+  useEffect(() => {
+    if (selectAllScope !== selectedStatus) {
+      return;
+    }
+
+    setSelectedApplicationIds((prev) => {
+      const next = new Set(prev);
+      let didChange = false;
+
+      for (const id of visibleApplicationIds) {
+        if (!next.has(id)) {
+          next.add(id);
+          didChange = true;
+        }
+      }
+
+      return didChange ? Array.from(next) : prev;
+    });
+  }, [selectAllScope, selectedStatus, visibleApplicationIds]);
+
+  useEffect(() => {
+    if (headerCheckboxRef.current) {
+      headerCheckboxRef.current.indeterminate = isHeaderIndeterminate;
+    }
+  }, [isHeaderIndeterminate]);
+
+  const toggleApplicationSelection = (applicationId: string) => {
+    const isSelected = selectedApplicationIds.includes(applicationId);
+    if (isSelected && selectAllScope === selectedStatus) {
+      setSelectAllScope(null);
+    }
+    setSelectedApplicationIds((prev) =>
+      isSelected ? prev.filter((id) => id !== applicationId) : [...prev, applicationId],
+    );
+  };
+
+  const toggleVisibleApplicationSelection = () => {
+    const shouldSelectAllVisibleRows = !areAllVisibleRowsSelected;
+    setSelectAllScope(shouldSelectAllVisibleRows ? selectedStatus : null);
+    setSelectedApplicationIds((prev) => {
+      const remainingIds = prev.filter((id) => !visibleApplicationIds.includes(id));
+      if (areAllVisibleRowsSelected) {
+        return remainingIds;
+      }
+      return [...remainingIds, ...visibleApplicationIds];
+    });
+  };
+
+  const deleteSelectedApplications = async () => {
+    if (selectedVisibleApplicationIds.length === 0 || isDeleting) {
+      return;
+    }
+
+    const didDelete = await deleteApplications(selectedVisibleApplicationIds);
+    if (!didDelete) {
+      return;
+    }
+    setSelectedApplicationIds([]);
+    setSelectAllScope(null);
+  };
+
+  const progressSelectedApplications = async () => {
+    if (selectedVisibleApplicationIds.length === 0 || isProgressingSelection) {
+      return;
+    }
+
+    const selectedRows = applications.filter((application) => selectedVisibleApplicationIds.includes(application.id));
+    if (selectedRows.length === 0) {
+      return;
+    }
+
+    setIsProgressingSelection(true);
+    try {
+      await Promise.all(
+        selectedRows.map((application) =>
+          updateApplicationStatus(application.id, getNextApplicationStatus(application.status)),
+        ),
+      );
+    } finally {
+      setIsProgressingSelection(false);
+    }
+  };
+
   return (
     <section className={styles.trackerView}>
       <header className={styles.trackerHeader}>
@@ -314,6 +427,38 @@ function ApplicationTrackerView({
             Rejected
             <span className={styles.statusCount}>{counts.rejected}</span>
           </button>
+          <div className={styles.statusPillActionSlot} aria-hidden={!showActionPills}>
+            {showActionPills ? (
+              <>
+                <button
+                  type="button"
+                  data-testid="tracker-delete-pill"
+                  className={[styles.statusPill, styles.statusPillActionPill, styles.statusPillActionPillVisible].join(" ").trim()}
+                  disabled={isDeleting}
+                  onClick={() => void deleteSelectedApplications()}
+                >
+                  {deletePillLabel}
+                  <img src={trashIcon} alt="" aria-hidden="true" className={styles.statusPillActionIcon} />
+                </button>
+                <button
+                  type="button"
+                  data-testid="tracker-progress-pill"
+                  className={[
+                    styles.statusPill,
+                    styles.statusPillActionProgress,
+                    styles.statusPillActionProgressApplied,
+                    styles.statusPillActionPillVisible,
+                  ]
+                    .join(" ")
+                    .trim()}
+                  disabled={isProgressingSelection || isDeleting}
+                  onClick={() => void progressSelectedApplications()}
+                >
+                  Progress
+                </button>
+              </>
+            ) : null}
+          </div>
         </div>
       </header>
       <div className={styles.trackerTopDivider} aria-hidden="true" />
@@ -321,7 +466,15 @@ function ApplicationTrackerView({
       <section className={styles.trackerColumns} aria-label="Applications grid">
         <div className={styles.trackerColumnHeader}>
           <span className={styles.trackerColumnCheckbox}>
-            <input type="checkbox" className={styles.trackerHeaderCheckbox} aria-label="Select all applications" />
+            <input
+              ref={headerCheckboxRef}
+              type="checkbox"
+              className={styles.trackerHeaderCheckbox}
+              aria-label="Select all applications"
+              checked={areAllVisibleRowsSelected}
+              disabled={!hasVisibleRows}
+              onChange={toggleVisibleApplicationSelection}
+            />
           </span>
           <span className={styles.trackerColumnLabel}>Company</span>
           <span className={styles.trackerColumnLabel}>Date Applied</span>
@@ -367,7 +520,13 @@ function ApplicationTrackerView({
                 <div key={row.id}>
                   <div className={styles.trackerRow}>
                     <span className={styles.trackerColumnCheckbox}>
-                      <input type="checkbox" className={styles.trackerRowCheckbox} aria-label={`Select ${row.company}`} />
+                      <input
+                        type="checkbox"
+                        className={styles.trackerRowCheckbox}
+                        aria-label={`Select ${row.company}`}
+                        checked={selectedApplicationIds.includes(row.id)}
+                        onChange={() => toggleApplicationSelection(row.id)}
+                      />
                     </span>
                     <span className={styles.trackerRowText}>{row.company}</span>
                     <span className={styles.trackerRowText}>{formatAppliedDate(row.date_applied)}</span>

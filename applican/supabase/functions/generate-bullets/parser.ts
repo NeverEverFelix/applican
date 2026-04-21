@@ -39,11 +39,11 @@ function normalizeHeadingText(value: string): string {
 }
 
 function isBulletLine(line: string): boolean {
-  return /^[•●◦▪▸▹►\-\*]\s*/.test(line.trim());
+  return /^[•●◦▪▸▹►*-]\s*/.test(line.trim());
 }
 
 function stripBulletPrefix(line: string): string {
-  return line.replace(/^[•●◦▪▸▹►\-\*]\s*/, "").trim();
+  return line.replace(/^[•●◦▪▸▹►*-]\s*/, "").trim();
 }
 
 function isExperienceSectionHeader(line: string): boolean {

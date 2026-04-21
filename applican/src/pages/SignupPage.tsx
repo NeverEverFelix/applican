@@ -10,6 +10,7 @@ import { useState } from "react";
 import { getAuthErrorMessage, signInWithGoogle, signUpWithPassword } from "../features/auth/auth";
 import { useNavigate } from "react-router-dom";
 import { captureEvent } from "../posthog";
+import { useDocumentScrollLock } from "../hooks/useDocumentScrollLock";
 
 export default function SignupPage() {
   const flow = useSignupFlow();
@@ -18,6 +19,7 @@ export default function SignupPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const showLoading = useMinimumLoading(isSubmitting);
+  useDocumentScrollLock();
 
   const handleSignup = async ({
     email,
