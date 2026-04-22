@@ -23,8 +23,7 @@
 
 .triggerButton:focus,
 .triggerButton:focus-visible {
-  outline: 2px solid #3f86ff;
-  outline-offset: 2px;
+  outline: none;
   box-shadow: none;
 }
 
@@ -101,8 +100,7 @@
 }
 
 .menuItem:focus-visible {
-  outline: 2px solid #3f86ff;
-  outline-offset: 2px;
+  outline: none;
 }
 
 .menuItem[data-disabled] {
