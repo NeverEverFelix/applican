@@ -3,6 +3,7 @@ import styles from "./LoadingMorph.module.css";
 
 type LoadingMorphProps = {
   progress?: number;
+  className?: string;
 };
 
 function buildDigits(progress: number) {
@@ -43,11 +44,16 @@ function DigitSlot({ digit }: { digit: number | null }) {
   );
 }
 
-export default function LoadingMorph({ progress = 0 }: LoadingMorphProps) {
+export default function LoadingMorph({ progress = 0, className = "" }: LoadingMorphProps) {
   const digits = buildDigits(progress);
 
   return (
-    <div className={styles.morph} role="status" aria-live="polite" aria-label={`Progress ${Math.round(progress)} percent`}>
+    <div
+      className={[styles.morph, className].filter(Boolean).join(" ")}
+      role="status"
+      aria-live="polite"
+      aria-label={`Progress ${Math.round(progress)} percent`}
+    >
       <DigitSlot digit={digits.hundreds} />
       <DigitSlot digit={digits.tens} />
       <DigitSlot digit={digits.ones} />

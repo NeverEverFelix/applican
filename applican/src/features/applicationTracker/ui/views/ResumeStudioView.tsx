@@ -6,8 +6,8 @@ import starIcon from "../../../../assets/Star.png";
 import blackStarIcon from "../../../../assets/Black star.png";
 import arrowIcon from "../../../../assets/Arrow.png";
 import jobDescriptionIcon from "../../../../assets/Job Description Icon.png";
-import checkIcon from "../../../../assets/Check.png";
 import errorScreenIcon from "../../../../assets/error screen.png";
+import checkIcon from "../../../../assets/Check.png";
 import { useLocalStorageState } from "../../../../hooks/useLocalStorageState";
 import { useCreateResumeRun } from "../../../jobs/hooks/useCreateResumeRun";
 import { getLatestResumeRunForEditor } from "../../../jobs/api/getLatestResumeRunForEditor";
@@ -360,6 +360,7 @@ export function ResumeStudioView() {
     submitResumeRun,
     retryResumeRun,
     resumeStoredRun,
+    cancelActiveRun,
     clearPersistedRunState,
     failedRun,
     isSubmitting,
@@ -381,6 +382,7 @@ export function ResumeStudioView() {
   const [jobDescriptionValidationError, setJobDescriptionValidationError] = useState("");
   const [resumeValidationError, setResumeValidationError] = useState("");
   const [revealedAnalysisCount, setRevealedAnalysisCount] = useState(0);
+  const [isCancellingRun, setIsCancellingRun] = useState(false);
   const initialRestoreSnapshotRef = useRef({
     jobDescription,
     uploadedFileName,
@@ -508,7 +510,7 @@ export function ResumeStudioView() {
 
     void (async () => {
       const result = await resumeStoredRun();
-      if (!result) {
+      if (!result || result.cancelled) {
         hasAttemptedPersistedRunResumeRef.current = false;
         return;
       }
@@ -735,6 +737,10 @@ export function ResumeStudioView() {
     await wait(220);
     setIsShowingProgressScreen(false);
 
+    if (result.cancelled) {
+      return;
+    }
+
     if (result.ok) {
       await completeSuccessfulRun(result.createdRun.row.output);
       return;
@@ -755,6 +761,10 @@ export function ResumeStudioView() {
     const result = await retryResumeRun();
     await wait(220);
     setIsShowingProgressScreen(false);
+
+    if (result.cancelled) {
+      return;
+    }
 
     if (result.ok) {
       await completeSuccessfulRun(result.createdRun.row.output);
@@ -785,6 +795,38 @@ export function ResumeStudioView() {
     setRevealedAnalysisCount(0);
   };
 
+  const resetToDraftInputs = useCallback(() => {
+    hasAttemptedPersistedRunResumeRef.current = false;
+    clearPersistedRunState();
+    setLoadingAnimationOriginMs(null);
+    setShowComputedResults(false);
+    setIsAnalysisCollapsed(false);
+    setIsShowingProgressScreen(false);
+    setIsShowingAnalysisCompleteScreen(false);
+    setShouldRenderAnalysisCompleteScreen(false);
+    setIsShowingGenerationErrorScreen(false);
+    setJobDescriptionValidationError("");
+    setResumeValidationError("");
+    setPersistedRunOutput(null);
+    setRevealedAnalysisCount(0);
+  }, [clearPersistedRunState, setLoadingAnimationOriginMs, setPersistedRunOutput, setShowComputedResults]);
+
+  const onCancelRun = useCallback(async () => {
+    if (isCancellingRun) {
+      return;
+    }
+
+    setIsCancellingRun(true);
+    const result = await cancelActiveRun();
+    setIsCancellingRun(false);
+
+    if (!result.ok) {
+      return;
+    }
+
+    resetToDraftInputs();
+  }, [cancelActiveRun, isCancellingRun, resetToDraftInputs]);
+
   const onToggleAnalysisCollapse = () => {
     setIsAnalysisCollapsed((previous) => {
       if (previous) {
@@ -807,7 +849,11 @@ export function ResumeStudioView() {
     <div className={rootClassName}>
       {isShowingProgressScreen ? (
         <section className={styles.progressScreenContainer}>
-          <LoadingScreen backendProgress={progressPercent} animationOriginMs={loadingAnimationOriginMs ?? undefined} />
+          <LoadingScreen
+            backendProgress={progressPercent}
+            animationOriginMs={loadingAnimationOriginMs ?? undefined}
+            onCancel={() => void onCancelRun()}
+          />
         </section>
       ) : shouldRenderAnalysisCompleteScreen ? (
         <section
@@ -822,16 +868,14 @@ export function ResumeStudioView() {
         </section>
       ) : isShowingGenerationErrorScreen ? (
         <section className={styles.generationErrorScreen}>
-          <div className={styles.generationErrorButtonContainer}>
-            <button
-              type="button"
-              className={styles.generationErrorButton}
-              onClick={() => void onRetryGenerateResult()}
-              aria-label="Try again"
-            >
-              <img src={errorScreenIcon} alt="Try again" className={styles.generationErrorButtonImage} />
-            </button>
-          </div>
+          <button
+            type="button"
+            className={styles.generationErrorButtonContainer}
+            onClick={() => void onCancelRun()}
+            aria-label="Cancel and return to resume inputs"
+          >
+            <img src={errorScreenIcon} alt="" className={styles.generationErrorButtonImage} />
+          </button>
           <div className={styles.generationErrorSubtextContainer}>
             <p
               className={
@@ -845,6 +889,13 @@ export function ResumeStudioView() {
                 ? `${generationErrorFeedback.message} Select Try again to retry.`
                 : "We failed to generate resume improvements. Select Try again to retry."}
             </p>
+            <button
+              type="button"
+              className={styles.generationErrorRetryTextButton}
+              onClick={() => void onRetryGenerateResult()}
+            >
+              TRY AGAIN
+            </button>
           </div>
         </section>
       ) : !shouldShowResults ? (

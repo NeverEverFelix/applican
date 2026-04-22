@@ -5,6 +5,7 @@ const {
   captureExceptionMock,
   captureEventMock,
   createResumeRunMock,
+  deleteResumeRunMock,
   getResumeRunMock,
   invokeGenerateBulletsMock,
   requeueResumeRunMock,
@@ -13,6 +14,7 @@ const {
   captureExceptionMock: vi.fn(),
   captureEventMock: vi.fn(),
   createResumeRunMock: vi.fn(),
+  deleteResumeRunMock: vi.fn(),
   getResumeRunMock: vi.fn(),
   invokeGenerateBulletsMock: vi.fn(),
   requeueResumeRunMock: vi.fn(),
@@ -29,6 +31,10 @@ vi.mock("../../../posthog", () => ({
 
 vi.mock("../api/createResumeRun", () => ({
   createResumeRun: createResumeRunMock,
+}));
+
+vi.mock("../api/deleteResumeRun", () => ({
+  deleteResumeRun: deleteResumeRunMock,
 }));
 
 vi.mock("../api/getResumeRun", () => ({
@@ -426,5 +432,73 @@ describe("useCreateResumeRun", () => {
         row: generatedRun,
       },
     });
+  });
+
+  it("cancels an active run, deletes it, and clears persisted state", async () => {
+    const file = new File(["resume"], "resume.pdf", { type: "application/pdf" });
+    const created = {
+      requestId: "request-1",
+      row: {
+        id: "run-1",
+        request_id: "request-1",
+        user_id: "user-1",
+        resume_path: "resume.pdf",
+        resume_filename: "resume.pdf",
+        job_description: "Software engineer",
+        status: "queued",
+        error_code: null,
+        error_message: null,
+        output: null,
+        created_at: "2026-04-16T00:00:00.000Z",
+        updated_at: "2026-04-16T00:00:00.000Z",
+      },
+    };
+
+    let releaseExtraction!: () => void;
+    createResumeRunMock.mockResolvedValue(created);
+    waitForRunExtractionMock.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseExtraction = resolve;
+        }),
+    );
+    deleteResumeRunMock.mockResolvedValue(undefined);
+
+    const { result } = renderHook(() => useCreateResumeRun());
+
+    let submitPromise!: Promise<Awaited<ReturnType<typeof result.current.submitResumeRun>>>;
+
+    await act(async () => {
+      submitPromise = result.current.submitResumeRun({
+        file,
+        jobDescription: "Software engineer",
+      });
+      await Promise.resolve();
+    });
+
+    let cancelResult:
+      | Awaited<ReturnType<typeof result.current.cancelActiveRun>>
+      | undefined;
+
+    await act(async () => {
+      cancelResult = await result.current.cancelActiveRun();
+    });
+
+    await act(async () => {
+      releaseExtraction();
+      await submitPromise;
+    });
+
+    expect(deleteResumeRunMock).toHaveBeenCalledWith({ runId: "run-1" });
+    expect(captureEventMock).toHaveBeenCalledWith("run_cancelled", {
+      run_id: "run-1",
+      request_id: "request-1",
+    });
+    expect(cancelResult).toEqual({ ok: true });
+    expect(result.current.isSubmitting).toBe(false);
+    expect(result.current.hasPersistedRunState).toBe(false);
+    expect(result.current.progressMessage).toBe("");
+    expect(result.current.progressPercent).toBe(0);
+    expect(window.localStorage.getItem("applican:resume-studio:active-run-session")).toBeNull();
   });
 });

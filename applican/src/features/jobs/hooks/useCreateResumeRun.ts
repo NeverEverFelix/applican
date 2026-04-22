@@ -1,7 +1,8 @@
 import * as Sentry from "@sentry/react";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { captureEvent } from "../../../posthog";
 import { createResumeRun } from "../api/createResumeRun";
+import { deleteResumeRun } from "../api/deleteResumeRun";
 import { getResumeRun } from "../api/getResumeRun";
 import { invokeGenerateBullets } from "../api/invokeGenerateBullets";
 import { requeueResumeRun } from "../api/requeueResumeRun";
@@ -20,11 +21,17 @@ type UseCreateResumeRunResult = {
   submitResumeRun: (params: { file: File | null; jobDescription: string }) => Promise<SubmitResumeRunResult>;
   retryResumeRun: () => Promise<SubmitResumeRunResult>;
   resumeStoredRun: () => Promise<SubmitResumeRunResult | null>;
+  cancelActiveRun: () => Promise<CancelActiveRunResult>;
   clearPersistedRunState: () => void;
 };
 
 type SubmitResumeRunResult =
   | { ok: true; createdRun: CreateResumeRunResult }
+  | { ok: false; errorMessage: string; cancelled?: false }
+  | { ok: false; errorMessage: ""; cancelled: true };
+
+type CancelActiveRunResult =
+  | { ok: true }
   | { ok: false; errorMessage: string };
 
 type PersistedRunPhase = "extracting" | "generating" | "failed";
@@ -41,6 +48,7 @@ type PersistedRunSession = {
 const PERSISTED_RUN_SESSION_KEY = "applican:resume-studio:active-run-session";
 const PERSISTED_RUN_OUTPUT_KEY = "applican:resume-studio:last-run-output";
 const PERSISTED_SHOW_RESULTS_KEY = "applican:resume-studio:show-results";
+const CANCELLED_RESULT: SubmitResumeRunResult = { ok: false, errorMessage: "", cancelled: true };
 
 function toErrorMessage(error: unknown) {
   if (typeof error === "object" && error && "message" in error) {
@@ -148,7 +156,7 @@ async function invokeGenerateBulletsWithRetry(params: { runId: string; requestId
 
 export function useCreateResumeRun(): UseCreateResumeRunResult {
   const initialSession = readPersistedRunSession();
-  const initialFailedRun = initialSession
+  const initialRun = initialSession
     ? {
         requestId: initialSession.requestId,
         row: initialSession.row,
@@ -159,11 +167,25 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
   const [progressMessage, setProgressMessage] = useState(initialSession?.progressMessage ?? "");
   const [progressPercent, setProgressPercent] = useState(initialSession?.progressPercent ?? 0);
   const [createdRun, setCreatedRun] = useState<CreateResumeRunResult | null>(null);
-  const [failedRun, setFailedRun] = useState<CreateResumeRunResult | null>(initialFailedRun);
+  const [failedRun, setFailedRun] = useState<CreateResumeRunResult | null>(initialRun);
   const [hasPersistedRunState, setHasPersistedRunState] = useState(initialSession !== null);
+  const currentExecutionIdRef = useRef(0);
+  const cancelledExecutionIdsRef = useRef(new Set<number>());
+  const activeRunRef = useRef<CreateResumeRunResult | null>(initialRun);
 
-  const clearPersistedRunState = useCallback(() => {
+  const beginExecution = useCallback(() => {
+    currentExecutionIdRef.current += 1;
+    cancelledExecutionIdsRef.current.delete(currentExecutionIdRef.current);
+    return currentExecutionIdRef.current;
+  }, []);
+
+  const isExecutionIgnored = useCallback((executionId: number) => {
+    return executionId !== currentExecutionIdRef.current || cancelledExecutionIdsRef.current.has(executionId);
+  }, []);
+
+  const clearState = useCallback(() => {
     clearPersistedRunSession();
+    activeRunRef.current = null;
     setHasPersistedRunState(false);
     setIsSubmitting(false);
     setErrorMessage("");
@@ -173,8 +195,23 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
     setFailedRun(null);
   }, []);
 
+  const clearPersistedRunState = useCallback(() => {
+    clearState();
+  }, [clearState]);
+
   const updatePersistedStage = useCallback(
-    (created: CreateResumeRunResult, phase: Exclude<PersistedRunPhase, "failed">, nextMessage: string, nextPercent: number) => {
+    (
+      executionId: number,
+      created: CreateResumeRunResult,
+      phase: Exclude<PersistedRunPhase, "failed">,
+      nextMessage: string,
+      nextPercent: number,
+    ) => {
+      if (isExecutionIgnored(executionId)) {
+        return;
+      }
+
+      activeRunRef.current = created;
       writePersistedRunSession({
         requestId: created.requestId,
         row: created.row,
@@ -187,40 +224,80 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
       setProgressMessage(nextMessage);
       setProgressPercent(nextPercent);
     },
-    [],
+    [isExecutionIgnored],
   );
 
-  const finalizeFailure = useCallback((created: CreateResumeRunResult, message: string) => {
-    setFailedRun(created);
-    setErrorMessage(message);
-    setProgressMessage("");
-    setProgressPercent(0);
-    setIsSubmitting(false);
-    writePersistedRunSession({
-      requestId: created.requestId,
-      row: created.row,
-      phase: "failed",
-      progressMessage: "",
-      progressPercent: 0,
-      errorMessage: message,
-    });
-    setHasPersistedRunState(true);
-  }, []);
+  const finalizeFailure = useCallback(
+    (executionId: number, created: CreateResumeRunResult, message: string) => {
+      if (isExecutionIgnored(executionId)) {
+        return;
+      }
 
-  const finalizeSuccess = useCallback((nextRun: CreateResumeRunResult) => {
-    setProgressPercent(100);
-    setCreatedRun(nextRun);
-    setFailedRun(null);
-    setErrorMessage("");
-    setProgressMessage("");
-    setIsSubmitting(false);
-    clearPersistedRunSession();
-    setHasPersistedRunState(false);
-    persistCompletedRunOutput(nextRun.row.output);
-  }, []);
+      activeRunRef.current = created;
+      setFailedRun(created);
+      setErrorMessage(message);
+      setProgressMessage("");
+      setProgressPercent(0);
+      setIsSubmitting(false);
+      writePersistedRunSession({
+        requestId: created.requestId,
+        row: created.row,
+        phase: "failed",
+        progressMessage: "",
+        progressPercent: 0,
+        errorMessage: message,
+      });
+      setHasPersistedRunState(true);
+    },
+    [isExecutionIgnored],
+  );
+
+  const finalizeSuccess = useCallback(
+    (executionId: number, nextRun: CreateResumeRunResult) => {
+      if (isExecutionIgnored(executionId)) {
+        return;
+      }
+
+      activeRunRef.current = nextRun;
+      setProgressPercent(100);
+      setCreatedRun(nextRun);
+      setFailedRun(null);
+      setErrorMessage("");
+      setProgressMessage("");
+      setIsSubmitting(false);
+      clearPersistedRunSession();
+      setHasPersistedRunState(false);
+      persistCompletedRunOutput(nextRun.row.output);
+    },
+    [isExecutionIgnored],
+  );
+
+  const cancelCreatedRunIfNeeded = useCallback(
+    async (executionId: number, created: CreateResumeRunResult) => {
+      if (!isExecutionIgnored(executionId)) {
+        return;
+      }
+
+      try {
+        await deleteResumeRun({ runId: created.row.id });
+      } catch (error) {
+        Sentry.captureException(error, {
+          tags: { feature: "resume_studio", action: "cancel_resume_run_cleanup" },
+          extra: { runId: created.row.id, requestId: created.requestId },
+        });
+      }
+    },
+    [isExecutionIgnored],
+  );
 
   const executeRun = useCallback(
-    async (created: CreateResumeRunResult, options?: { startFromGenerating?: boolean }) => {
+    async (executionId: number, created: CreateResumeRunResult, options?: { startFromGenerating?: boolean }) => {
+      if (isExecutionIgnored(executionId)) {
+        await cancelCreatedRunIfNeeded(executionId, created);
+        return CANCELLED_RESULT;
+      }
+
+      activeRunRef.current = created;
       setIsSubmitting(true);
       setErrorMessage("");
       setCreatedRun(null);
@@ -228,16 +305,20 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
 
       try {
         if (!options?.startFromGenerating) {
-          updatePersistedStage(created, "extracting", "Waiting for extraction service...", 28);
+          updatePersistedStage(executionId, created, "extracting", "Waiting for extraction service...", 28);
           captureEvent("extract_started", {
             run_id: created.row.id,
             request_id: created.requestId,
           });
 
           try {
-            updatePersistedStage(created, "extracting", "Waiting for extraction service...", 42);
+            updatePersistedStage(executionId, created, "extracting", "Waiting for extraction service...", 42);
             await waitForRunExtraction({ runId: created.row.id });
-            updatePersistedStage(created, "extracting", "Waiting for extraction service...", 68);
+            if (isExecutionIgnored(executionId)) {
+              await cancelCreatedRunIfNeeded(executionId, created);
+              return CANCELLED_RESULT;
+            }
+            updatePersistedStage(executionId, created, "extracting", "Waiting for extraction service...", 68);
             captureEvent("extract_succeeded", {
               run_id: created.row.id,
               request_id: created.requestId,
@@ -252,7 +333,12 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
           }
         }
 
-        updatePersistedStage(created, "generating", "Generating bullets...", 78);
+        if (isExecutionIgnored(executionId)) {
+          await cancelCreatedRunIfNeeded(executionId, created);
+          return CANCELLED_RESULT;
+        }
+
+        updatePersistedStage(executionId, created, "generating", "Generating bullets...", 78);
         captureEvent("rag_started", {
           run_id: created.row.id,
           request_id: created.requestId,
@@ -263,6 +349,10 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
             runId: created.row.id,
             requestId: created.requestId,
           });
+          if (isExecutionIgnored(executionId)) {
+            await cancelCreatedRunIfNeeded(executionId, created);
+            return CANCELLED_RESULT;
+          }
           captureEvent("rag_succeeded", {
             run_id: created.row.id,
             request_id: created.requestId,
@@ -280,22 +370,28 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
           requestId: created.requestId,
           row: generated.run,
         };
-        finalizeSuccess(nextRun);
+        finalizeSuccess(executionId, nextRun);
         return { ok: true as const, createdRun: nextRun };
       } catch (error) {
+        if (isExecutionIgnored(executionId)) {
+          await cancelCreatedRunIfNeeded(executionId, created);
+          return CANCELLED_RESULT;
+        }
+
         Sentry.captureException(error, {
           tags: { feature: "resume_studio", action: "submit_resume_run" },
         });
         const message = toErrorMessage(error);
-        finalizeFailure(created, message);
+        finalizeFailure(executionId, created, message);
         return { ok: false as const, errorMessage: message };
       }
     },
-    [finalizeFailure, finalizeSuccess, updatePersistedStage],
+    [cancelCreatedRunIfNeeded, finalizeFailure, finalizeSuccess, isExecutionIgnored, updatePersistedStage],
   );
 
   const submitResumeRun = useCallback(
     async ({ file, jobDescription }: { file: File | null; jobDescription: string }) => {
+      const executionId = beginExecution();
       setIsSubmitting(true);
       setErrorMessage("");
       setProgressMessage("Uploading resume...");
@@ -304,17 +400,28 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
       setFailedRun(null);
       clearPersistedRunSession();
       setHasPersistedRunState(false);
+      activeRunRef.current = null;
 
       try {
         const created = await createResumeRun({ file, jobDescription });
+        activeRunRef.current = created;
+        if (isExecutionIgnored(executionId)) {
+          await cancelCreatedRunIfNeeded(executionId, created);
+          return CANCELLED_RESULT;
+        }
+
         captureEvent("run_created", {
           run_id: created.row.id,
           request_id: created.requestId,
           has_job_description: Boolean(jobDescription.trim()),
           has_resume_file: Boolean(file),
         });
-        return await executeRun(created);
+        return await executeRun(executionId, created);
       } catch (error) {
+        if (isExecutionIgnored(executionId)) {
+          return CANCELLED_RESULT;
+        }
+
         Sentry.captureException(error, {
           tags: { feature: "resume_studio", action: "submit_resume_run" },
         });
@@ -325,7 +432,7 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
         return { ok: false as const, errorMessage: message };
       }
     },
-    [executeRun],
+    [beginExecution, cancelCreatedRunIfNeeded, executeRun, isExecutionIgnored],
   );
 
   const retryResumeRun = useCallback(async () => {
@@ -336,14 +443,26 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
       };
     }
 
+    const executionId = beginExecution();
     setIsSubmitting(true);
     setErrorMessage("");
     setCreatedRun(null);
+    activeRunRef.current = failedRun;
 
     try {
       const retried = await requeueResumeRun({ runId: failedRun.row.id });
-      return await executeRun(retried);
+      activeRunRef.current = retried;
+      if (isExecutionIgnored(executionId)) {
+        await cancelCreatedRunIfNeeded(executionId, retried);
+        return CANCELLED_RESULT;
+      }
+
+      return await executeRun(executionId, retried);
     } catch (error) {
+      if (isExecutionIgnored(executionId)) {
+        return CANCELLED_RESULT;
+      }
+
       Sentry.captureException(error, {
         tags: { feature: "resume_studio", action: "retry_resume_run" },
       });
@@ -353,7 +472,7 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
       setIsSubmitting(false);
       return { ok: false as const, errorMessage: message };
     }
-  }, [executeRun, failedRun]);
+  }, [beginExecution, cancelCreatedRunIfNeeded, executeRun, failedRun, isExecutionIgnored]);
 
   const resumeStoredRun = useCallback(async () => {
     const persisted = readPersistedRunSession();
@@ -362,11 +481,13 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
       return null;
     }
 
+    const executionId = beginExecution();
     const persistedRun = {
       requestId: persisted.requestId,
       row: persisted.row,
     };
 
+    activeRunRef.current = persistedRun;
     setHasPersistedRunState(true);
     setErrorMessage(persisted.errorMessage);
     setProgressMessage(persisted.progressMessage);
@@ -376,13 +497,18 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
 
     try {
       const latestRow = await getResumeRun({ runId: persisted.row.id });
+      if (isExecutionIgnored(executionId)) {
+        return CANCELLED_RESULT;
+      }
+
       const latestRun = {
         requestId: latestRow.request_id,
         row: latestRow,
       };
+      activeRunRef.current = latestRun;
 
       if (latestRow.output !== null && latestRow.output !== undefined) {
-        finalizeSuccess(latestRun);
+        finalizeSuccess(executionId, latestRun);
         return { ok: true as const, createdRun: latestRun };
       }
 
@@ -391,19 +517,51 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
           typeof latestRow.error_message === "string" && latestRow.error_message.trim()
             ? latestRow.error_message.trim()
             : "Resume generation failed. Please try again.";
-        finalizeFailure(latestRun, latestErrorMessage);
+        finalizeFailure(executionId, latestRun, latestErrorMessage);
         return { ok: false as const, errorMessage: latestErrorMessage };
       }
 
-      return await executeRun(latestRun, {
+      return await executeRun(executionId, latestRun, {
         startFromGenerating: latestRow.status === RESUME_RUN_STATUS.EXTRACTED,
       });
     } catch (error) {
+      if (isExecutionIgnored(executionId)) {
+        return CANCELLED_RESULT;
+      }
+
       const message = toErrorMessage(error);
-      finalizeFailure(persistedRun, message);
+      finalizeFailure(executionId, persistedRun, message);
       return { ok: false as const, errorMessage: message };
     }
-  }, [executeRun, finalizeFailure, finalizeSuccess]);
+  }, [beginExecution, executeRun, finalizeFailure, finalizeSuccess, isExecutionIgnored]);
+
+  const cancelActiveRun = useCallback(async (): Promise<CancelActiveRunResult> => {
+    const executionId = currentExecutionIdRef.current;
+    cancelledExecutionIdsRef.current.add(executionId);
+    const runToCancel = activeRunRef.current;
+
+    if (!runToCancel) {
+      clearState();
+      return { ok: true };
+    }
+
+    try {
+      await deleteResumeRun({ runId: runToCancel.row.id });
+      captureEvent("run_cancelled", {
+        run_id: runToCancel.row.id,
+        request_id: runToCancel.requestId,
+      });
+      clearState();
+      return { ok: true };
+    } catch (error) {
+      cancelledExecutionIdsRef.current.delete(executionId);
+      Sentry.captureException(error, {
+        tags: { feature: "resume_studio", action: "cancel_resume_run" },
+        extra: { runId: runToCancel.row.id, requestId: runToCancel.requestId },
+      });
+      return { ok: false, errorMessage: toErrorMessage(error) };
+    }
+  }, [clearState]);
 
   return {
     isSubmitting,
@@ -416,6 +574,7 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
     submitResumeRun,
     retryResumeRun,
     resumeStoredRun,
+    cancelActiveRun,
     clearPersistedRunState,
   };
 }

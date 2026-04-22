@@ -16,7 +16,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 45px;
+  gap: 38px;
   overflow: visible;
 }
 
@@ -106,11 +106,14 @@
 
 .morphSlot {
   width: 100%;
-  min-height: 72px;
+  min-height: 108px;
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  margin-top: 24px;
-  transform: translateY(16px);
+  gap: 14px;
+  margin-top: -7px;
+  transform: translateY(10px);
   opacity: 0;
 }
 
@@ -120,6 +123,45 @@
 
 .morphSlotVisible {
   opacity: 1;
+  transform: translateY(0);
+}
+
+.progressIndicator {
+  transform: translateX(-15px) scale(0.75);
+  transform-origin: center center;
+}
+
+.cancelButton {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #eef3ff;
+  font-family: "Neue Haas Grotesk Display Pro", Inter, Helvetica, Arial, sans-serif;
+  font-size: 0.96rem;
+  font-weight: 700;
+  letter-spacing: 0.26em;
+  line-height: 1;
+  text-transform: uppercase;
+  cursor: pointer;
+  opacity: 0.72;
+  transition:
+    transform 180ms ease,
+    opacity 180ms ease,
+    color 180ms ease;
+}
+
+.cancelButton:hover {
+  transform: translateY(-1px);
+  opacity: 1;
+  color: #ffffff;
+}
+
+.cancelButton:focus-visible {
+  outline: 2px solid #dcd9fb;
+  outline-offset: 4px;
+}
+
+.cancelButton:active {
   transform: translateY(0);
 }
 
@@ -143,6 +185,7 @@
   .stage {
     width: 100%;
     height: 62vh;
+    gap: 30px;
   }
 
   .launcher {
@@ -155,6 +198,16 @@
   }
 
   .morphSlot {
-    min-height: 58px;
+    min-height: 96px;
+    gap: 12px;
+    margin-top: 3px;
+  }
+
+  .progressIndicator {
+    transform: translateX(-15px) scale(0.72);
+  }
+
+  .cancelButton {
+    font-size: 0.84rem;
   }
 }

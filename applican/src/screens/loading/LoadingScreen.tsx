@@ -21,13 +21,14 @@ const MORPH_REVEAL_DELAY_MS = 1400;
 type LoadingScreenProps = {
   backendProgress?: number;
   animationOriginMs?: number;
+  onCancel?: () => void;
 };
 
 type ActiveResumeProjectile = ResumeProjectile & {
   elapsedMs: number;
 };
 
-export default function LoadingScreen({ backendProgress = 0, animationOriginMs }: LoadingScreenProps) {
+export default function LoadingScreen({ backendProgress = 0, animationOriginMs, onCancel }: LoadingScreenProps) {
   const getElapsedMs = () => {
     if (!animationOriginMs) {
       return 0;
@@ -238,7 +239,10 @@ export default function LoadingScreen({ backendProgress = 0, animationOriginMs }
             showMorph ? styles.morphSlotVisible : styles.morphSlotHidden,
           ].join(" ")}
         >
-          <LoadingMorph progress={backendProgress} />
+          <LoadingMorph progress={backendProgress} className={styles.progressIndicator} />
+          <button type="button" className={styles.cancelButton} onClick={onCancel}>
+            CANCEL
+          </button>
         </div>
 
       </div>

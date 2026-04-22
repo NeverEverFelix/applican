@@ -34,5 +34,6 @@ describe("LoadingScreen", () => {
     const introMessage = screen.getByText("Generating Resume");
     expect(introMessage.className).toContain(styles.messageHidden);
     expect(screen.getByLabelText("Progress 78 percent")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "CANCEL" })).toBeTruthy();
   });
 });
