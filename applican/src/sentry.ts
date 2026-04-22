@@ -26,15 +26,12 @@ if (dsn) {
         matchRoutes,
       }),
       Sentry.captureConsoleIntegration({
-        levels: isDev ? ["log", "info", "warn", "error"] : ["warn", "error"],
+        levels: ["warn", "error"],
       }),
     ],
     tracesSampleRate: 1.0,
   });
 
-  if (isDev) {
-    console.info("[sentry] initialized");
-  }
 } else if (isDev) {
   console.warn("[sentry] VITE_SENTRY_DSN is missing; Sentry is disabled");
 }

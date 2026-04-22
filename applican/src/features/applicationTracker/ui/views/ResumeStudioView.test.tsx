@@ -87,7 +87,9 @@ beforeEach(() => {
     cancelActiveRun: vi.fn(async () => ({ ok: true })),
     clearPersistedRunState: vi.fn(),
     isSubmitting: false,
+    errorKind: null,
     errorMessage: "",
+    errorFeedback: { tone: "error", retryable: false, message: "" },
     progressMessage: "",
     progressPercent: 0,
     createdRun: null,
@@ -185,7 +187,9 @@ describe("ResumeStudioView", () => {
       cancelActiveRun: vi.fn(async () => ({ ok: true })),
       clearPersistedRunState: vi.fn(),
       isSubmitting: true,
+      errorKind: null,
       errorMessage: "",
+      errorFeedback: { tone: "error", retryable: false, message: "" },
       progressMessage: "Generating bullets...",
       progressPercent: 78,
       createdRun: null,
@@ -197,5 +201,245 @@ describe("ResumeStudioView", () => {
 
     expect(screen.getByText("Loading")).toBeTruthy();
     expect(screen.queryByPlaceholderText("Paste a job description...")).toBeNull();
+  });
+
+  it("does not auto-resume a persisted failed run", () => {
+    const resumeStoredRunMock = vi.fn(async () => null);
+
+    useCreateResumeRunMock.mockReturnValue({
+      submitResumeRun: vi.fn(),
+      retryResumeRun: vi.fn(),
+      resumeStoredRun: resumeStoredRunMock,
+      cancelActiveRun: vi.fn(async () => ({ ok: true })),
+      clearPersistedRunState: vi.fn(),
+      isSubmitting: false,
+      errorKind: "retryable",
+      errorMessage: "worker offline",
+      errorFeedback: {
+        tone: "warning",
+        retryable: true,
+        message: "worker offline Your draft is still saved, so you can try again in a moment.",
+      },
+      progressMessage: "",
+      progressPercent: 0,
+      createdRun: null,
+      failedRun: {
+        requestId: "request-1",
+        row: {
+          id: "run-1",
+          request_id: "request-1",
+          user_id: "user-1",
+          resume_path: "resume.pdf",
+          resume_filename: "resume.pdf",
+          job_description: "Software engineer",
+          status: "failed",
+          error_code: "worker_offline",
+          error_message: "worker offline",
+          output: null,
+          created_at: "2026-04-16T00:00:00.000Z",
+          updated_at: "2026-04-16T00:00:00.000Z",
+        },
+      },
+      hasPersistedRunState: true,
+    });
+
+    render(<ResumeStudioView />);
+
+    expect(screen.getByRole("button", { name: /try again/i })).toBeTruthy();
+    expect(resumeStoredRunMock).not.toHaveBeenCalled();
+  });
+
+  it("does not auto-resume when retry switches the view back into submitting", () => {
+    const resumeStoredRunMock = vi.fn(async () => null);
+    const retryResumeRunMock = vi.fn(async () => ({ ok: false, errorMessage: "worker offline" }));
+    const useCreateResumeRunState = {
+      submitResumeRun: vi.fn(),
+      retryResumeRun: retryResumeRunMock,
+      resumeStoredRun: resumeStoredRunMock,
+      cancelActiveRun: vi.fn(async () => ({ ok: true })),
+      clearPersistedRunState: vi.fn(),
+      isSubmitting: false,
+      errorKind: "retryable",
+      errorMessage: "worker offline",
+      errorFeedback: {
+        tone: "warning",
+        retryable: true,
+        message: "worker offline Your draft is still saved, so you can try again in a moment.",
+      },
+      progressMessage: "",
+      progressPercent: 0,
+      createdRun: null,
+      failedRun: {
+        requestId: "request-1",
+        row: {
+          id: "run-1",
+          request_id: "request-1",
+          user_id: "user-1",
+          resume_path: "resume.pdf",
+          resume_filename: "resume.pdf",
+          job_description: "Software engineer",
+          status: "failed",
+          error_code: "worker_offline",
+          error_message: "worker offline",
+          output: null,
+          created_at: "2026-04-16T00:00:00.000Z",
+          updated_at: "2026-04-16T00:00:00.000Z",
+        },
+      },
+      hasPersistedRunState: true,
+    };
+
+    useCreateResumeRunMock.mockImplementation(() => useCreateResumeRunState);
+
+    const { rerender } = render(<ResumeStudioView />);
+
+    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+
+    useCreateResumeRunState.isSubmitting = true;
+    useCreateResumeRunState.errorMessage = "";
+    useCreateResumeRunState.failedRun = null;
+
+    rerender(<ResumeStudioView />);
+
+    expect(retryResumeRunMock).toHaveBeenCalledTimes(1);
+    expect(resumeStoredRunMock).not.toHaveBeenCalled();
+  });
+
+  it("returns to the error screen when retry fails again without re-triggering persisted restore", () => {
+    const resumeStoredRunMock = vi.fn(async () => null);
+    const retryResumeRunMock = vi.fn(async () => ({
+      ok: false as const,
+      errorKind: "retryable" as const,
+      errorMessage: "worker offline",
+    }));
+    const useCreateResumeRunState = {
+      submitResumeRun: vi.fn(),
+      retryResumeRun: retryResumeRunMock,
+      resumeStoredRun: resumeStoredRunMock,
+      cancelActiveRun: vi.fn(async () => ({ ok: true })),
+      clearPersistedRunState: vi.fn(),
+      isSubmitting: false,
+      errorKind: "retryable" as const,
+      errorMessage: "worker offline",
+      errorFeedback: {
+        tone: "warning" as const,
+        retryable: true,
+        message: "worker offline Your draft is still saved, so you can try again in a moment.",
+      },
+      progressMessage: "",
+      progressPercent: 0,
+      createdRun: null,
+      failedRun: {
+        requestId: "request-1",
+        row: {
+          id: "run-1",
+          request_id: "request-1",
+          user_id: "user-1",
+          resume_path: "resume.pdf",
+          resume_filename: "resume.pdf",
+          job_description: "Software engineer",
+          status: "failed",
+          error_code: "worker_offline",
+          error_message: "worker offline",
+          output: null,
+          created_at: "2026-04-16T00:00:00.000Z",
+          updated_at: "2026-04-16T00:00:00.000Z",
+        },
+      },
+      hasPersistedRunState: true,
+    };
+
+    useCreateResumeRunMock.mockImplementation(() => useCreateResumeRunState);
+
+    const { rerender } = render(<ResumeStudioView />);
+
+    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+
+    useCreateResumeRunState.isSubmitting = true;
+    useCreateResumeRunState.errorMessage = "";
+    useCreateResumeRunState.failedRun = null;
+
+    rerender(<ResumeStudioView />);
+
+    expect(screen.getByText("Loading")).toBeTruthy();
+
+    useCreateResumeRunState.isSubmitting = false;
+    useCreateResumeRunState.errorKind = "retryable";
+    useCreateResumeRunState.errorMessage = "worker offline";
+    useCreateResumeRunState.errorFeedback = {
+      tone: "warning",
+      retryable: true,
+      message: "worker offline Your draft is still saved, so you can try again in a moment.",
+    };
+    useCreateResumeRunState.failedRun = {
+      requestId: "request-1",
+      row: {
+        id: "run-1",
+        request_id: "request-1",
+        user_id: "user-1",
+        resume_path: "resume.pdf",
+        resume_filename: "resume.pdf",
+        job_description: "Software engineer",
+        status: "failed",
+        error_code: "worker_offline",
+        error_message: "worker offline",
+        output: null,
+        created_at: "2026-04-16T00:00:00.000Z",
+        updated_at: "2026-04-16T00:00:00.000Z",
+      },
+    };
+
+    rerender(<ResumeStudioView />);
+
+    expect(screen.queryByText("Loading")).toBeNull();
+    expect(screen.getByRole("button", { name: /try again/i })).toBeTruthy();
+    expect(screen.getByText(/worker offline/i)).toBeTruthy();
+    expect(retryResumeRunMock).toHaveBeenCalledTimes(1);
+    expect(resumeStoredRunMock).not.toHaveBeenCalled();
+  });
+
+  it("hides try again for missing-run recovery errors", () => {
+    useCreateResumeRunMock.mockReturnValue({
+      submitResumeRun: vi.fn(),
+      retryResumeRun: vi.fn(),
+      resumeStoredRun: vi.fn(async () => null),
+      cancelActiveRun: vi.fn(async () => ({ ok: true })),
+      clearPersistedRunState: vi.fn(),
+      isSubmitting: false,
+      errorKind: "missing_run",
+      errorMessage: "Your previous run could not be restored. Start a new analysis.",
+      errorFeedback: {
+        tone: "error",
+        retryable: false,
+        message: "Your previous run could not be restored. Start a new analysis.",
+      },
+      progressMessage: "",
+      progressPercent: 0,
+      createdRun: null,
+      failedRun: {
+        requestId: "request-1",
+        row: {
+          id: "run-1",
+          request_id: "request-1",
+          user_id: "user-1",
+          resume_path: "resume.pdf",
+          resume_filename: "resume.pdf",
+          job_description: "Software engineer",
+          status: "failed",
+          error_code: null,
+          error_message: null,
+          output: null,
+          created_at: "2026-04-16T00:00:00.000Z",
+          updated_at: "2026-04-16T00:00:00.000Z",
+        },
+      },
+      hasPersistedRunState: false,
+    });
+
+    render(<ResumeStudioView />);
+
+    expect(screen.queryByRole("button", { name: /try again/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /start new/i })).toBeTruthy();
+    expect(screen.getByText(/could not be restored/i)).toBeTruthy();
   });
 });

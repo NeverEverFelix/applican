@@ -8,11 +8,13 @@ import { invokeGenerateBullets } from "../api/invokeGenerateBullets";
 import { requeueResumeRun } from "../api/requeueResumeRun";
 import { waitForRunExtraction } from "../api/waitForRunExtraction";
 import { RESUME_RUN_STATUS } from "../model/constants";
-import type { CreateResumeRunResult } from "../model/types";
+import type { CreateResumeRunResult, ResumeRunRow } from "../model/types";
 
 type UseCreateResumeRunResult = {
   isSubmitting: boolean;
+  errorKind: ResumeRunErrorKind | null;
   errorMessage: string;
+  errorFeedback: ResumeRunErrorFeedback;
   progressMessage: string;
   progressPercent: number;
   createdRun: CreateResumeRunResult | null;
@@ -27,21 +29,31 @@ type UseCreateResumeRunResult = {
 
 type SubmitResumeRunResult =
   | { ok: true; createdRun: CreateResumeRunResult; cancelled?: false }
-  | { ok: false; errorMessage: string; cancelled?: false }
+  | { ok: false; errorKind: ResumeRunErrorKind; errorMessage: string; cancelled?: false }
   | { ok: false; errorMessage: ""; cancelled: true };
 
 type CancelActiveRunResult =
   | { ok: true }
   | { ok: false; errorMessage: string };
 
+export type ResumeRunErrorKind = "missing_run" | "retryable" | "validation" | "limit" | "unknown";
+export type ResumeRunErrorFeedback = {
+  tone: "error" | "warning";
+  retryable: boolean;
+  message: string;
+};
+
 type PersistedRunPhase = "extracting" | "generating" | "failed";
 
 type PersistedRunSession = {
+  runId?: string;
   requestId: string;
-  row: CreateResumeRunResult["row"];
+  row?: CreateResumeRunResult["row"];
+  status?: ResumeRunRow["status"];
   phase: PersistedRunPhase;
   progressMessage: string;
   progressPercent: number;
+  errorKind: ResumeRunErrorKind | null;
   errorMessage: string;
 };
 
@@ -49,6 +61,101 @@ const PERSISTED_RUN_SESSION_KEY = "applican:resume-studio:active-run-session";
 const PERSISTED_RUN_OUTPUT_KEY = "applican:resume-studio:last-run-output";
 const PERSISTED_SHOW_RESULTS_KEY = "applican:resume-studio:show-results";
 const CANCELLED_RESULT: SubmitResumeRunResult = { ok: false, errorMessage: "", cancelled: true };
+
+export function classifyResumeRunErrorKind(message: string, errorCode?: string | null): ResumeRunErrorKind {
+  const normalizedCode = typeof errorCode === "string" ? errorCode.trim().toUpperCase() : "";
+
+  if (normalizedCode === "FREE_PLAN_LIMIT_REACHED" || normalizedCode === "ANALYSIS_LIMIT_REACHED") {
+    return "limit";
+  }
+
+  if (
+    normalizedCode === "RUN_NOT_READY" ||
+    normalizedCode === "RESUME_NOT_EXTRACTED" ||
+    normalizedCode === "WORKER_OFFLINE" ||
+    normalizedCode === "EXTRACTION_WORKER_OFFLINE"
+  ) {
+    return "retryable";
+  }
+
+  const normalized = message.trim().toLowerCase();
+
+  if (!normalized) {
+    return "unknown";
+  }
+
+  if (normalized.includes("could not be restored")) {
+    return "missing_run";
+  }
+
+  if (normalized.includes("free plan limit reached") || normalized.includes("analysis limit reached")) {
+    return "limit";
+  }
+
+  if (
+    normalized.includes("please upload") ||
+    normalized.includes("please provide") ||
+    normalized.includes("required") ||
+    normalized.includes("empty")
+  ) {
+    return "validation";
+  }
+
+  if (
+    normalized.includes("network error") ||
+    normalized.includes("failed to fetch") ||
+    normalized.includes("edge function unreachable") ||
+    normalized.includes("worker offline") ||
+    normalized.includes("offline") ||
+    normalized.includes("still queued") ||
+    normalized.includes("still processing") ||
+    normalized.includes("try again in a moment") ||
+    normalized.includes("failed to upload resume") ||
+    normalized.includes("failed to check resume extraction status") ||
+    normalized.includes("failed to retry resume run")
+  ) {
+    return "retryable";
+  }
+
+  return "unknown";
+}
+
+export function getResumeRunErrorFeedback(
+  errorMessage: string,
+  errorKind: ResumeRunErrorKind | null,
+): ResumeRunErrorFeedback {
+  const normalized = errorMessage.trim();
+
+  if (!normalized) {
+    return {
+      tone: "error",
+      retryable: false,
+      message: "",
+    };
+  }
+
+  if (errorKind === "missing_run" || errorKind === "limit" || errorKind === "validation") {
+    return {
+      tone: "error",
+      retryable: false,
+      message: normalized,
+    };
+  }
+
+  if (errorKind === "retryable") {
+    return {
+      tone: "warning",
+      retryable: true,
+      message: `${normalized} Your draft is still saved, so you can try again in a moment.`,
+    };
+  }
+
+  return {
+    tone: "warning",
+    retryable: true,
+    message: `${normalized} Your draft is still saved.`,
+  };
+}
 
 function toErrorMessage(error: unknown) {
   if (typeof error === "object" && error && "message" in error) {
@@ -60,10 +167,51 @@ function toErrorMessage(error: unknown) {
   return "Failed to submit resume run. Please try again.";
 }
 
+function createFailedResult(
+  errorMessage: string,
+  errorCode?: string | null,
+): Extract<SubmitResumeRunResult, { ok: false; cancelled?: false }> {
+  return {
+    ok: false,
+    errorKind: classifyResumeRunErrorKind(errorMessage, errorCode),
+    errorMessage,
+  };
+}
+
 function delay(ms: number) {
   return new Promise<void>((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+function buildPersistedRunResult(session: PersistedRunSession): CreateResumeRunResult | null {
+  const runId = session.runId?.trim() || session.row?.id;
+
+  if (!runId) {
+    return null;
+  }
+
+  return {
+    requestId: session.requestId,
+    row:
+      session.row ??
+      {
+        id: runId,
+        request_id: session.requestId,
+        user_id: "",
+        resume_path: "",
+        resume_filename: "",
+        job_description: "",
+        status:
+          session.status ??
+          (session.phase === "failed" ? RESUME_RUN_STATUS.FAILED : RESUME_RUN_STATUS.EXTRACTING),
+        error_code: null,
+        error_message: session.errorMessage || null,
+        output: null,
+        created_at: "",
+        updated_at: "",
+      },
+  };
 }
 
 function isPersistedRunSession(value: unknown): value is PersistedRunSession {
@@ -73,11 +221,20 @@ function isPersistedRunSession(value: unknown): value is PersistedRunSession {
 
   const maybe = value as Partial<PersistedRunSession>;
   return (
+    (maybe.runId === undefined || typeof maybe.runId === "string") &&
     typeof maybe.requestId === "string" &&
-    Boolean(maybe.row && typeof maybe.row === "object") &&
+    (maybe.row === undefined || Boolean(maybe.row && typeof maybe.row === "object")) &&
+    (maybe.status === undefined || typeof maybe.status === "string") &&
     (maybe.phase === "extracting" || maybe.phase === "generating" || maybe.phase === "failed") &&
     typeof maybe.progressMessage === "string" &&
     typeof maybe.progressPercent === "number" &&
+    (maybe.errorKind === undefined ||
+      maybe.errorKind === null ||
+      maybe.errorKind === "missing_run" ||
+      maybe.errorKind === "retryable" ||
+      maybe.errorKind === "validation" ||
+      maybe.errorKind === "limit" ||
+      maybe.errorKind === "unknown") &&
     typeof maybe.errorMessage === "string"
   );
 }
@@ -156,13 +313,14 @@ async function invokeGenerateBulletsWithRetry(params: { runId: string; requestId
 
 export function useCreateResumeRun(): UseCreateResumeRunResult {
   const initialSession = readPersistedRunSession();
-  const initialRun = initialSession
-    ? {
-        requestId: initialSession.requestId,
-        row: initialSession.row,
-      }
-    : null;
+  const initialRun = initialSession ? buildPersistedRunResult(initialSession) : null;
   const [isSubmitting, setIsSubmitting] = useState(initialSession !== null && initialSession.phase !== "failed");
+  const [errorKind, setErrorKind] = useState<ResumeRunErrorKind | null>(
+    initialSession?.errorKind ??
+      (initialSession?.errorMessage
+        ? classifyResumeRunErrorKind(initialSession.errorMessage, initialSession.row?.error_code)
+        : null),
+  );
   const [errorMessage, setErrorMessage] = useState(initialSession?.errorMessage ?? "");
   const [progressMessage, setProgressMessage] = useState(initialSession?.progressMessage ?? "");
   const [progressPercent, setProgressPercent] = useState(initialSession?.progressPercent ?? 0);
@@ -188,6 +346,7 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
     activeRunRef.current = null;
     setHasPersistedRunState(false);
     setIsSubmitting(false);
+    setErrorKind(null);
     setErrorMessage("");
     setProgressMessage("");
     setProgressPercent(0);
@@ -213,11 +372,13 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
 
       activeRunRef.current = created;
       writePersistedRunSession({
+        runId: created.row.id,
         requestId: created.requestId,
-        row: created.row,
+        status: created.row.status,
         phase,
         progressMessage: nextMessage,
         progressPercent: nextPercent,
+        errorKind: null,
         errorMessage: "",
       });
       setHasPersistedRunState(true);
@@ -235,16 +396,19 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
 
       activeRunRef.current = created;
       setFailedRun(created);
+      setErrorKind(classifyResumeRunErrorKind(message, created.row.error_code));
       setErrorMessage(message);
       setProgressMessage("");
       setProgressPercent(0);
       setIsSubmitting(false);
       writePersistedRunSession({
+        runId: created.row.id,
         requestId: created.requestId,
-        row: created.row,
+        status: created.row.status,
         phase: "failed",
         progressMessage: "",
         progressPercent: 0,
+        errorKind: classifyResumeRunErrorKind(message, created.row.error_code),
         errorMessage: message,
       });
       setHasPersistedRunState(true);
@@ -262,6 +426,7 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
       setProgressPercent(100);
       setCreatedRun(nextRun);
       setFailedRun(null);
+      setErrorKind(null);
       setErrorMessage("");
       setProgressMessage("");
       setIsSubmitting(false);
@@ -299,6 +464,7 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
 
       activeRunRef.current = created;
       setIsSubmitting(true);
+      setErrorKind(null);
       setErrorMessage("");
       setCreatedRun(null);
       setFailedRun(null);
@@ -383,7 +549,7 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
         });
         const message = toErrorMessage(error);
         finalizeFailure(executionId, created, message);
-        return { ok: false as const, errorMessage: message };
+        return createFailedResult(message);
       }
     },
     [cancelCreatedRunIfNeeded, finalizeFailure, finalizeSuccess, isExecutionIgnored, updatePersistedStage],
@@ -393,6 +559,7 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
     async ({ file, jobDescription }: { file: File | null; jobDescription: string }) => {
       const executionId = beginExecution();
       setIsSubmitting(true);
+      setErrorKind(null);
       setErrorMessage("");
       setProgressMessage("Uploading resume...");
       setProgressPercent(8);
@@ -426,10 +593,12 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
           tags: { feature: "resume_studio", action: "submit_resume_run" },
         });
         const message = toErrorMessage(error);
+        setErrorKind(classifyResumeRunErrorKind(message));
         setErrorMessage(message);
         setProgressMessage("");
+        setProgressPercent(0);
         setIsSubmitting(false);
-        return { ok: false as const, errorMessage: message };
+        return createFailedResult(message);
       }
     },
     [beginExecution, cancelCreatedRunIfNeeded, executeRun, isExecutionIgnored],
@@ -437,16 +606,19 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
 
   const retryResumeRun = useCallback(async () => {
     if (!failedRun) {
-      return {
-        ok: false as const,
-        errorMessage: "Failed to retry resume run: no previous run is available.",
-      };
+      return createFailedResult("Failed to retry resume run: no previous run is available.");
     }
 
     const executionId = beginExecution();
     setIsSubmitting(true);
+    setErrorKind(null);
     setErrorMessage("");
+    setProgressMessage("");
+    setProgressPercent(0);
     setCreatedRun(null);
+    setFailedRun(null);
+    clearPersistedRunSession();
+    setHasPersistedRunState(false);
     activeRunRef.current = failedRun;
 
     try {
@@ -467,10 +639,11 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
         tags: { feature: "resume_studio", action: "retry_resume_run" },
       });
       const message = toErrorMessage(error);
+      setErrorKind(classifyResumeRunErrorKind(message));
       setErrorMessage(message);
       setProgressMessage("");
       setIsSubmitting(false);
-      return { ok: false as const, errorMessage: message };
+      return createFailedResult(message);
     }
   }, [beginExecution, cancelCreatedRunIfNeeded, executeRun, failedRun, isExecutionIgnored]);
 
@@ -482,23 +655,43 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
     }
 
     const executionId = beginExecution();
-    const persistedRun = {
-      requestId: persisted.requestId,
-      row: persisted.row,
-    };
+    const persistedRun = buildPersistedRunResult(persisted);
+
+    if (!persistedRun) {
+      clearState();
+      return createFailedResult("Your previous run could not be restored. Start a new analysis.");
+    }
 
     activeRunRef.current = persistedRun;
     setHasPersistedRunState(true);
+    setErrorKind(
+      persisted.errorKind ??
+        (persisted.errorMessage ? classifyResumeRunErrorKind(persisted.errorMessage, persisted.row?.error_code) : null),
+    );
     setErrorMessage(persisted.errorMessage);
     setProgressMessage(persisted.progressMessage);
     setProgressPercent(persisted.progressPercent);
     setFailedRun(persistedRun);
     setIsSubmitting(persisted.phase !== "failed");
 
+    if (persisted.phase === "failed") {
+      return createFailedResult(persisted.errorMessage);
+    }
+
     try {
-      const latestRow = await getResumeRun({ runId: persisted.row.id });
+      const persistedRunId = persisted.runId?.trim() || persisted.row?.id;
+      if (!persistedRunId) {
+        clearState();
+        return createFailedResult("Your previous run could not be restored. Start a new analysis.");
+      }
+      const latestRow = await getResumeRun({ runId: persistedRunId });
       if (isExecutionIgnored(executionId)) {
         return CANCELLED_RESULT;
+      }
+
+      if (!latestRow) {
+        clearState();
+        return createFailedResult("Your previous run could not be restored. Start a new analysis.");
       }
 
       const latestRun = {
@@ -518,7 +711,7 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
             ? latestRow.error_message.trim()
             : "Resume generation failed. Please try again.";
         finalizeFailure(executionId, latestRun, latestErrorMessage);
-        return { ok: false as const, errorMessage: latestErrorMessage };
+        return createFailedResult(latestErrorMessage, latestRow.error_code);
       }
 
       return await executeRun(executionId, latestRun, {
@@ -531,9 +724,9 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
 
       const message = toErrorMessage(error);
       finalizeFailure(executionId, persistedRun, message);
-      return { ok: false as const, errorMessage: message };
+      return createFailedResult(message);
     }
-  }, [beginExecution, executeRun, finalizeFailure, finalizeSuccess, isExecutionIgnored]);
+  }, [beginExecution, clearState, executeRun, finalizeFailure, finalizeSuccess, isExecutionIgnored]);
 
   const cancelActiveRun = useCallback(async (): Promise<CancelActiveRunResult> => {
     const executionId = currentExecutionIdRef.current;
@@ -565,7 +758,9 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
 
   return {
     isSubmitting,
+    errorKind,
     errorMessage,
+    errorFeedback: getResumeRunErrorFeedback(errorMessage, errorKind),
     progressMessage,
     progressPercent,
     createdRun,

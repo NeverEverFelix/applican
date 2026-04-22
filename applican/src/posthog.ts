@@ -3,6 +3,7 @@ import posthog from "posthog-js";
 const posthogKey = import.meta.env.VITE_PUBLIC_POSTHOG_KEY;
 const posthogHost = import.meta.env.VITE_PUBLIC_POSTHOG_HOST ?? "https://us.i.posthog.com";
 const isDev = import.meta.env.DEV;
+const isPostHogDebugEnabled = import.meta.env.VITE_POSTHOG_DEBUG === "true";
 
 let initialized = false;
 const PROBE_KEY = "applican:posthog:probe-sent:v1";
@@ -17,9 +18,8 @@ if (posthogKey) {
         window.localStorage.setItem(PROBE_KEY, "1");
       }
 
-      if (isDev) {
+      if (isDev && isPostHogDebugEnabled) {
         client.debug();
-        console.info("[posthog] initialized");
       }
     },
   });
@@ -39,7 +39,7 @@ export function captureEvent(event: string, properties?: Record<string, unknown>
   }
 
   posthogClient.capture(event, properties);
-  if (isDev) {
+  if (isDev && isPostHogDebugEnabled) {
     console.info("[posthog] capture", event, properties ?? {});
   }
 }

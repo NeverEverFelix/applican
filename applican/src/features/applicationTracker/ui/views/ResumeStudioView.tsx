@@ -84,67 +84,6 @@ function validateResumeFile(file: File | null): string {
   return "";
 }
 
-function classifyGenerationError(errorMessage: string): {
-  tone: "error" | "warning";
-  retryable: boolean;
-  message: string;
-} {
-  const normalized = errorMessage.trim();
-  const lowerMessage = normalized.toLowerCase();
-
-  if (!normalized) {
-    return {
-      tone: "error",
-      retryable: false,
-      message: "",
-    };
-  }
-
-  if (lowerMessage.includes("free plan limit reached") || lowerMessage.includes("analysis limit reached")) {
-    return {
-      tone: "error",
-      retryable: false,
-      message: normalized,
-    };
-  }
-
-  if (
-    lowerMessage.includes("network error") ||
-    lowerMessage.includes("failed to fetch") ||
-    lowerMessage.includes("edge function unreachable") ||
-    lowerMessage.includes("offline") ||
-    lowerMessage.includes("still queued") ||
-    lowerMessage.includes("still processing") ||
-    lowerMessage.includes("failed to upload resume") ||
-    lowerMessage.includes("failed to check resume extraction status")
-  ) {
-    return {
-      tone: "warning",
-      retryable: true,
-      message: `${normalized} Your draft is still saved, so you can try again in a moment.`,
-    };
-  }
-
-  if (
-    lowerMessage.includes("please upload") ||
-    lowerMessage.includes("please provide") ||
-    lowerMessage.includes("required") ||
-    lowerMessage.includes("empty")
-  ) {
-    return {
-      tone: "error",
-      retryable: false,
-      message: normalized,
-    };
-  }
-
-  return {
-    tone: "warning",
-    retryable: true,
-    message: `${normalized} Your draft is still saved.`,
-  };
-}
-
 function OptimizationSectionAccordion({ section }: { section: ResumeOptimizationPresentationSection }) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -365,6 +304,7 @@ export function ResumeStudioView() {
     failedRun,
     isSubmitting,
     errorMessage,
+    errorFeedback: generationErrorFeedback,
     progressMessage,
     progressPercent,
     createdRun,
@@ -373,6 +313,7 @@ export function ResumeStudioView() {
   const shouldStartOnPersistedProgressScreen = hasPersistedRunState && isSubmitting && !showComputedResults;
   const shouldStartOnPersistedErrorScreen =
     hasPersistedRunState && Boolean(errorMessage) && failedRun !== null && !showComputedResults;
+  const shouldAttemptInitialPersistedRunResumeRef = useRef(shouldStartOnPersistedProgressScreen);
   const [isShowingProgressScreen, setIsShowingProgressScreen] = useState(shouldStartOnPersistedProgressScreen);
   const [isShowingAnalysisCompleteScreen, setIsShowingAnalysisCompleteScreen] = useState(false);
   const [shouldRenderAnalysisCompleteScreen, setShouldRenderAnalysisCompleteScreen] = useState(false);
@@ -403,7 +344,6 @@ export function ResumeStudioView() {
     showComputedResults && hasRunOutput && !hasResult
       ? "Result was generated, but output shape is not UI-compatible yet."
       : "";
-  const generationErrorFeedback = classifyGenerationError(errorMessage);
   const isJobDescriptionValid = jobDescription.trim().length > MIN_JOB_DESCRIPTION_LENGTH;
   const shouldShowValidatedJobDescriptionStyle = isJobDescriptionValid;
   const shouldShowInvalidJobDescriptionStyle = Boolean(jobDescriptionValidationError);
@@ -497,11 +437,18 @@ export function ResumeStudioView() {
   }, [errorMessage, failedRun, hasPersistedRunState, isSubmitting, shouldShowResults]);
 
   useEffect(() => {
-    if (shouldShowResults || !hasPersistedRunState || hasAttemptedPersistedRunResumeRef.current) {
+    if (
+      !shouldAttemptInitialPersistedRunResumeRef.current ||
+      shouldShowResults ||
+      !hasPersistedRunState ||
+      !isSubmitting ||
+      hasAttemptedPersistedRunResumeRef.current
+    ) {
       return;
     }
 
     hasAttemptedPersistedRunResumeRef.current = true;
+    shouldAttemptInitialPersistedRunResumeRef.current = false;
     if (loadingAnimationOriginMs === null) {
       setLoadingAnimationOriginMs(Date.now());
     }
@@ -531,6 +478,7 @@ export function ResumeStudioView() {
     loadingAnimationOriginMs,
     resumeStoredRun,
     setLoadingAnimationOriginMs,
+    isSubmitting,
     shouldShowResults,
   ]);
 
@@ -777,6 +725,7 @@ export function ResumeStudioView() {
   const onStartNewAnalysis = () => {
     lastTrackedResultKeyRef.current = "";
     hasAttemptedPersistedRunResumeRef.current = false;
+    shouldAttemptInitialPersistedRunResumeRef.current = false;
     void clearPersistedResumeFile();
     clearPersistedRunState();
     setLoadingAnimationOriginMs(null);
@@ -797,6 +746,7 @@ export function ResumeStudioView() {
 
   const resetToDraftInputs = useCallback(() => {
     hasAttemptedPersistedRunResumeRef.current = false;
+    shouldAttemptInitialPersistedRunResumeRef.current = false;
     clearPersistedRunState();
     setLoadingAnimationOriginMs(null);
     setShowComputedResults(false);
@@ -886,16 +836,30 @@ export function ResumeStudioView() {
               role="alert"
             >
               {generationErrorFeedback.message
-                ? `${generationErrorFeedback.message} Select Try again to retry.`
-                : "We failed to generate resume improvements. Select Try again to retry."}
+                ? generationErrorFeedback.retryable
+                  ? `${generationErrorFeedback.message} Select Try again to retry.`
+                  : generationErrorFeedback.message
+                : generationErrorFeedback.retryable
+                  ? "We failed to generate resume improvements. Select Try again to retry."
+                  : "We failed to generate resume improvements."}
             </p>
-            <button
-              type="button"
-              className={styles.generationErrorRetryTextButton}
-              onClick={() => void onRetryGenerateResult()}
-            >
-              TRY AGAIN
-            </button>
+            {generationErrorFeedback.retryable ? (
+              <button
+                type="button"
+                className={styles.generationErrorRetryTextButton}
+                onClick={() => void onRetryGenerateResult()}
+              >
+                TRY AGAIN
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={styles.generationErrorRetryTextButton}
+                onClick={onStartNewAnalysis}
+              >
+                START NEW
+              </button>
+            )}
           </div>
         </section>
       ) : !shouldShowResults ? (
