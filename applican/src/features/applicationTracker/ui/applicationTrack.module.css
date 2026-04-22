@@ -1493,7 +1493,7 @@
   grid-column: 2 / span 2;
   grid-row: 2;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   align-items: flex-start;
   justify-items: center;
   column-gap: 10px;
@@ -1530,6 +1530,12 @@
 .statusPillActionProgressApplied {
   background: #022d28;
   color: #31c56c;
+  border-color: transparent;
+}
+
+.statusPillActionOffer {
+  background: #de7003;
+  color: #ffc992;
   border-color: transparent;
 }
 
@@ -1676,6 +1682,12 @@
   width: 63px;
   background: #022d28;
   color: #31c56c;
+}
+
+.trackerStatusOffer {
+  width: 52px;
+  background: #de7003;
+  color: #ffc992;
 }
 
 .trackerStatusInterview {

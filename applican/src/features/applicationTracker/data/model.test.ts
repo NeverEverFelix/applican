@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  APPLICATION_APPLIED_STATUSES,
+  APPLICATION_INTERVIEW_STATUSES,
   APPLICATION_STATUS,
   formatAppliedDate,
   getApplicationFilterBucket,
@@ -9,9 +11,12 @@ import {
 
 describe("applicationTracker model", () => {
   it("maps statuses into filter buckets", () => {
-    expect(getApplicationFilterBucket(APPLICATION_STATUS.APPLIED)).toBe("applied");
-    expect(getApplicationFilterBucket(APPLICATION_STATUS.INTERVIEW_1)).toBe("interview");
-    expect(getApplicationFilterBucket(APPLICATION_STATUS.INTERVIEW_2)).toBe("interview");
+    for (const status of APPLICATION_APPLIED_STATUSES) {
+      expect(getApplicationFilterBucket(status)).toBe("applied");
+    }
+    for (const status of APPLICATION_INTERVIEW_STATUSES) {
+      expect(getApplicationFilterBucket(status)).toBe("interview");
+    }
     expect(getApplicationFilterBucket(APPLICATION_STATUS.REJECTED)).toBe("rejected");
   });
 
@@ -32,12 +37,16 @@ describe("applicationTracker model", () => {
     expect(getNextApplicationStatus(APPLICATION_STATUS.APPLIED)).toBe(
       APPLICATION_STATUS.INTERVIEW_1,
     );
-    expect(getNextApplicationStatus(APPLICATION_STATUS.INTERVIEW_1)).toBe(
-      APPLICATION_STATUS.INTERVIEW_2,
+    expect(getNextApplicationStatus(APPLICATION_STATUS.OFFER)).toBe(
+      APPLICATION_STATUS.OFFER,
     );
-    expect(getNextApplicationStatus(APPLICATION_STATUS.INTERVIEW_2)).toBe(
-      APPLICATION_STATUS.REJECTED,
-    );
+    APPLICATION_INTERVIEW_STATUSES.forEach((status, index) => {
+      const expected =
+        index === APPLICATION_INTERVIEW_STATUSES.length - 1
+          ? APPLICATION_STATUS.REJECTED
+          : APPLICATION_INTERVIEW_STATUSES[index + 1];
+      expect(getNextApplicationStatus(status)).toBe(expected);
+    });
     expect(getNextApplicationStatus(APPLICATION_STATUS.REJECTED)).toBe(
       APPLICATION_STATUS.REJECTED,
     );

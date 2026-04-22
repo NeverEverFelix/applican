@@ -1,17 +1,38 @@
 export const APPLICATION_STATUS = {
   APPLIED: "Applied",
+  OFFER: "Offer",
   INTERVIEW_1: "Interview #1",
   INTERVIEW_2: "Interview #2",
+  INTERVIEW_3: "Interview #3",
+  INTERVIEW_4: "Interview #4",
+  INTERVIEW_5: "Interview #5",
+  INTERVIEW_6: "Interview #6",
+  INTERVIEW_7: "Interview #7",
+  INTERVIEW_8: "Interview #8",
   REJECTED: "Rejected",
   READY_TO_APPLY: "Ready To Apply",
 } as const;
 
 export type ApplicationStatus = (typeof APPLICATION_STATUS)[keyof typeof APPLICATION_STATUS];
+export const APPLICATION_APPLIED_STATUSES = [
+  APPLICATION_STATUS.APPLIED,
+  APPLICATION_STATUS.OFFER,
+] as const satisfies readonly ApplicationStatus[];
+export const APPLICATION_INTERVIEW_STATUSES = [
+  APPLICATION_STATUS.INTERVIEW_1,
+  APPLICATION_STATUS.INTERVIEW_2,
+  APPLICATION_STATUS.INTERVIEW_3,
+  APPLICATION_STATUS.INTERVIEW_4,
+  APPLICATION_STATUS.INTERVIEW_5,
+  APPLICATION_STATUS.INTERVIEW_6,
+  APPLICATION_STATUS.INTERVIEW_7,
+  APPLICATION_STATUS.INTERVIEW_8,
+] as const satisfies readonly ApplicationStatus[];
+
 export const APPLICATION_STATUS_FLOW: ApplicationStatus[] = [
   APPLICATION_STATUS.READY_TO_APPLY,
   APPLICATION_STATUS.APPLIED,
-  APPLICATION_STATUS.INTERVIEW_1,
-  APPLICATION_STATUS.INTERVIEW_2,
+  ...APPLICATION_INTERVIEW_STATUSES,
   APPLICATION_STATUS.REJECTED,
 ];
 
@@ -35,10 +56,10 @@ export function getApplicationFilterBucket(status: string): Exclude<ApplicationF
   if (status === APPLICATION_STATUS.REJECTED) {
     return "rejected";
   }
-  if (status === APPLICATION_STATUS.INTERVIEW_1 || status === APPLICATION_STATUS.INTERVIEW_2) {
+  if (APPLICATION_INTERVIEW_STATUSES.includes(status as ApplicationStatus)) {
     return "interview";
   }
-  if (status === APPLICATION_STATUS.APPLIED) {
+  if (APPLICATION_APPLIED_STATUSES.includes(status as ApplicationStatus)) {
     return "applied";
   }
   return "applied";
@@ -67,6 +88,9 @@ export function formatAppliedDate(value: string | null): string {
 }
 
 export function getNextApplicationStatus(status: ApplicationStatus): ApplicationStatus {
+  if (status === APPLICATION_STATUS.OFFER) {
+    return APPLICATION_STATUS.OFFER;
+  }
   const index = APPLICATION_STATUS_FLOW.indexOf(status);
   if (index === -1) {
     return APPLICATION_STATUS.READY_TO_APPLY;

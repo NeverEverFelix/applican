@@ -107,6 +107,7 @@ describe("ApplicationTrackerContent", () => {
 
     const progressPill = screen.getByTestId("tracker-progress-pill");
     const deletePill = screen.getByTestId("tracker-delete-pill");
+    const offerPill = screen.getByTestId("tracker-offer-pill");
 
     expect(acmeCheckbox.checked).toBe(true);
     expect(betaCheckbox.checked).toBe(false);
@@ -114,6 +115,13 @@ describe("ApplicationTrackerContent", () => {
     expect(headerCheckbox.indeterminate).toBe(true);
     expect(progressPill.textContent).toContain("Progress");
     expect(deletePill.textContent).toContain("Delete");
+    expect(offerPill.textContent).toContain("Offer");
+
+    fireEvent.click(offerPill);
+
+    await waitFor(() => {
+      expect(updateApplicationStatusMock).toHaveBeenCalledWith("application-1", APPLICATION_STATUS.OFFER);
+    });
 
     fireEvent.click(progressPill);
 

@@ -188,7 +188,7 @@ alter table "public"."applications" validate constraint "applications_source_res
 
 alter table "public"."applications" add constraint "applications_source_resume_run_id_key" UNIQUE using index "applications_source_resume_run_id_key";
 
-alter table "public"."applications" add constraint "applications_status_check" CHECK ((status = ANY (ARRAY['Applied'::text, 'Interview #1'::text, 'Interview #2'::text, 'Rejected'::text, 'Ready To Apply'::text]))) not valid;
+alter table "public"."applications" add constraint "applications_status_check" CHECK ((status = ANY (ARRAY['Applied'::text, 'Offer'::text, 'Interview #1'::text, 'Interview #2'::text, 'Interview #3'::text, 'Interview #4'::text, 'Interview #5'::text, 'Interview #6'::text, 'Interview #7'::text, 'Interview #8'::text, 'Rejected'::text, 'Ready To Apply'::text]))) not valid;
 
 alter table "public"."applications" validate constraint "applications_status_check";
 
@@ -945,6 +945,4 @@ using (((bucket_id = 'resumes'::text) AND ((storage.foldername(name))[1] = (auth
   for insert
   to authenticated
 with check (((bucket_id = 'resumes'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text)));
-
-
 

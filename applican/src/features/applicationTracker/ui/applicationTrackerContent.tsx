@@ -1,6 +1,8 @@
 import * as Sentry from "@sentry/react";
 import { type ComponentType, type UIEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
+  APPLICATION_APPLIED_STATUSES,
+  APPLICATION_INTERVIEW_STATUSES,
   APPLICATION_STATUS,
   formatAppliedDate,
   getNextApplicationStatus,
@@ -209,6 +211,7 @@ function ApplicationTrackerView({
   const [selectedApplicationIds, setSelectedApplicationIds] = useState<string[]>([]);
   const [selectAllScope, setSelectAllScope] = useState<ApplicationTrackerStatus | null>(null);
   const [isProgressingSelection, setIsProgressingSelection] = useState(false);
+  const [isOfferingSelection, setIsOfferingSelection] = useState(false);
   const wasFetchingMoreRef = useRef(false);
   const trailingLoadTimeoutRef = useRef<number | null>(null);
   const headerCheckboxRef = useRef<HTMLInputElement | null>(null);
@@ -231,8 +234,9 @@ function ApplicationTrackerView({
 
   const getStatusButtonClassName = (status: ApplicationStatus) => {
     if (status === APPLICATION_STATUS.READY_TO_APPLY) return styles.trackerStatusReady;
-    if (status === APPLICATION_STATUS.APPLIED) return styles.trackerStatusApplied;
-    if (status === APPLICATION_STATUS.INTERVIEW_1 || status === APPLICATION_STATUS.INTERVIEW_2) return styles.trackerStatusInterview;
+    if (status === APPLICATION_STATUS.OFFER) return styles.trackerStatusOffer;
+    if (APPLICATION_APPLIED_STATUSES.includes(status)) return styles.trackerStatusApplied;
+    if (APPLICATION_INTERVIEW_STATUSES.includes(status)) return styles.trackerStatusInterview;
     return styles.trackerStatusRejected;
   };
 
@@ -394,6 +398,26 @@ function ApplicationTrackerView({
     }
   };
 
+  const offerSelectedApplications = async () => {
+    if (selectedVisibleApplicationIds.length === 0 || isOfferingSelection) {
+      return;
+    }
+
+    const selectedRows = applications.filter((application) => selectedVisibleApplicationIds.includes(application.id));
+    if (selectedRows.length === 0) {
+      return;
+    }
+
+    setIsOfferingSelection(true);
+    try {
+      await Promise.all(
+        selectedRows.map((application) => updateApplicationStatus(application.id, APPLICATION_STATUS.OFFER)),
+      );
+    } finally {
+      setIsOfferingSelection(false);
+    }
+  };
+
   return (
     <section className={styles.trackerView}>
       <header className={styles.trackerHeader}>
@@ -445,6 +469,22 @@ function ApplicationTrackerView({
                 </button>
                 <button
                   type="button"
+                  data-testid="tracker-offer-pill"
+                  className={[
+                    styles.statusPill,
+                    styles.statusPillActionProgress,
+                    styles.statusPillActionOffer,
+                    styles.statusPillActionPillVisible,
+                  ]
+                    .join(" ")
+                    .trim()}
+                  disabled={isOfferingSelection || isProgressingSelection || isDeleting}
+                  onClick={() => void offerSelectedApplications()}
+                >
+                  Offer
+                </button>
+                <button
+                  type="button"
                   data-testid="tracker-progress-pill"
                   className={[
                     styles.statusPill,
@@ -454,7 +494,7 @@ function ApplicationTrackerView({
                   ]
                     .join(" ")
                     .trim()}
-                  disabled={isProgressingSelection || isDeleting}
+                  disabled={isOfferingSelection || isProgressingSelection || isDeleting}
                   onClick={() => void progressSelectedApplications()}
                 >
                   Progress

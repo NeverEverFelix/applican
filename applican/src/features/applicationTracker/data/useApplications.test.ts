@@ -10,6 +10,7 @@ const {
   rangeMock,
   orderMock,
   eqQueryMock,
+  orQueryMock,
   countResultsQueue,
   selectQueryMock,
   updateEqMock,
@@ -32,6 +33,7 @@ const {
     rangeMock: vi.fn(),
     orderMock: vi.fn(),
     eqQueryMock: vi.fn(),
+    orQueryMock: vi.fn(),
     countResultsQueue: [] as Array<{ count: number; error: null }>,
     selectQueryMock: vi.fn(),
     updateEqMock: vi.fn(),
@@ -84,7 +86,9 @@ describe("useApplications", () => {
     channelSubscribeMock.mockReturnValue(channelMock);
 
     orderMock.mockReturnValue({ range: rangeMock });
-    eqQueryMock.mockReturnValue({ order: orderMock });
+    const filteredQuery = { order: orderMock, or: orQueryMock };
+    eqQueryMock.mockReturnValue(filteredQuery);
+    orQueryMock.mockReturnValue({ order: orderMock });
     selectQueryMock.mockImplementation((_columns?: string, options?: { count?: string; head?: boolean }) => {
       if (options?.head) {
         const chain = {
@@ -95,7 +99,7 @@ describe("useApplications", () => {
         };
         return { eq: vi.fn(() => chain) };
       }
-      return { eq: eqQueryMock };
+      return { eq: eqQueryMock, or: orQueryMock };
     });
 
     updateEqMock.mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
@@ -170,6 +174,33 @@ describe("useApplications", () => {
     unmount();
 
     expect(removeChannelMock).toHaveBeenCalledWith(channelMock);
+  });
+
+  it("queries the full interview range when loading interview counts and filters", async () => {
+    countResultsQueue.push(
+      { count: 1, error: null },
+      { count: 0, error: null },
+      { count: 1, error: null },
+      { count: 0, error: null },
+    );
+
+    rangeMock.mockResolvedValue({
+      data: [createApplication({ id: "app-2", status: APPLICATION_STATUS.INTERVIEW_7 })],
+      error: null,
+    });
+
+    renderHook(() => useApplications("interview"));
+
+    await waitFor(() => {
+      expect(rangeMock).toHaveBeenCalled();
+    });
+
+    expect(selectQueryMock).toHaveBeenCalled();
+    expect(eqQueryMock).toHaveBeenCalledWith("user_id", "user-1");
+    expect(orderMock).toHaveBeenCalled();
+    expect(orQueryMock).toHaveBeenCalledWith(
+      "status.eq.Interview #1,status.eq.Interview #2,status.eq.Interview #3,status.eq.Interview #4,status.eq.Interview #5,status.eq.Interview #6,status.eq.Interview #7,status.eq.Interview #8",
+    );
   });
 
   it("optimistically updates status, sets applied date, and rolls back on failure", async () => {

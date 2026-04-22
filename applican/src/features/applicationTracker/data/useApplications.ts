@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "../../../lib/supabaseClient";
 import {
+  APPLICATION_APPLIED_STATUSES,
+  APPLICATION_INTERVIEW_STATUSES,
   APPLICATION_STATUS,
   type ApplicationFilter,
   type ApplicationRow,
@@ -30,12 +32,15 @@ type FilterableApplicationsQuery<T> = {
   or: (filters: string) => T;
 };
 
+const APPLIED_STATUS_FILTER = APPLICATION_APPLIED_STATUSES.map((status) => `status.eq.${status}`).join(",");
+const INTERVIEW_STATUS_FILTER = APPLICATION_INTERVIEW_STATUSES.map((status) => `status.eq.${status}`).join(",");
+
 function applyFilterToApplicationsQuery<T extends FilterableApplicationsQuery<T>>(query: T, filter: ApplicationFilter) {
   if (filter === "applied") {
-    return query.eq("status", APPLICATION_STATUS.APPLIED);
+    return query.or(APPLIED_STATUS_FILTER);
   }
   if (filter === "interview") {
-    return query.or(`status.eq.${APPLICATION_STATUS.INTERVIEW_1},status.eq.${APPLICATION_STATUS.INTERVIEW_2}`);
+    return query.or(INTERVIEW_STATUS_FILTER);
   }
   if (filter === "rejected") {
     return query.eq("status", APPLICATION_STATUS.REJECTED);
@@ -128,12 +133,12 @@ export function useApplications(filter: ApplicationFilter = "all"): UseApplicati
                 .from("applications")
                 .select("*", { count: "exact", head: true })
                 .eq("user_id", userId)
-                .eq("status", APPLICATION_STATUS.APPLIED),
+                .or(APPLIED_STATUS_FILTER),
               supabase
                 .from("applications")
                 .select("*", { count: "exact", head: true })
                 .eq("user_id", userId)
-                .or(`status.eq.${APPLICATION_STATUS.INTERVIEW_1},status.eq.${APPLICATION_STATUS.INTERVIEW_2}`),
+                .or(INTERVIEW_STATUS_FILTER),
               supabase
                 .from("applications")
                 .select("*", { count: "exact", head: true })
@@ -228,14 +233,16 @@ export function useApplications(filter: ApplicationFilter = "all"): UseApplicati
     );
     setCounts((prev) => {
       const nextCounts = { ...prev };
-      if (previousStatus === APPLICATION_STATUS.APPLIED) nextCounts.applied = Math.max(0, nextCounts.applied - 1);
-      if (previousStatus === APPLICATION_STATUS.INTERVIEW_1 || previousStatus === APPLICATION_STATUS.INTERVIEW_2) {
+      if (APPLICATION_APPLIED_STATUSES.includes(previousStatus)) {
+        nextCounts.applied = Math.max(0, nextCounts.applied - 1);
+      }
+      if (APPLICATION_INTERVIEW_STATUSES.includes(previousStatus)) {
         nextCounts.interview = Math.max(0, nextCounts.interview - 1);
       }
       if (previousStatus === APPLICATION_STATUS.REJECTED) nextCounts.rejected = Math.max(0, nextCounts.rejected - 1);
 
-      if (nextStatus === APPLICATION_STATUS.APPLIED) nextCounts.applied += 1;
-      if (nextStatus === APPLICATION_STATUS.INTERVIEW_1 || nextStatus === APPLICATION_STATUS.INTERVIEW_2) {
+      if (APPLICATION_APPLIED_STATUSES.includes(nextStatus)) nextCounts.applied += 1;
+      if (APPLICATION_INTERVIEW_STATUSES.includes(nextStatus)) {
         nextCounts.interview += 1;
       }
       if (nextStatus === APPLICATION_STATUS.REJECTED) nextCounts.rejected += 1;
@@ -291,15 +298,11 @@ export function useApplications(filter: ApplicationFilter = "all"): UseApplicati
       all: Math.max(0, prev.all - idsToDelete.length),
       applied: Math.max(
         0,
-        prev.applied - deletedApplications.filter((application) => application.status === APPLICATION_STATUS.APPLIED).length,
+        prev.applied - deletedApplications.filter((application) => APPLICATION_APPLIED_STATUSES.includes(application.status)).length,
       ),
       interview: Math.max(
         0,
-        prev.interview -
-          deletedApplications.filter(
-            (application) =>
-              application.status === APPLICATION_STATUS.INTERVIEW_1 || application.status === APPLICATION_STATUS.INTERVIEW_2,
-          ).length,
+        prev.interview - deletedApplications.filter((application) => APPLICATION_INTERVIEW_STATUSES.includes(application.status)).length,
       ),
       rejected: Math.max(
         0,
