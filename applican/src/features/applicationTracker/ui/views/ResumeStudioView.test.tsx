@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 
 import { ResumeStudioView } from "./ResumeStudioView";
+import type { CreateResumeRunResult } from "../../../jobs/model/types";
 
 const { useCreateResumeRunMock, getLatestResumeRunForEditorMock } = vi.hoisted(() => ({
   useCreateResumeRunMock: vi.fn(),
@@ -68,6 +69,26 @@ const localStorageMock = {
     storage.clear();
   },
 };
+
+function createFailedRun(): CreateResumeRunResult {
+  return {
+    requestId: "request-1",
+    row: {
+      id: "run-1",
+      request_id: "request-1",
+      user_id: "user-1",
+      resume_path: "resume.pdf",
+      resume_filename: "resume.pdf",
+      job_description: "Software engineer",
+      status: "failed",
+      error_code: "worker_offline",
+      error_message: "worker offline",
+      output: null,
+      created_at: "2026-04-16T00:00:00.000Z",
+      updated_at: "2026-04-16T00:00:00.000Z",
+    },
+  };
+}
 
 afterEach(() => {
   cleanup();
@@ -269,23 +290,7 @@ describe("ResumeStudioView", () => {
       progressMessage: "",
       progressPercent: 0,
       createdRun: null,
-      failedRun: {
-        requestId: "request-1",
-        row: {
-          id: "run-1",
-          request_id: "request-1",
-          user_id: "user-1",
-          resume_path: "resume.pdf",
-          resume_filename: "resume.pdf",
-          job_description: "Software engineer",
-          status: "failed",
-          error_code: "worker_offline",
-          error_message: "worker offline",
-          output: null,
-          created_at: "2026-04-16T00:00:00.000Z",
-          updated_at: "2026-04-16T00:00:00.000Z",
-        },
-      },
+      failedRun: createFailedRun() as CreateResumeRunResult | null,
       hasPersistedRunState: true,
     };
 
@@ -329,23 +334,7 @@ describe("ResumeStudioView", () => {
       progressMessage: "",
       progressPercent: 0,
       createdRun: null,
-      failedRun: {
-        requestId: "request-1",
-        row: {
-          id: "run-1",
-          request_id: "request-1",
-          user_id: "user-1",
-          resume_path: "resume.pdf",
-          resume_filename: "resume.pdf",
-          job_description: "Software engineer",
-          status: "failed",
-          error_code: "worker_offline",
-          error_message: "worker offline",
-          output: null,
-          created_at: "2026-04-16T00:00:00.000Z",
-          updated_at: "2026-04-16T00:00:00.000Z",
-        },
-      },
+      failedRun: createFailedRun() as CreateResumeRunResult | null,
       hasPersistedRunState: true,
     };
 
@@ -371,23 +360,7 @@ describe("ResumeStudioView", () => {
       retryable: true,
       message: "worker offline Your draft is still saved, so you can try again in a moment.",
     };
-    useCreateResumeRunState.failedRun = {
-      requestId: "request-1",
-      row: {
-        id: "run-1",
-        request_id: "request-1",
-        user_id: "user-1",
-        resume_path: "resume.pdf",
-        resume_filename: "resume.pdf",
-        job_description: "Software engineer",
-        status: "failed",
-        error_code: "worker_offline",
-        error_message: "worker offline",
-        output: null,
-        created_at: "2026-04-16T00:00:00.000Z",
-        updated_at: "2026-04-16T00:00:00.000Z",
-      },
-    };
+    useCreateResumeRunState.failedRun = createFailedRun();
 
     rerender(<ResumeStudioView />);
 

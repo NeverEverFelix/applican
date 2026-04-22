@@ -14,11 +14,11 @@ export const APPLICATION_STATUS = {
 } as const;
 
 export type ApplicationStatus = (typeof APPLICATION_STATUS)[keyof typeof APPLICATION_STATUS];
-export const APPLICATION_APPLIED_STATUSES = [
+export const APPLICATION_APPLIED_STATUSES: readonly ApplicationStatus[] = [
   APPLICATION_STATUS.APPLIED,
   APPLICATION_STATUS.OFFER,
-] as const satisfies readonly ApplicationStatus[];
-export const APPLICATION_INTERVIEW_STATUSES = [
+] as const;
+export const APPLICATION_INTERVIEW_STATUSES: readonly ApplicationStatus[] = [
   APPLICATION_STATUS.INTERVIEW_1,
   APPLICATION_STATUS.INTERVIEW_2,
   APPLICATION_STATUS.INTERVIEW_3,
@@ -27,7 +27,7 @@ export const APPLICATION_INTERVIEW_STATUSES = [
   APPLICATION_STATUS.INTERVIEW_6,
   APPLICATION_STATUS.INTERVIEW_7,
   APPLICATION_STATUS.INTERVIEW_8,
-] as const satisfies readonly ApplicationStatus[];
+] as const;
 
 export const APPLICATION_STATUS_FLOW: ApplicationStatus[] = [
   APPLICATION_STATUS.READY_TO_APPLY,
