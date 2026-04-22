@@ -26,7 +26,7 @@ type UseCreateResumeRunResult = {
 };
 
 type SubmitResumeRunResult =
-  | { ok: true; createdRun: CreateResumeRunResult }
+  | { ok: true; createdRun: CreateResumeRunResult; cancelled?: false }
   | { ok: false; errorMessage: string; cancelled?: false }
   | { ok: false; errorMessage: ""; cancelled: true };
 
