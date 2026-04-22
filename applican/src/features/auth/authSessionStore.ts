@@ -5,6 +5,7 @@ export type AuthSessionContextValue = {
   session: Session | null;
   isChecking: boolean;
   isAuthenticated: boolean;
+  refreshSession: () => Promise<void>;
 };
 
 export const AuthSessionStore = createContext<AuthSessionContextValue | undefined>(undefined);

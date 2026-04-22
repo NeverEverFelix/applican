@@ -18,6 +18,8 @@ async function requestPasswordChange(email: string) {
 
 export function useChangePassword(email: string) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const canSubmit = Boolean(normalizeEmail(email)) && !isSubmitting;
 
   const submitChange = async () => {
@@ -26,9 +28,13 @@ export function useChangePassword(email: string) {
     }
 
     setIsSubmitting(true);
+    setStatusMessage("");
+    setErrorMessage("");
     try {
       await requestPasswordChange(email);
-      window.alert("Check your email for the password reset link.");
+      setStatusMessage("Check your email for the password reset link.");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to request password reset.");
     } finally {
       setIsSubmitting(false);
     }
@@ -38,5 +44,7 @@ export function useChangePassword(email: string) {
     submitChange,
     isSubmitting,
     canSubmit,
+    statusMessage,
+    errorMessage,
   };
 }

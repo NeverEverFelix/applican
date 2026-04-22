@@ -1,6 +1,6 @@
 import * as Sentry from "@sentry/react";
 import styles from "./LoginPage.module.css";
-import pageImage from "../assets/PageImage.svg";
+import pageImage from "../assets/PageImage.jpg";
 import logo from "../assets/logo.png";
 import googleIcon from "../assets/GoogleIcon.png";
 import LoginForm from "../features/auth/LoginForm";

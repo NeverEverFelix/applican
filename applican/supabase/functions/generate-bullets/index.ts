@@ -1615,8 +1615,19 @@ serve(async (req) => {
       throw new HttpError(500, "APPLICATION_UPDATE_FAILED", applicationUpdateError.message);
     }
 
+    // Keep analysis generation resilient even if the application sync path is missing or delayed.
+    // The application row is expected to come from the resume_run trigger, but analysis/history
+    // should still succeed if that linkage is absent in production.
     if (!updatedApplication) {
-      throw new HttpError(404, "APPLICATION_NOT_FOUND", "Application linked to this run was not found.");
+      console.warn(
+        JSON.stringify({
+          level: "warn",
+          code: "APPLICATION_NOT_FOUND",
+          message: "Application linked to this run was not found; skipping application sync.",
+          run_id: runId,
+          user_id: authenticatedUserId,
+        }),
+      );
     }
 
     let responseRun = updatedRun;

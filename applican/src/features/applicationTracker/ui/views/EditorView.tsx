@@ -9,6 +9,7 @@ import {
   invokeCompileTailoredResumePdf,
   type CompileTailoredResumePdfError,
 } from "../../../jobs/api/invokeCompileTailoredResumePdf";
+import StatusNotice from "../../../../components/feedback/StatusNotice";
 import { listGeneratedResumes } from "../../../jobs/api/listGeneratedResumes";
 import { getLatestResumeRunForEditor } from "../../../jobs/api/getLatestResumeRunForEditor";
 import type { GeneratedResumeRow } from "../../../jobs/model/types";
@@ -423,9 +424,14 @@ export function EditorView() {
       </div>
 
       {errorMessage ? (
-        <p className={styles.statusError} role="alert">
-          {errorMessage}
-        </p>
+        <StatusNotice
+          tone="error"
+          message={errorMessage}
+          className={styles.statusNotice}
+          actionLabel={isPreviewFailed ? "Try again" : undefined}
+          onAction={isPreviewFailed ? () => void runPreviewCompile({ force: true, clearPreview: true }) : undefined}
+          actionDisabled={isPreviewLoading || isPdfCompiling}
+        />
       ) : null}
       {compileLog ? <pre className={styles.outputPanel}>{compileLog}</pre> : null}
 
@@ -459,7 +465,7 @@ export function EditorView() {
                 </div>
               ))
             ) : generatedResumes.length === 0 ? (
-              <p className={styles.editorHistoryEmpty}>No generated resumes yet.</p>
+              <StatusNotice tone="info" message="No generated resumes yet." className={styles.editorHistoryEmptyNotice} />
             ) : (
               generatedResumes.map((row) => (
                 <button

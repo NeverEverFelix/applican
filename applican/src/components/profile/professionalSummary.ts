@@ -43,11 +43,16 @@ async function saveProfessionalSummary(userId: string, value: string) {
 export function useProfessionalSummary(userId: string | null) {
   const [summary, setSummary] = useState("");
   const [savedSummary, setSavedSummary] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
   const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     if (!userId) {
       hasLoadedRef.current = false;
+      setStatusMessage("");
+      setErrorMessage("");
       return;
     }
 
@@ -61,15 +66,18 @@ export function useProfessionalSummary(userId: string | null) {
 
         setSummary(value);
         setSavedSummary(value);
+        setStatusMessage("");
+        setErrorMessage("");
         hasLoadedRef.current = true;
       })
-      .catch(() => {
+      .catch((error) => {
         if (cancelled) {
           return;
         }
 
         setSummary("");
         setSavedSummary("");
+        setErrorMessage(error instanceof Error ? error.message : "Failed to load professional summary.");
         hasLoadedRef.current = true;
       });
 
@@ -86,8 +94,18 @@ export function useProfessionalSummary(userId: string | null) {
       return;
     }
 
-    await saveProfessionalSummary(userId, summary);
-    setSavedSummary(summary);
+    setIsSaving(true);
+    setStatusMessage("");
+    setErrorMessage("");
+    try {
+      await saveProfessionalSummary(userId, summary);
+      setSavedSummary(summary);
+      setStatusMessage("Professional summary saved.");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to save professional summary.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return {
@@ -95,5 +113,8 @@ export function useProfessionalSummary(userId: string | null) {
     setSummary,
     persistSummary,
     isOverLimit,
+    isSaving,
+    statusMessage,
+    errorMessage,
   };
 }

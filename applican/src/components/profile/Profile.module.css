@@ -38,7 +38,7 @@
   left: 46px;
   display: flex;
   flex-direction: column;
-  gap: 50px;
+  gap: 28px;
 }
 
 .nameRow {
@@ -46,10 +46,20 @@
   gap: 50px;
 }
 
+.nameActionGroup {
+  display: flex;
+  align-items: center;
+  gap: 50px;
+}
+
 .emailRow {
   display: flex;
   align-items: center;
   gap: 50px;
+}
+
+.profileNotice {
+  width: 743px;
 }
 
 .firstNameTextbox {
@@ -228,11 +238,4 @@
 .cancelSubscriptionLink:disabled {
   color: rgb(255 255 255 / 35%);
   cursor: not-allowed;
-}
-
-.billingPortalError {
-  margin: -26px 0 0;
-  font-size: 16px;
-  line-height: 1.4;
-  color: #ec2542;
 }

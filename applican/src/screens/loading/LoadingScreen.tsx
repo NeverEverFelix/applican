@@ -9,6 +9,7 @@ import {
   INTRO_MESSAGE,
   INTRO_MESSAGE_MS,
   JOB_MARKET_QUOTES,
+  MAX_PROJECTILE_DURATION_MS,
   QUOTE_ROTATE_MS,
   type ResumeProjectile,
 } from "./LoadingScreen";
@@ -19,21 +20,61 @@ const MORPH_REVEAL_DELAY_MS = 1400;
 
 type LoadingScreenProps = {
   backendProgress?: number;
+  animationOriginMs?: number;
 };
 
-export default function LoadingScreen({ backendProgress = 0 }: LoadingScreenProps) {
-  const [projectiles, setProjectiles] = useState<ResumeProjectile[]>([]);
-  const [showIntroMessage, setShowIntroMessage] = useState(true);
-  const [shouldRevealMorph, setShouldRevealMorph] = useState(false);
-  const [quoteIndex, setQuoteIndex] = useState(0);
-  const nextId = useRef(1);
+type ActiveResumeProjectile = ResumeProjectile & {
+  elapsedMs: number;
+};
+
+export default function LoadingScreen({ backendProgress = 0, animationOriginMs }: LoadingScreenProps) {
+  const getElapsedMs = () => {
+    if (!animationOriginMs) {
+      return 0;
+    }
+
+    return Math.max(0, Date.now() - animationOriginMs);
+  };
+  const [projectiles, setProjectiles] = useState<ActiveResumeProjectile[]>(() => {
+    const elapsedMs = getElapsedMs();
+    if (elapsedMs <= 0) {
+      return [];
+    }
+
+    const firstVisibleSpawnMs = Math.max(0, elapsedMs - MAX_PROJECTILE_DURATION_MS);
+    const firstVisibleSequence = Math.floor(firstVisibleSpawnMs / SPAWN_INTERVAL_MS);
+    const lastVisibleSequence = Math.floor(elapsedMs / SPAWN_INTERVAL_MS);
+    const restoredProjectiles: ActiveResumeProjectile[] = [];
+
+    for (let sequence = firstVisibleSequence; sequence <= lastVisibleSequence; sequence += 1) {
+      const projectile = buildResumeProjectile(sequence + 1);
+      const spawnedAtMs = sequence * SPAWN_INTERVAL_MS;
+      restoredProjectiles.push({
+        ...projectile,
+        elapsedMs: Math.max(0, elapsedMs - spawnedAtMs),
+      });
+    }
+
+    return restoredProjectiles.slice(-MAX_PROJECTILES);
+  });
+  const [showIntroMessage, setShowIntroMessage] = useState(() => getElapsedMs() < INTRO_MESSAGE_MS);
+  const [shouldRevealMorph, setShouldRevealMorph] = useState(() => getElapsedMs() >= INTRO_MESSAGE_MS + MORPH_REVEAL_DELAY_MS);
+  const [quoteIndex, setQuoteIndex] = useState(() => {
+    const elapsedAfterIntroMs = Math.max(0, getElapsedMs() - INTRO_MESSAGE_MS);
+    if (elapsedAfterIntroMs <= 0 || JOB_MARKET_QUOTES.length === 0) {
+      return 0;
+    }
+
+    return Math.floor(elapsedAfterIntroMs / QUOTE_ROTATE_MS) % JOB_MARKET_QUOTES.length;
+  });
+  const nextId = useRef(Math.floor(getElapsedMs() / SPAWN_INTERVAL_MS) + 2);
   const quoteRef = useRef<HTMLParagraphElement | null>(null);
   const morphRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       setProjectiles((prev) => {
-        const next = [...prev, buildResumeProjectile(nextId.current)];
+        const next = [...prev, { ...buildResumeProjectile(nextId.current), elapsedMs: 0 }];
         nextId.current += 1;
         return next.slice(-MAX_PROJECTILES);
       });
@@ -43,23 +84,41 @@ export default function LoadingScreen({ backendProgress = 0 }: LoadingScreenProp
   }, []);
 
   useEffect(() => {
+    if (!showIntroMessage) {
+      return;
+    }
+
+    const remainingIntroMs = Math.max(0, INTRO_MESSAGE_MS - getElapsedMs());
     const timeoutId = window.setTimeout(() => {
       setShowIntroMessage(false);
-    }, INTRO_MESSAGE_MS);
+    }, remainingIntroMs);
 
     return () => window.clearTimeout(timeoutId);
-  }, []);
+  }, [showIntroMessage]);
 
   useEffect(() => {
     if (showIntroMessage || JOB_MARKET_QUOTES.length <= 1) {
       return;
     }
 
-    const intervalId = window.setInterval(() => {
-      setQuoteIndex((prev) => (prev + 1) % JOB_MARKET_QUOTES.length);
-    }, QUOTE_ROTATE_MS);
+    const elapsedAfterIntroMs = Math.max(0, getElapsedMs() - INTRO_MESSAGE_MS);
+    const elapsedIntoCurrentQuoteMs = elapsedAfterIntroMs % QUOTE_ROTATE_MS;
+    const msUntilNextQuote = elapsedIntoCurrentQuoteMs === 0 ? QUOTE_ROTATE_MS : QUOTE_ROTATE_MS - elapsedIntoCurrentQuoteMs;
+    let intervalId: number | null = null;
 
-    return () => window.clearInterval(intervalId);
+    const timeoutId = window.setTimeout(() => {
+      setQuoteIndex((prev) => (prev + 1) % JOB_MARKET_QUOTES.length);
+      intervalId = window.setInterval(() => {
+        setQuoteIndex((prev) => (prev + 1) % JOB_MARKET_QUOTES.length);
+      }, QUOTE_ROTATE_MS);
+    }, msUntilNextQuote);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      if (intervalId !== null) {
+        window.clearInterval(intervalId);
+      }
+    };
   }, [showIntroMessage]);
 
   useEffect(() => {
@@ -78,9 +137,11 @@ export default function LoadingScreen({ backendProgress = 0 }: LoadingScreenProp
       return;
     }
 
+    const elapsedAfterIntroMs = Math.max(0, getElapsedMs() - INTRO_MESSAGE_MS);
+    const remainingRevealDelayMs = Math.max(0, MORPH_REVEAL_DELAY_MS - elapsedAfterIntroMs);
     const timeoutId = window.setTimeout(() => {
       setShouldRevealMorph(true);
-    }, MORPH_REVEAL_DELAY_MS);
+    }, remainingRevealDelayMs);
 
     return () => window.clearTimeout(timeoutId);
   }, [showIntroMessage]);
@@ -137,6 +198,7 @@ export default function LoadingScreen({ backendProgress = 0 }: LoadingScreenProp
                   "--scale": projectile.scale,
                   "--duration": `${projectile.durationMs}ms`,
                   "--spin": `${projectile.spinDeg}deg`,
+                  "--delay": `${-(projectile.elapsedMs ?? 0)}ms`,
                 } as CSSProperties
               }
               onAnimationEnd={() => handleProjectileDone(projectile.id)}

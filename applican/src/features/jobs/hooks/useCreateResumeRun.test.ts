@@ -5,6 +5,7 @@ const {
   captureExceptionMock,
   captureEventMock,
   createResumeRunMock,
+  getResumeRunMock,
   invokeGenerateBulletsMock,
   requeueResumeRunMock,
   waitForRunExtractionMock,
@@ -12,6 +13,7 @@ const {
   captureExceptionMock: vi.fn(),
   captureEventMock: vi.fn(),
   createResumeRunMock: vi.fn(),
+  getResumeRunMock: vi.fn(),
   invokeGenerateBulletsMock: vi.fn(),
   requeueResumeRunMock: vi.fn(),
   waitForRunExtractionMock: vi.fn(),
@@ -29,6 +31,10 @@ vi.mock("../api/createResumeRun", () => ({
   createResumeRun: createResumeRunMock,
 }));
 
+vi.mock("../api/getResumeRun", () => ({
+  getResumeRun: getResumeRunMock,
+}));
+
 vi.mock("../api/invokeGenerateBullets", () => ({
   invokeGenerateBullets: invokeGenerateBulletsMock,
 }));
@@ -43,13 +49,36 @@ vi.mock("../api/waitForRunExtraction", () => ({
 
 import { useCreateResumeRun } from "./useCreateResumeRun";
 
+const storage = new Map<string, string>();
+const localStorageMock = {
+  getItem: (key: string) => storage.get(key) ?? null,
+  setItem: (key: string, value: string) => {
+    storage.set(key, value);
+  },
+  removeItem: (key: string) => {
+    storage.delete(key);
+  },
+};
+
 describe("useCreateResumeRun", () => {
+  const clearResumeStudioStorage = () => {
+    localStorageMock.removeItem("applican:resume-studio:active-run-session");
+    localStorageMock.removeItem("applican:resume-studio:last-run-output");
+    localStorageMock.removeItem("applican:resume-studio:show-results");
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(window, "localStorage", {
+      value: localStorageMock,
+      configurable: true,
+    });
+    clearResumeStudioStorage();
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    clearResumeStudioStorage();
   });
 
   it("submits a run successfully and exposes the completed run", async () => {
@@ -311,6 +340,86 @@ describe("useCreateResumeRun", () => {
       requestId: "request-1",
     });
     expect(retryResult).toEqual({
+      ok: true,
+      createdRun: {
+        requestId: "request-1",
+        row: generatedRun,
+      },
+    });
+  });
+
+  it("resumes a persisted in-progress run and exposes the completed result", async () => {
+    window.localStorage.setItem(
+      "applican:resume-studio:active-run-session",
+      JSON.stringify({
+        requestId: "request-1",
+        row: {
+          id: "run-1",
+          request_id: "request-1",
+          user_id: "user-1",
+          resume_path: "resume.pdf",
+          resume_filename: "resume.pdf",
+          job_description: "Software engineer",
+          status: "queued",
+          error_code: null,
+          error_message: null,
+          output: null,
+          created_at: "2026-04-16T00:00:00.000Z",
+          updated_at: "2026-04-16T00:00:00.000Z",
+        },
+        phase: "extracting",
+        progressMessage: "Waiting for extraction service...",
+        progressPercent: 42,
+        errorMessage: "",
+      }),
+    );
+
+    const generatedRun = {
+      id: "run-1",
+      request_id: "request-1",
+      user_id: "user-1",
+      resume_path: "resume.pdf",
+      resume_filename: "resume.pdf",
+      job_description: "Software engineer",
+      status: "extracted",
+      error_code: null,
+      error_message: null,
+      output: { bullets: ["A"] },
+      created_at: "2026-04-16T00:00:00.000Z",
+      updated_at: "2026-04-16T00:00:00.000Z",
+    };
+
+    getResumeRunMock.mockResolvedValue({
+      ...generatedRun,
+      output: null,
+    });
+    waitForRunExtractionMock.mockResolvedValue(undefined);
+    invokeGenerateBulletsMock.mockResolvedValue({ run: generatedRun });
+
+    const { result } = renderHook(() => useCreateResumeRun());
+
+    let resumeResult:
+      | Awaited<ReturnType<typeof result.current.resumeStoredRun>>
+      | undefined;
+
+    await act(async () => {
+      resumeResult = await result.current.resumeStoredRun();
+    });
+
+    expect(getResumeRunMock).toHaveBeenCalledWith({ runId: "run-1" });
+    expect(waitForRunExtractionMock).not.toHaveBeenCalled();
+    expect(invokeGenerateBulletsMock).toHaveBeenCalledWith({
+      runId: "run-1",
+      requestId: "request-1",
+    });
+    expect(result.current.createdRun).toEqual({
+      requestId: "request-1",
+      row: generatedRun,
+    });
+    expect(result.current.hasPersistedRunState).toBe(false);
+    expect(window.localStorage.getItem("applican:resume-studio:active-run-session")).toBeNull();
+    expect(window.localStorage.getItem("applican:resume-studio:show-results")).toBe("true");
+    expect(resumeResult).toEqual({
       ok: true,
       createdRun: {
         requestId: "request-1",

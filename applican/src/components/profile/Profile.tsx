@@ -2,8 +2,10 @@ import { useState } from "react";
 import { usePostHog } from "@posthog/react";
 import type { User } from "@supabase/supabase-js";
 import { useAuthSession } from "../../features/auth/useAuthSession";
+import StatusNotice from "../feedback/StatusNotice";
 import styles from "./Profile.module.css";
 import { useChangeEmail } from "./changeEmail";
+import { useChangeName } from "./changeName";
 import { useChangePassword } from "./changePassword";
 import { useProfessionalSummary } from "./professionalSummary";
 import { cancelSubscription } from "../../features/billing/api/cancelSubscription";
@@ -44,18 +46,42 @@ export default function Profile({ onClose }: ProfileProps) {
   const email = user?.email ?? "";
   const userPlan = typeof user?.app_metadata?.plan === "string" ? user.app_metadata.plan.trim().toLowerCase() : "";
   const hasCancelableSubscription = userPlan === "pro";
-  const { summary, setSummary, persistSummary, isOverLimit } = useProfessionalSummary(user?.id ?? null);
+  const {
+    firstNameDraft,
+    setFirstNameDraft,
+    lastNameDraft,
+    setLastNameDraft,
+    submitChange: submitNameChange,
+    isSubmitting: isChangingName,
+    canSubmit: canChangeName,
+    statusMessage: nameStatusMessage,
+    errorMessage: nameErrorMessage,
+  } = useChangeName(firstName, lastName);
+  const {
+    summary,
+    setSummary,
+    persistSummary,
+    isOverLimit,
+    isSaving: isSummarySaving,
+    statusMessage: summaryStatusMessage,
+    errorMessage: summaryErrorMessage,
+  } = useProfessionalSummary(user?.id ?? null);
   const {
     emailDraft,
     setEmailDraft,
     submitChange: submitChangeEmail,
+    isSubmitting: isChangingEmail,
     canSubmit: canChangeEmail,
     isInvalid: isEmailInvalid,
+    statusMessage: emailStatusMessage,
+    errorMessage: emailErrorMessage,
   } = useChangeEmail(email);
   const {
     submitChange: submitChangePassword,
     isSubmitting: isChangingPassword,
     canSubmit: canChangePassword,
+    statusMessage: passwordStatusMessage,
+    errorMessage: passwordErrorMessage,
   } = useChangePassword(email);
 
   const handleResetPassword = () => {
@@ -100,9 +126,38 @@ export default function Profile({ onClose }: ProfileProps) {
       </button>
       <div className={styles.profileColumn}>
         <div className={styles.nameRow}>
-          <input type="text" className={styles.firstNameTextbox} defaultValue={firstName} aria-label="First name" />
-          <input type="text" className={styles.lastNameTextbox} defaultValue={lastName} aria-label="Last name" />
+          <input
+            type="text"
+            className={styles.firstNameTextbox}
+            value={firstNameDraft}
+            onChange={(event) => setFirstNameDraft(event.target.value)}
+            aria-label="First name"
+          />
+          <div className={styles.nameActionGroup}>
+            <input
+              type="text"
+              className={styles.lastNameTextbox}
+              value={lastNameDraft}
+              onChange={(event) => setLastNameDraft(event.target.value)}
+              aria-label="Last name"
+            />
+            <button
+              type="button"
+              className={[
+                styles.changeEmailLink,
+                canChangeName ? styles.changeEmailLinkActive : "",
+              ]
+                .join(" ")
+                .trim()}
+              onClick={() => void submitNameChange()}
+              disabled={!canChangeName}
+            >
+              {isChangingName ? "saving..." : "save name"}
+            </button>
+          </div>
         </div>
+        {nameStatusMessage ? <StatusNotice tone="success" message={nameStatusMessage} className={styles.profileNotice} /> : null}
+        {nameErrorMessage ? <StatusNotice tone="error" message={nameErrorMessage} className={styles.profileNotice} /> : null}
         <div className={styles.emailRow}>
           <input
             type="email"
@@ -123,9 +178,11 @@ export default function Profile({ onClose }: ProfileProps) {
             onClick={() => void submitChangeEmail()}
             disabled={!canChangeEmail}
           >
-            change email
+            {isChangingEmail ? "sending..." : "change email"}
           </button>
         </div>
+        {emailStatusMessage ? <StatusNotice tone="success" message={emailStatusMessage} className={styles.profileNotice} /> : null}
+        {emailErrorMessage ? <StatusNotice tone="error" message={emailErrorMessage} className={styles.profileNotice} /> : null}
         <div className={styles.professionalSummaryField}>
           <span
             className={[
@@ -149,6 +206,22 @@ export default function Profile({ onClose }: ProfileProps) {
             aria-label="Professional summary"
           />
         </div>
+        {isOverLimit ? (
+          <StatusNotice
+            tone="warning"
+            message="Professional summary is over the 325 character limit. Shorten it to save changes."
+            className={styles.profileNotice}
+          />
+        ) : null}
+        {!isOverLimit && isSummarySaving ? (
+          <StatusNotice tone="info" message="Saving professional summary..." className={styles.profileNotice} />
+        ) : null}
+        {!isOverLimit && summaryStatusMessage ? (
+          <StatusNotice tone="success" message={summaryStatusMessage} className={styles.profileNotice} />
+        ) : null}
+        {!isOverLimit && summaryErrorMessage ? (
+          <StatusNotice tone="error" message={summaryErrorMessage} className={styles.profileNotice} />
+        ) : null}
         <button
           type="button"
           className={styles.profileActionLink}
@@ -157,6 +230,8 @@ export default function Profile({ onClose }: ProfileProps) {
         >
           {isChangingPassword ? "sending..." : "change password"}
         </button>
+        {passwordStatusMessage ? <StatusNotice tone="success" message={passwordStatusMessage} className={styles.profileNotice} /> : null}
+        {passwordErrorMessage ? <StatusNotice tone="error" message={passwordErrorMessage} className={styles.profileNotice} /> : null}
         <button
           type="button"
           className={styles.cancelSubscriptionLink}
@@ -173,15 +248,13 @@ export default function Profile({ onClose }: ProfileProps) {
             : "no active subscription"}
         </button>
         {cancellationState === "scheduled" ? (
-          <p className={styles.billingPortalError} role="status" aria-live="polite">
-            Your subscription will cancel at the end of the current billing period.
-          </p>
+          <StatusNotice
+            tone="success"
+            message="Your subscription will cancel at the end of the current billing period."
+            className={styles.profileNotice}
+          />
         ) : null}
-        {cancellationError ? (
-          <p className={styles.billingPortalError} role="alert">
-            {cancellationError}
-          </p>
-        ) : null}
+        {cancellationError ? <StatusNotice tone="error" message={cancellationError} className={styles.profileNotice} /> : null}
       </div>
     </section>
   );

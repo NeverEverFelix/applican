@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import StatusNotice from "../components/feedback/StatusNotice";
 import { supabase } from "../lib/supabaseClient";
 import { useAuthSession } from "../features/auth/useAuthSession";
 import { isEmailVerifiedSession } from "../features/auth/emailVerification";
@@ -106,8 +107,8 @@ export default function VerifyEmailPage() {
           </button>
         </div>
 
-        {statusMessage ? <p className={`${styles.message} ${styles.success}`}>{statusMessage}</p> : null}
-        {errorMessage ? <p className={`${styles.message} ${styles.error}`}>{errorMessage}</p> : null}
+        {statusMessage ? <StatusNotice tone="success" message={statusMessage} className={styles.notice} /> : null}
+        {errorMessage ? <StatusNotice tone="error" message={errorMessage} className={styles.notice} /> : null}
       </section>
     </div>
   );

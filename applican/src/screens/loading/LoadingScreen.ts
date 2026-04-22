@@ -45,7 +45,7 @@ const MAX_DISTANCE_PX = 620;
 const MIN_SCALE = 0.75;
 const MAX_SCALE = 1.12;
 const MIN_DURATION_MS = 1400;
-const MAX_DURATION_MS = 2000;
+export const MAX_PROJECTILE_DURATION_MS = 2000;
 const MIN_SPIN_DEG = -26;
 const MAX_SPIN_DEG = 26;
 
@@ -60,7 +60,7 @@ export function buildResumeProjectile(id: number): ResumeProjectile {
     tx: Math.cos(angleRad) * distance,
     ty: Math.sin(angleRad) * distance,
     scale: randomBetween(MIN_SCALE, MAX_SCALE),
-    durationMs: randomBetween(MIN_DURATION_MS, MAX_DURATION_MS),
+    durationMs: randomBetween(MIN_DURATION_MS, MAX_PROJECTILE_DURATION_MS),
     spinDeg: randomBetween(MIN_SPIN_DEG, MAX_SPIN_DEG),
   };
 }

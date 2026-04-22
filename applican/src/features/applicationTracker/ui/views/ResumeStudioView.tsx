@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePostHog } from "@posthog/react";
 import gsap from "gsap";
 import styles from "../applicationTrack.module.css";
@@ -15,6 +15,7 @@ import LoadingScreen from "../../../../screens/loading/LoadingScreen.tsx";
 import WritingText from "../../../../effects/writing-text";
 import TypingText from "../../../../effects/typing-text";
 import ScrollSections from "../../../../effects/ScrollSections";
+import StatusNotice from "../../../../components/feedback/StatusNotice";
 import {
   extractResumeOptimizationPresentationSections,
   type ResumeOptimizationPresentationSection,
@@ -331,6 +332,7 @@ export function ResumeStudioView() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const analysisCompleteScreenRef = useRef<HTMLElement | null>(null);
   const lastTrackedResultKeyRef = useRef<string>("");
+  const hasAttemptedPersistedRunResumeRef = useRef(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [jobDescription, setJobDescription] = useLocalStorageState<string>(
     "applican:resume-studio:job-description",
@@ -349,17 +351,36 @@ export function ResumeStudioView() {
     "applican:resume-studio:last-run-output",
     null,
   );
+  const [loadingAnimationOriginMs, setLoadingAnimationOriginMs] = useLocalStorageState<number | null>(
+    "applican:resume-studio:loading-animation-origin-ms",
+    null,
+  );
   const [isAnalysisCollapsed, setIsAnalysisCollapsed] = useState(false);
-  const [isShowingProgressScreen, setIsShowingProgressScreen] = useState(false);
+  const {
+    submitResumeRun,
+    retryResumeRun,
+    resumeStoredRun,
+    clearPersistedRunState,
+    failedRun,
+    isSubmitting,
+    errorMessage,
+    progressMessage,
+    progressPercent,
+    createdRun,
+    hasPersistedRunState,
+  } = useCreateResumeRun();
+  const shouldStartOnPersistedProgressScreen = hasPersistedRunState && isSubmitting && !showComputedResults;
+  const shouldStartOnPersistedErrorScreen =
+    hasPersistedRunState && Boolean(errorMessage) && failedRun !== null && !showComputedResults;
+  const [isShowingProgressScreen, setIsShowingProgressScreen] = useState(shouldStartOnPersistedProgressScreen);
   const [isShowingAnalysisCompleteScreen, setIsShowingAnalysisCompleteScreen] = useState(false);
   const [shouldRenderAnalysisCompleteScreen, setShouldRenderAnalysisCompleteScreen] = useState(false);
-  const [isShowingGenerationErrorScreen, setIsShowingGenerationErrorScreen] = useState(false);
+  const [isShowingGenerationErrorScreen, setIsShowingGenerationErrorScreen] = useState(
+    shouldStartOnPersistedErrorScreen,
+  );
   const [jobDescriptionValidationError, setJobDescriptionValidationError] = useState("");
   const [resumeValidationError, setResumeValidationError] = useState("");
-  const [restoreNotice, setRestoreNotice] = useState("");
   const [revealedAnalysisCount, setRevealedAnalysisCount] = useState(0);
-  const { submitResumeRun, retryResumeRun, failedRun, isSubmitting, errorMessage, progressMessage, progressPercent, createdRun } =
-    useCreateResumeRun();
   const initialRestoreSnapshotRef = useRef({
     jobDescription,
     uploadedFileName,
@@ -428,6 +449,89 @@ export function ResumeStudioView() {
     });
   }, [isShowingAnalysisCompleteScreen, shouldRenderAnalysisCompleteScreen]);
 
+  const wait = (ms: number) =>
+    new Promise<void>((resolve) => {
+      window.setTimeout(resolve, ms);
+    });
+
+  const completeSuccessfulRun = useCallback(
+    async (output: unknown) => {
+      setShouldRenderAnalysisCompleteScreen(true);
+      setIsShowingAnalysisCompleteScreen(true);
+      await wait(2500);
+      setIsShowingAnalysisCompleteScreen(false);
+      await wait(360);
+      setPersistedRunOutput(output);
+      setLoadingAnimationOriginMs(null);
+      setRevealedAnalysisCount(0);
+      setShowComputedResults(true);
+    },
+    [setLoadingAnimationOriginMs, setPersistedRunOutput, setShowComputedResults],
+  );
+
+  useEffect(() => {
+    if (shouldShowResults) {
+      setIsShowingProgressScreen(false);
+      setIsShowingGenerationErrorScreen(false);
+      return;
+    }
+
+    if (isSubmitting) {
+      setIsShowingProgressScreen(true);
+      setIsShowingGenerationErrorScreen(false);
+      return;
+    }
+
+    if (errorMessage && failedRun) {
+      setIsShowingProgressScreen(false);
+      setIsShowingGenerationErrorScreen(true);
+      return;
+    }
+
+    if (!hasPersistedRunState) {
+      setIsShowingProgressScreen(false);
+      setIsShowingGenerationErrorScreen(false);
+    }
+  }, [errorMessage, failedRun, hasPersistedRunState, isSubmitting, shouldShowResults]);
+
+  useEffect(() => {
+    if (shouldShowResults || !hasPersistedRunState || hasAttemptedPersistedRunResumeRef.current) {
+      return;
+    }
+
+    hasAttemptedPersistedRunResumeRef.current = true;
+    if (loadingAnimationOriginMs === null) {
+      setLoadingAnimationOriginMs(Date.now());
+    }
+    setIsShowingProgressScreen(!errorMessage);
+    setIsShowingGenerationErrorScreen(Boolean(errorMessage));
+
+    void (async () => {
+      const result = await resumeStoredRun();
+      if (!result) {
+        hasAttemptedPersistedRunResumeRef.current = false;
+        return;
+      }
+
+      if (result.ok) {
+        setIsShowingProgressScreen(false);
+        await completeSuccessfulRun(result.createdRun.row.output);
+        return;
+      }
+
+      setIsShowingProgressScreen(false);
+      setIsShowingGenerationErrorScreen(true);
+    })();
+  }, [
+    completeSuccessfulRun,
+    errorMessage,
+    hasPersistedRunState,
+    loadingAnimationOriginMs,
+    resumeStoredRun,
+    setLoadingAnimationOriginMs,
+    shouldShowResults,
+  ]);
+
   useEffect(() => {
     let isActive = true;
 
@@ -493,28 +597,21 @@ export function ResumeStudioView() {
         if (persistedFile) {
           setSelectedFile(persistedFile);
           setUploadedFileName(persistedFile.name);
-          setRestoreNotice(
-            initialSnapshot.jobDescription.trim()
-              ? "Restored your previous draft."
-              : "Restored your uploaded resume from your previous session.",
-          );
           return;
         }
 
         if (initialSnapshot.uploadedFileName.trim()) {
           setUploadedFileName("");
           setResumeValidationError("We restored your draft, but your saved resume file expired. Please upload it again.");
-          setRestoreNotice("Restored your previous draft. Re-upload your resume to continue.");
           return;
         }
 
         if (initialSnapshot.jobDescription.trim()) {
-          setRestoreNotice("Restored your previous draft.");
           return;
         }
 
         if (initialSnapshot.hasPersistedOutput || initialSnapshot.showComputedResults) {
-          setRestoreNotice("Restored your previous analysis.");
+          return;
         }
       } catch {
         if (!isActive) {
@@ -524,7 +621,6 @@ export function ResumeStudioView() {
         if (initialSnapshot.uploadedFileName.trim()) {
           setUploadedFileName("");
           setResumeValidationError("We couldn't restore your saved resume file. Please upload it again.");
-          setRestoreNotice("Restored your previous draft. Re-upload your resume to continue.");
         }
       }
     })();
@@ -621,13 +717,7 @@ export function ResumeStudioView() {
     setSelectedFile(nextFile);
     setUploadedFileName(nextFile.name);
     setResumeValidationError("");
-    setRestoreNotice("");
   };
-
-  const wait = (ms: number) =>
-    new Promise<void>((resolve) => {
-      window.setTimeout(resolve, ms);
-    });
 
   const onGenerateResult = async () => {
     const resumeError = validateResumeFile(selectedFile);
@@ -638,22 +728,15 @@ export function ResumeStudioView() {
     if (!isJobValidForSubmission || Boolean(resumeError)) return;
 
     setIsShowingGenerationErrorScreen(false);
+    setLoadingAnimationOriginMs(Date.now());
     setIsShowingProgressScreen(true);
-    setRestoreNotice("");
 
     const result = await submitResumeRun({ file: selectedFile, jobDescription });
     await wait(220);
     setIsShowingProgressScreen(false);
 
     if (result.ok) {
-      setShouldRenderAnalysisCompleteScreen(true);
-      setIsShowingAnalysisCompleteScreen(true);
-      await wait(2500);
-      setIsShowingAnalysisCompleteScreen(false);
-      await wait(360);
-      setPersistedRunOutput(result.createdRun.row.output);
-      setRevealedAnalysisCount(0);
-      setShowComputedResults(true);
+      await completeSuccessfulRun(result.createdRun.row.output);
       return;
     }
 
@@ -666,22 +749,15 @@ export function ResumeStudioView() {
     }
 
     setIsShowingGenerationErrorScreen(false);
+    setLoadingAnimationOriginMs(Date.now());
     setIsShowingProgressScreen(true);
-    setRestoreNotice("");
 
     const result = await retryResumeRun();
     await wait(220);
     setIsShowingProgressScreen(false);
 
     if (result.ok) {
-      setShouldRenderAnalysisCompleteScreen(true);
-      setIsShowingAnalysisCompleteScreen(true);
-      await wait(2500);
-      setIsShowingAnalysisCompleteScreen(false);
-      await wait(360);
-      setPersistedRunOutput(result.createdRun.row.output);
-      setRevealedAnalysisCount(0);
-      setShowComputedResults(true);
+      await completeSuccessfulRun(result.createdRun.row.output);
       return;
     }
 
@@ -690,15 +766,18 @@ export function ResumeStudioView() {
 
   const onStartNewAnalysis = () => {
     lastTrackedResultKeyRef.current = "";
+    hasAttemptedPersistedRunResumeRef.current = false;
     void clearPersistedResumeFile();
+    clearPersistedRunState();
+    setLoadingAnimationOriginMs(null);
     setShowComputedResults(false);
     setIsAnalysisCollapsed(false);
+    setIsShowingProgressScreen(false);
     setIsShowingAnalysisCompleteScreen(false);
     setShouldRenderAnalysisCompleteScreen(false);
     setIsShowingGenerationErrorScreen(false);
     setJobDescriptionValidationError("");
     setResumeValidationError("");
-    setRestoreNotice("");
     setSelectedFile(null);
     setJobDescription("");
     setUploadedFileName("");
@@ -728,7 +807,7 @@ export function ResumeStudioView() {
     <div className={rootClassName}>
       {isShowingProgressScreen ? (
         <section className={styles.progressScreenContainer}>
-          <LoadingScreen backendProgress={progressPercent} />
+          <LoadingScreen backendProgress={progressPercent} animationOriginMs={loadingAnimationOriginMs ?? undefined} />
         </section>
       ) : shouldRenderAnalysisCompleteScreen ? (
         <section
@@ -763,18 +842,13 @@ export function ResumeStudioView() {
               role="alert"
             >
               {generationErrorFeedback.message
-                ? `${generationErrorFeedback.message} Press X to try again.`
-                : "We failed to generate resume improvements. Press X to try again."}
+                ? `${generationErrorFeedback.message} Select Try again to retry.`
+                : "We failed to generate resume improvements. Select Try again to retry."}
             </p>
           </div>
         </section>
       ) : !shouldShowResults ? (
         <>
-          {restoreNotice ? (
-            <p className={styles.statusInfo} role="status" aria-live="polite">
-              {restoreNotice}
-            </p>
-          ) : null}
           <div className={styles.jobInputWrapper}>
             <img src={jobDescriptionIcon} alt="" aria-hidden="true" className={styles.jobInputIcon} />
             <input
@@ -846,46 +920,26 @@ export function ResumeStudioView() {
             <span>{isSubmitting ? "Generating..." : "Generate Result"}</span>
           </button>
           {progressMessage ? (
-            <p className={styles.statusSuccess} role="status" aria-live="polite">
-              {progressMessage}
-            </p>
+            <StatusNotice tone="success" message={progressMessage} className={styles.statusNotice} />
           ) : null}
           {jobDescriptionValidationError ? (
-            <p className={styles.statusError} role="alert">
-              {jobDescriptionValidationError}
-            </p>
+            <StatusNotice tone="error" message={jobDescriptionValidationError} className={styles.statusNotice} />
           ) : null}
           {resumeValidationError ? (
-            <p className={styles.statusError} role="alert">
-              {resumeValidationError}
-            </p>
+            <StatusNotice tone="error" message={resumeValidationError} className={styles.statusNotice} />
           ) : null}
           {generationErrorFeedback.message ? (
-            <div className={styles.statusActionRow}>
-              <p
-                className={
-                  generationErrorFeedback.tone === "warning" ? styles.statusWarning : styles.statusError
-                }
-                role="alert"
-              >
-                {generationErrorFeedback.message}
-              </p>
-              {generationErrorFeedback.retryable ? (
-                <button
-                  type="button"
-                  className={styles.inlineRetryButton}
-                  onClick={() => void onRetryGenerateResult()}
-                  disabled={isSubmitting || Boolean(jobDescriptionValidationError) || Boolean(resumeValidationError)}
-                >
-                  Try again
-                </button>
-              ) : null}
-            </div>
+            <StatusNotice
+              tone={generationErrorFeedback.tone}
+              message={generationErrorFeedback.message}
+              className={styles.statusNotice}
+              actionLabel={generationErrorFeedback.retryable ? "Try again" : undefined}
+              onAction={generationErrorFeedback.retryable ? () => void onRetryGenerateResult() : undefined}
+              actionDisabled={isSubmitting || Boolean(jobDescriptionValidationError) || Boolean(resumeValidationError)}
+            />
           ) : null}
           {outputShapeError ? (
-            <p className={styles.statusError} role="alert">
-              {outputShapeError}
-            </p>
+            <StatusNotice tone="error" message={outputShapeError} className={styles.statusNotice} />
           ) : null}
         </>
       ) : useScrollSectionsFlow ? (

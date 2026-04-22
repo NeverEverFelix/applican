@@ -66,10 +66,6 @@
   background: linear-gradient(90deg, #292929 0%, #1f1f1f 100%);
 }
 
-.stateControlItem:focus-visible {
-  box-shadow: 0 0 0 3px rgb(63 134 255 / 45%);
-}
-
 .stateControlIcon {
   width: 14px;
   height: 14px;

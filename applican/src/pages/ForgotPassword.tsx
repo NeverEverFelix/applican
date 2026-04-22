@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import styles from "./ForgotPassword.module.css";
-import pageImage from "../assets/PageImage.svg";
+import pageImage from "../assets/PageImage.jpg";
 import logo from "../assets/logo.png";
 import AuthLoadingScreen from "../features/auth/AuthLoadingScreen";
 import { getAuthErrorMessage } from "../features/auth/auth";

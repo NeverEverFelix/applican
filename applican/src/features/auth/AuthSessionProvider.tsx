@@ -15,6 +15,12 @@ export function AuthSessionProvider({ children }: AuthSessionProviderProps) {
   const [session, setSession] = useState<AuthSessionContextValue["session"]>(null);
   const [isChecking, setIsChecking] = useState(true);
 
+  const refreshSession = async () => {
+    await supabase.auth.refreshSession();
+    const { data } = await supabase.auth.getSession();
+    setSession(data.session ?? null);
+  };
+
   useEffect(() => {
     let active = true;
 
@@ -49,6 +55,7 @@ export function AuthSessionProvider({ children }: AuthSessionProviderProps) {
       session,
       isChecking,
       isAuthenticated: Boolean(session),
+      refreshSession,
     }),
     [isChecking, session],
   );

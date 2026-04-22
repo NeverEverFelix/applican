@@ -70,15 +70,6 @@
   color: #cccccc;
 }
 
-.message {
-  margin: 14px 0 0;
-  font-size: 13px;
-}
-
-.success {
-  color: #72d88a;
-}
-
-.error {
-  color: #ff7b7b;
+.notice {
+  margin-top: 14px;
 }

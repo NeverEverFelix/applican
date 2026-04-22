@@ -4,6 +4,11 @@ import type { ReactNode } from "react";
 
 import { ResumeStudioView } from "./ResumeStudioView";
 
+const { useCreateResumeRunMock, getLatestResumeRunForEditorMock } = vi.hoisted(() => ({
+  useCreateResumeRunMock: vi.fn(),
+  getLatestResumeRunForEditorMock: vi.fn(async () => null),
+}));
+
 vi.mock("@posthog/react", () => ({
   usePostHog: () => ({
     capture: vi.fn(),
@@ -19,18 +24,11 @@ vi.mock("gsap", () => ({
 }));
 
 vi.mock("../../../jobs/hooks/useCreateResumeRun", () => ({
-  useCreateResumeRun: () => ({
-    submitResumeRun: vi.fn(),
-    isSubmitting: false,
-    errorMessage: "",
-    progressMessage: "",
-    progressPercent: 0,
-    createdRun: null,
-  }),
+  useCreateResumeRun: () => useCreateResumeRunMock(),
 }));
 
 vi.mock("../../../jobs/api/getLatestResumeRunForEditor", () => ({
-  getLatestResumeRunForEditor: vi.fn(async () => null),
+  getLatestResumeRunForEditor: getLatestResumeRunForEditorMock,
 }));
 
 vi.mock("../../../../screens/loading/LoadingScreen.tsx", () => ({
@@ -82,6 +80,20 @@ beforeEach(() => {
     configurable: true,
   });
   localStorageMock.clear();
+  useCreateResumeRunMock.mockReturnValue({
+    submitResumeRun: vi.fn(),
+    retryResumeRun: vi.fn(),
+    resumeStoredRun: vi.fn(async () => null),
+    clearPersistedRunState: vi.fn(),
+    isSubmitting: false,
+    errorMessage: "",
+    progressMessage: "",
+    progressPercent: 0,
+    createdRun: null,
+    failedRun: null,
+    hasPersistedRunState: false,
+  });
+  getLatestResumeRunForEditorMock.mockResolvedValue(null);
 });
 
 describe("ResumeStudioView", () => {
@@ -162,5 +174,26 @@ describe("ResumeStudioView", () => {
         "Diagnosed and resolved production issues in APIs and PostgreSQL, enhancing query performance and system reliability",
       ),
     ).toBeTruthy();
+  });
+
+  it("shows the loading screen when a persisted run is still resuming", () => {
+    useCreateResumeRunMock.mockReturnValue({
+      submitResumeRun: vi.fn(),
+      retryResumeRun: vi.fn(),
+      resumeStoredRun: vi.fn(async () => null),
+      clearPersistedRunState: vi.fn(),
+      isSubmitting: true,
+      errorMessage: "",
+      progressMessage: "Generating bullets...",
+      progressPercent: 78,
+      createdRun: null,
+      failedRun: null,
+      hasPersistedRunState: true,
+    });
+
+    render(<ResumeStudioView />);
+
+    expect(screen.getByText("Loading")).toBeTruthy();
+    expect(screen.queryByPlaceholderText("Paste a job description...")).toBeNull();
   });
 });

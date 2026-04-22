@@ -19,6 +19,8 @@ async function requestEmailChange(nextEmail: string) {
 export function useChangeEmail(currentEmail: string) {
   const [emailDraft, setEmailDraft] = useState(currentEmail);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     setEmailDraft(currentEmail);
@@ -37,9 +39,13 @@ export function useChangeEmail(currentEmail: string) {
     }
 
     setIsSubmitting(true);
+    setStatusMessage("");
+    setErrorMessage("");
     try {
-      await requestEmailChange(normalizedDraft);
-      window.alert("Check your email to confirm the address change.");
+      const nextEmail = await requestEmailChange(normalizedDraft);
+      setStatusMessage(`Check ${nextEmail} to confirm the address change.`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to change email.");
     } finally {
       setIsSubmitting(false);
     }
@@ -52,5 +58,7 @@ export function useChangeEmail(currentEmail: string) {
     isSubmitting,
     canSubmit,
     isInvalid,
+    statusMessage,
+    errorMessage,
   };
 }

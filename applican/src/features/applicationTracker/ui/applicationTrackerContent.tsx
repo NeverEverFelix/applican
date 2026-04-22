@@ -15,6 +15,7 @@ import { ResumeStudioView } from "./views/ResumeStudioView";
 import { EditorView } from "./views/EditorView";
 import downloadIcon from "../../../assets/Download Icon.png";
 import trashIcon from "../../../assets/trash.svg";
+import StatusNotice from "../../../components/feedback/StatusNotice";
 import HistoryCard from "../../../components/history/HistoryCard";
 import HistorySummaryPanel from "../../../components/history/HistorySummaryPanel";
 import type { HistoryCardData } from "../../../components/history/history";
@@ -83,9 +84,7 @@ function HistoryView() {
   if (isHistoryLoading) {
     return (
       <section className={styles.historyView}>
-        <p className={styles.historyStatusMessage} role="status" aria-live="polite">
-          Loading history...
-        </p>
+        <StatusNotice tone="info" message="Loading history..." className={styles.historyStatusNotice} />
       </section>
     );
   }
@@ -93,9 +92,7 @@ function HistoryView() {
   if (historyLoadError) {
     return (
       <section className={styles.historyView}>
-        <p className={styles.historyStatusMessage} role="alert">
-          {historyLoadError}
-        </p>
+        <StatusNotice tone="error" message={historyLoadError} className={styles.historyStatusNotice} />
       </section>
     );
   }
@@ -103,9 +100,7 @@ function HistoryView() {
   if (historyCards.length === 0) {
     return (
       <section className={styles.historyView}>
-        <p className={styles.historyStatusMessage} role="status" aria-live="polite">
-          No previous analyses yet.
-        </p>
+        <StatusNotice tone="info" message="No previous analyses yet." className={styles.historyStatusNotice} />
       </section>
     );
   }
@@ -172,9 +167,7 @@ function HistoryView() {
   return (
     <section className={styles.historyView}>
       {historyResumeError ? (
-        <p className={styles.historyInlineError} role="alert">
-          {historyResumeError}
-        </p>
+        <StatusNotice tone="error" message={historyResumeError} className={styles.historyInlineNotice} />
       ) : null}
       <div className={styles.historyFlow}>
         <FadeSwipePanels
@@ -496,19 +489,16 @@ function ApplicationTrackerView({
         <div className={styles.trackerHeaderDivider} aria-hidden="true" />
         <div className={styles.trackerGridBody} onScroll={onGridScroll}>
           {errorMessage ? (
-            <div className={styles.trackerErrorPanel}>
-              <p className={styles.trackerError} role="alert">
-                {errorMessage}
-              </p>
-              <button type="button" className={styles.trackerRetryButton} onClick={retryLoad}>
-                Retry
-              </button>
-            </div>
+            <StatusNotice
+              tone="error"
+              message={errorMessage}
+              className={styles.trackerNotice}
+              actionLabel="Retry"
+              onAction={retryLoad}
+            />
           ) : null}
           {downloadError ? (
-            <p className={styles.trackerError} role="alert">
-              {downloadError}
-            </p>
+            <StatusNotice tone="error" message={downloadError} className={styles.trackerNotice} />
           ) : null}
           {isLoading
             ? Array.from({ length: skeletonRows }).map((_, index) => (
@@ -529,9 +519,7 @@ function ApplicationTrackerView({
               ))
             : null}
           {!isLoading && !errorMessage && applicationRows.length === 0 ? (
-            <p className={styles.trackerEmptyMessage} role="status" aria-live="polite">
-              No applications yet for this filter.
-            </p>
+            <StatusNotice tone="info" message="No applications yet for this filter." className={styles.trackerNotice} />
           ) : null}
           {!isLoading && !errorMessage
             ? applicationRows.map((row) => (
@@ -580,9 +568,7 @@ function ApplicationTrackerView({
               ))
             : null}
           {!isLoading && (isFetchingMore || showTrailingLoadState) ? (
-            <p className={styles.trackerLoadState} role="status" aria-live="polite">
-              Loading more applications...
-            </p>
+            <StatusNotice tone="info" message="Loading more applications..." className={styles.trackerNotice} />
           ) : null}
         </div>
       </section>
