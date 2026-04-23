@@ -320,6 +320,7 @@ export function ResumeStudioView() {
   const [isShowingGenerationErrorScreen, setIsShowingGenerationErrorScreen] = useState(
     shouldStartOnPersistedErrorScreen,
   );
+  const [isTransitioningToSuccessfulResult, setIsTransitioningToSuccessfulResult] = useState(false);
   const [jobDescriptionValidationError, setJobDescriptionValidationError] = useState("");
   const [resumeValidationError, setResumeValidationError] = useState("");
   const [revealedAnalysisCount, setRevealedAnalysisCount] = useState(0);
@@ -407,11 +408,16 @@ export function ResumeStudioView() {
       setLoadingAnimationOriginMs(null);
       setRevealedAnalysisCount(0);
       setShowComputedResults(true);
+      setIsTransitioningToSuccessfulResult(false);
     },
     [setLoadingAnimationOriginMs, setPersistedRunOutput, setShowComputedResults],
   );
 
   useEffect(() => {
+    if (isTransitioningToSuccessfulResult) {
+      return;
+    }
+
     if (shouldShowResults) {
       setIsShowingProgressScreen(false);
       setIsShowingGenerationErrorScreen(false);
@@ -434,7 +440,7 @@ export function ResumeStudioView() {
       setIsShowingProgressScreen(false);
       setIsShowingGenerationErrorScreen(false);
     }
-  }, [errorMessage, failedRun, hasPersistedRunState, isSubmitting, shouldShowResults]);
+  }, [errorMessage, failedRun, hasPersistedRunState, isSubmitting, isTransitioningToSuccessfulResult, shouldShowResults]);
 
   useEffect(() => {
     if (
@@ -458,16 +464,19 @@ export function ResumeStudioView() {
     void (async () => {
       const result = await resumeStoredRun();
       if (!result || result.cancelled) {
+        setIsTransitioningToSuccessfulResult(false);
         hasAttemptedPersistedRunResumeRef.current = false;
         return;
       }
 
       if (result.ok) {
+        setIsTransitioningToSuccessfulResult(true);
         setIsShowingProgressScreen(false);
         await completeSuccessfulRun(result.createdRun.row.output);
         return;
       }
 
+      setIsTransitioningToSuccessfulResult(false);
       setIsShowingProgressScreen(false);
       setIsShowingGenerationErrorScreen(true);
     })();
@@ -479,6 +488,7 @@ export function ResumeStudioView() {
     resumeStoredRun,
     setLoadingAnimationOriginMs,
     isSubmitting,
+    setIsTransitioningToSuccessfulResult,
     shouldShowResults,
   ]);
 
@@ -682,10 +692,14 @@ export function ResumeStudioView() {
     setIsShowingProgressScreen(true);
 
     const result = await submitResumeRun({ file: selectedFile, jobDescription });
+    if (result.ok) {
+      setIsTransitioningToSuccessfulResult(true);
+    }
     await wait(220);
     setIsShowingProgressScreen(false);
 
     if (result.cancelled) {
+      setIsTransitioningToSuccessfulResult(false);
       return;
     }
 
@@ -694,6 +708,7 @@ export function ResumeStudioView() {
       return;
     }
 
+    setIsTransitioningToSuccessfulResult(false);
     setIsShowingGenerationErrorScreen(true);
   };
 
@@ -707,10 +722,14 @@ export function ResumeStudioView() {
     setIsShowingProgressScreen(true);
 
     const result = await retryResumeRun();
+    if (result.ok) {
+      setIsTransitioningToSuccessfulResult(true);
+    }
     await wait(220);
     setIsShowingProgressScreen(false);
 
     if (result.cancelled) {
+      setIsTransitioningToSuccessfulResult(false);
       return;
     }
 
@@ -719,6 +738,7 @@ export function ResumeStudioView() {
       return;
     }
 
+    setIsTransitioningToSuccessfulResult(false);
     setIsShowingGenerationErrorScreen(true);
   };
 
@@ -735,6 +755,7 @@ export function ResumeStudioView() {
     setIsShowingAnalysisCompleteScreen(false);
     setShouldRenderAnalysisCompleteScreen(false);
     setIsShowingGenerationErrorScreen(false);
+    setIsTransitioningToSuccessfulResult(false);
     setJobDescriptionValidationError("");
     setResumeValidationError("");
     setSelectedFile(null);
@@ -755,6 +776,7 @@ export function ResumeStudioView() {
     setIsShowingAnalysisCompleteScreen(false);
     setShouldRenderAnalysisCompleteScreen(false);
     setIsShowingGenerationErrorScreen(false);
+    setIsTransitioningToSuccessfulResult(false);
     setJobDescriptionValidationError("");
     setResumeValidationError("");
     setPersistedRunOutput(null);
