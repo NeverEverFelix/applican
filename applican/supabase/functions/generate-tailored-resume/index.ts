@@ -8,6 +8,15 @@ const RUNS_TABLE = "resume_runs";
 const DOCUMENTS_TABLE = "resume_documents";
 const GENERATED_RESUMES_TABLE = "generated_resumes";
 const FUNCTION_NAME = "generate-tailored-resume";
+const STATUS = {
+  EXTRACTED: "extracted",
+  QUEUED_GENERATE: "queued_generate",
+  GENERATING: "generating",
+  QUEUED_PDF: "queued_pdf",
+  COMPILING_PDF: "compiling_pdf",
+  COMPLETED: "completed",
+  FAILED: "failed",
+};
 
 const sentryDsn = Deno.env.get("SENTRY_DSN");
 const sentryEnabled = Boolean(sentryDsn);
@@ -89,6 +98,17 @@ function toError(error: unknown): Error {
     return error;
   }
   return new Error(typeof error === "string" ? error : "Unknown non-Error thrown.");
+}
+
+function isRunReadyForTailoredResume(status: unknown): boolean {
+  return (
+    status === STATUS.EXTRACTED ||
+    status === STATUS.QUEUED_GENERATE ||
+    status === STATUS.GENERATING ||
+    status === STATUS.QUEUED_PDF ||
+    status === STATUS.COMPILING_PDF ||
+    status === STATUS.COMPLETED
+  );
 }
 
 function getRequestContext(req: Request) {
@@ -183,19 +203,9 @@ serve(async (req) => {
     const serviceRoleKey = getEnv("SUPABASE_SERVICE_ROLE_KEY");
     const authHeader = req.headers.get("Authorization");
     const accessToken = parseBearerToken(authHeader);
+    const isInternalInvocation = accessToken === serviceRoleKey;
 
     adminClient = createClient(supabaseUrl, serviceRoleKey);
-
-    const {
-      data: { user },
-      error: userError,
-    } = await adminClient.auth.getUser(accessToken);
-
-    if (userError || !user) {
-      throw new HttpError(401, "UNAUTHORIZED", "Invalid or expired user token.");
-    }
-
-    authenticatedUserId = user.id;
 
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
@@ -216,9 +226,24 @@ serve(async (req) => {
       throw new HttpError(400, "INVALID_INPUT", "run_id is required.");
     }
 
-    const { data: run, error: runError } = await userClient
+    const runClient = isInternalInvocation ? adminClient : userClient;
+
+    if (!isInternalInvocation) {
+      const {
+        data: { user },
+        error: userError,
+      } = await adminClient.auth.getUser(accessToken);
+
+      if (userError || !user) {
+        throw new HttpError(401, "UNAUTHORIZED", "Invalid or expired user token.");
+      }
+
+      authenticatedUserId = user.id;
+    }
+
+    const { data: run, error: runError } = await runClient
       .from(RUNS_TABLE)
-      .select("id, request_id, user_id, output")
+      .select("id, request_id, user_id, status, output")
       .eq("id", runId)
       .single();
 
@@ -228,6 +253,11 @@ serve(async (req) => {
 
     const runUserId = cleanString(run.user_id);
     const runRequestId = cleanString(run.request_id);
+
+    if (isInternalInvocation) {
+      authenticatedUserId = runUserId;
+    }
+
     if (!runUserId || runUserId !== authenticatedUserId) {
       throw new HttpError(403, "FORBIDDEN", "Run does not belong to authenticated user.");
     }
@@ -236,11 +266,23 @@ serve(async (req) => {
       throw new HttpError(409, "REQUEST_ID_MISMATCH", "Provided request_id does not match the run.");
     }
 
+    if (run.status === STATUS.FAILED) {
+      throw new HttpError(409, "RUN_TERMINAL", "Run is in terminal failed state.");
+    }
+
+    if (!isRunReadyForTailoredResume(run.status)) {
+      throw new HttpError(
+        409,
+        "RUN_NOT_READY",
+        "Run is not ready for tailored resume generation yet.",
+      );
+    }
+
     if (!run.output || typeof run.output !== "object") {
       throw new HttpError(409, "RUN_OUTPUT_MISSING", "Run output is required before generating tailored resume.");
     }
 
-    const { data: resumeDoc, error: resumeDocError } = await userClient
+    const { data: resumeDoc, error: resumeDocError } = await runClient
       .from(DOCUMENTS_TABLE)
       .select("text")
       .eq("run_id", runId)
@@ -298,11 +340,12 @@ serve(async (req) => {
     const { data: updatedRun, error: updateError } = await adminClient
       .from(RUNS_TABLE)
       .update({
+        status: STATUS.QUEUED_PDF,
         output: mergedOutput,
       })
       .eq("id", runId)
       .eq("user_id", authenticatedUserId)
-      .select("id, request_id, output")
+      .select("id, request_id, status, output")
       .single();
 
     if (updateError || !updatedRun) {

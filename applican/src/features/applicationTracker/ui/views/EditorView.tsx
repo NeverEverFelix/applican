@@ -106,6 +106,7 @@ export function EditorView() {
   const [latex, setLatex] = useState(DEFAULT_LATEX);
   const [filename, setFilename] = useState("tailored-resume.tex");
   const [selectedResumeId, setSelectedResumeId] = useState("");
+  const [currentRunId, setCurrentRunId] = useState("");
   const [isPdfCompiling, setIsPdfCompiling] = useState(false);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [isHistoryRefreshAnimating, setIsHistoryRefreshAnimating] = useState(false);
@@ -151,6 +152,7 @@ export function EditorView() {
     setIsPreviewFailed(false);
     setLastCompiledPreviewSignature("");
     setSelectedResumeId(row.id);
+    setCurrentRunId(row.run_id);
     setFilename(row.filename);
     setLatex(row.latex);
     setErrorMessage("");
@@ -190,6 +192,7 @@ export function EditorView() {
       setLatex(response.tailored_resume.latex);
       setFilename(response.tailored_resume.filename || "tailored-resume.tex");
       setSelectedResumeId(response.tailored_resume.id ?? "");
+      setCurrentRunId(targetRunId);
       await loadHistory(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to compile LaTeX.";
@@ -215,6 +218,7 @@ export function EditorView() {
           setLatex(existingTailored.latex);
           setFilename(existingTailored.filename || "tailored-resume.tex");
           setSelectedResumeId(existingTailored.id ?? "");
+          setCurrentRunId(latestRun.id);
           return;
         }
 
@@ -269,6 +273,7 @@ export function EditorView() {
         const response = await invokeCompileTailoredResumePdf({
           latex,
           filename,
+          runId: currentRunId || undefined,
         });
 
         const pdfResponse = await fetch(response.signed_url);
@@ -316,6 +321,7 @@ export function EditorView() {
       const response = await invokeCompileTailoredResumePdf({
         latex,
         filename,
+        runId: currentRunId || undefined,
       });
 
       if (latestPreviewRequestRef.current !== requestToken) {

@@ -1,5 +1,9 @@
 import { supabase } from "../../../lib/supabaseClient";
-import { RESUME_RUN_STATUS, RESUME_RUNS_TABLE } from "../model/constants";
+import {
+  RESUME_RUN_STATUS,
+  RESUME_RUNS_TABLE,
+  isResumeRunPastExtraction,
+} from "../model/constants";
 
 type WaitForRunExtractionInput = {
   runId: string;
@@ -48,7 +52,7 @@ export async function waitForRunExtraction({
       return;
     }
 
-    if (status === RESUME_RUN_STATUS.EXTRACTED) {
+    if (isResumeRunPastExtraction(status)) {
       return;
     }
 

@@ -3,6 +3,7 @@ import { supabase } from "../../../lib/supabaseClient";
 type CompileTailoredResumePdfInput = {
   latex: string;
   filename: string;
+  runId?: string;
 };
 
 type CompileTailoredResumePdfResponse = {
@@ -105,6 +106,7 @@ export async function invokeCompileTailoredResumePdf(
 ): Promise<CompileTailoredResumePdfResponse> {
   const latex = payload.latex.trim();
   const filename = payload.filename.trim() || "tailored-resume.tex";
+  const runId = payload.runId?.trim() || undefined;
 
   if (!latex) {
     throw toCompilePdfError({
@@ -116,6 +118,7 @@ export async function invokeCompileTailoredResumePdf(
     body: {
       latex,
       filename,
+      run_id: runId,
     },
   });
 

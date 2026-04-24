@@ -36,13 +36,14 @@ describe("invokeCompileTailoredResumePdf", () => {
     });
 
     await expect(
-      invokeCompileTailoredResumePdf({ latex: "  \\section{Experience}  ", filename: "   " }),
+      invokeCompileTailoredResumePdf({ latex: "  \\section{Experience}  ", filename: "   ", runId: " run-1 " }),
     ).resolves.toEqual(response);
 
     expect(invokeMock).toHaveBeenCalledWith("compile-tailored-resume-pdf", {
       body: {
         latex: "\\section{Experience}",
         filename: "tailored-resume.tex",
+        run_id: "run-1",
       },
     });
   });

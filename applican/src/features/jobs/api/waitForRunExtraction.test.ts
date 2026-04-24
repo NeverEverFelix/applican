@@ -91,6 +91,21 @@ describe("waitForRunExtraction", () => {
     expect(singleMock).toHaveBeenCalledTimes(2);
   });
 
+  it("returns when the run has already advanced beyond extraction", async () => {
+    singleMock.mockResolvedValue({
+      data: {
+        status: RESUME_RUN_STATUS.GENERATING,
+        error_message: null,
+        output: null,
+      },
+      error: null,
+    });
+
+    await expect(
+      waitForRunExtraction({ runId: "run-1", pollIntervalMs: 1 }),
+    ).resolves.toBeUndefined();
+  });
+
   it("throws the run error when extraction fails", async () => {
     singleMock.mockResolvedValue({
       data: {

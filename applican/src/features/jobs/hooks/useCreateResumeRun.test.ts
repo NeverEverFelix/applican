@@ -567,6 +567,108 @@ describe("useCreateResumeRun", () => {
     });
   });
 
+  it("resumes a persisted run that has already advanced to queued_pdf without waiting for extraction", async () => {
+    window.localStorage.setItem(
+      "applican:resume-studio:active-run-session",
+      JSON.stringify({
+        runId: "run-1",
+        requestId: "request-1",
+        row: {
+          id: "run-1",
+          request_id: "request-1",
+          user_id: "user-1",
+          resume_path: "resume.pdf",
+          resume_filename: "resume.pdf",
+          job_description: "Software engineer",
+          status: "queued_pdf",
+          error_code: null,
+          error_message: null,
+          output: null,
+          created_at: "2026-04-16T00:00:00.000Z",
+          updated_at: "2026-04-16T00:00:00.000Z",
+        },
+        phase: "generating",
+        progressMessage: "Generating bullets...",
+        progressPercent: 78,
+        errorKind: null,
+        errorMessage: "",
+      }),
+    );
+
+    const generatedRun = {
+      id: "run-1",
+      request_id: "request-1",
+      user_id: "user-1",
+      resume_path: "resume.pdf",
+      resume_filename: "resume.pdf",
+      job_description: "Software engineer",
+      status: "queued_pdf",
+      error_code: null,
+      error_message: null,
+      output: { bullets: ["A"] },
+      created_at: "2026-04-16T00:00:00.000Z",
+      updated_at: "2026-04-16T00:00:00.000Z",
+    };
+
+    getResumeRunMock.mockResolvedValue({
+      ...generatedRun,
+      output: null,
+    });
+    invokeGenerateBulletsMock.mockResolvedValue({ run: generatedRun });
+
+    const { result } = renderHook(() => useCreateResumeRun());
+
+    await act(async () => {
+      await result.current.resumeStoredRun();
+    });
+
+    expect(waitForRunExtractionMock).not.toHaveBeenCalled();
+    expect(invokeGenerateBulletsMock).toHaveBeenCalledWith({
+      runId: "run-1",
+      requestId: "request-1",
+    });
+    expect(result.current.createdRun).toEqual({
+      requestId: "request-1",
+      row: generatedRun,
+    });
+  });
+
+  it("surfaces compile-stage progress when a restored run is already queued for pdf work", async () => {
+    window.localStorage.setItem(
+      "applican:resume-studio:active-run-session",
+      JSON.stringify({
+        runId: "run-1",
+        requestId: "request-1",
+        row: {
+          id: "run-1",
+          request_id: "request-1",
+          user_id: "user-1",
+          resume_path: "resume.pdf",
+          resume_filename: "resume.pdf",
+          job_description: "Software engineer",
+          status: "queued_pdf",
+          error_code: null,
+          error_message: null,
+          output: null,
+          created_at: "2026-04-16T00:00:00.000Z",
+          updated_at: "2026-04-16T00:00:00.000Z",
+        },
+        phase: "compiling",
+        progressMessage: "Preparing PDF...",
+        progressPercent: 92,
+        errorKind: null,
+        errorMessage: "",
+      }),
+    );
+
+    getResumeRunMock.mockResolvedValue(null);
+
+    const { result } = renderHook(() => useCreateResumeRun());
+
+    expect(result.current.progressMessage).toBe("Preparing PDF...");
+    expect(result.current.progressPercent).toBe(92);
+  });
+
   it("treats a persisted failed run as terminal without re-fetching it", async () => {
     window.localStorage.setItem(
       "applican:resume-studio:active-run-session",

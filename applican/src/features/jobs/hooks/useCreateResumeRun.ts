@@ -7,7 +7,7 @@ import { getResumeRun } from "../api/getResumeRun";
 import { invokeGenerateBullets } from "../api/invokeGenerateBullets";
 import { requeueResumeRun } from "../api/requeueResumeRun";
 import { waitForRunExtraction } from "../api/waitForRunExtraction";
-import { RESUME_RUN_STATUS } from "../model/constants";
+import { RESUME_RUN_STATUS, isResumeRunPastExtraction } from "../model/constants";
 import type { CreateResumeRunResult, ResumeRunRow } from "../model/types";
 
 type UseCreateResumeRunResult = {
@@ -43,7 +43,7 @@ export type ResumeRunErrorFeedback = {
   message: string;
 };
 
-type PersistedRunPhase = "extracting" | "generating" | "failed";
+type PersistedRunPhase = "extracting" | "generating" | "compiling" | "failed";
 
 type PersistedRunSession = {
   runId?: string;
@@ -184,6 +184,34 @@ function delay(ms: number) {
   });
 }
 
+function getRunProgressSnapshot(status: ResumeRunRow["status"] | undefined): {
+  phase: Exclude<PersistedRunPhase, "failed">;
+  message: string;
+  percent: number;
+} {
+  if (status === RESUME_RUN_STATUS.QUEUED_PDF || status === RESUME_RUN_STATUS.COMPILING_PDF) {
+    return {
+      phase: "compiling",
+      message: "Preparing PDF...",
+      percent: 92,
+    };
+  }
+
+  if (isResumeRunPastExtraction(status ?? "")) {
+    return {
+      phase: "generating",
+      message: "Generating bullets...",
+      percent: 78,
+    };
+  }
+
+  return {
+    phase: "extracting",
+    message: "Waiting for extraction service...",
+    percent: 42,
+  };
+}
+
 function buildPersistedRunResult(session: PersistedRunSession): CreateResumeRunResult | null {
   const runId = session.runId?.trim() || session.row?.id;
 
@@ -204,7 +232,9 @@ function buildPersistedRunResult(session: PersistedRunSession): CreateResumeRunR
         job_description: "",
         status:
           session.status ??
-          (session.phase === "failed" ? RESUME_RUN_STATUS.FAILED : RESUME_RUN_STATUS.EXTRACTING),
+          (session.phase === "failed"
+            ? RESUME_RUN_STATUS.FAILED
+            : session.row?.status ?? RESUME_RUN_STATUS.EXTRACTING),
         error_code: null,
         error_message: session.errorMessage || null,
         output: null,
@@ -225,7 +255,10 @@ function isPersistedRunSession(value: unknown): value is PersistedRunSession {
     typeof maybe.requestId === "string" &&
     (maybe.row === undefined || Boolean(maybe.row && typeof maybe.row === "object")) &&
     (maybe.status === undefined || typeof maybe.status === "string") &&
-    (maybe.phase === "extracting" || maybe.phase === "generating" || maybe.phase === "failed") &&
+    (maybe.phase === "extracting" ||
+      maybe.phase === "generating" ||
+      maybe.phase === "compiling" ||
+      maybe.phase === "failed") &&
     typeof maybe.progressMessage === "string" &&
     typeof maybe.progressPercent === "number" &&
     (maybe.errorKind === undefined ||
@@ -700,6 +733,11 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
       };
       activeRunRef.current = latestRun;
 
+      if (latestRow.status !== RESUME_RUN_STATUS.FAILED && latestRow.output == null) {
+        const snapshot = getRunProgressSnapshot(latestRow.status);
+        updatePersistedStage(executionId, latestRun, snapshot.phase, snapshot.message, snapshot.percent);
+      }
+
       if (latestRow.output !== null && latestRow.output !== undefined) {
         finalizeSuccess(executionId, latestRun);
         return { ok: true as const, createdRun: latestRun };
@@ -715,7 +753,7 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
       }
 
       return await executeRun(executionId, latestRun, {
-        startFromGenerating: latestRow.status === RESUME_RUN_STATUS.EXTRACTED,
+        startFromGenerating: isResumeRunPastExtraction(latestRow.status),
       });
     } catch (error) {
       if (isExecutionIgnored(executionId)) {
@@ -726,7 +764,7 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
       finalizeFailure(executionId, persistedRun, message);
       return createFailedResult(message);
     }
-  }, [beginExecution, clearState, executeRun, finalizeFailure, finalizeSuccess, isExecutionIgnored]);
+  }, [beginExecution, clearState, executeRun, finalizeFailure, finalizeSuccess, isExecutionIgnored, updatePersistedStage]);
 
   const cancelActiveRun = useCallback(async (): Promise<CancelActiveRunResult> => {
     const executionId = currentExecutionIdRef.current;

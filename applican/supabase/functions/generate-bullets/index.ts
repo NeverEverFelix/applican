@@ -20,6 +20,11 @@ const ANALYSIS_RUNS_TABLE = "analysis_runs";
 const CONSUME_ANALYSIS_CREDIT_RPC = "consume_analysis_credit";
 const STATUS = {
   EXTRACTED: "extracted",
+  QUEUED_GENERATE: "queued_generate",
+  GENERATING: "generating",
+  QUEUED_PDF: "queued_pdf",
+  COMPILING_PDF: "compiling_pdf",
+  COMPLETED: "completed",
   FAILED: "failed",
 };
 const FUNCTION_NAME = "generate-bullets";
@@ -103,6 +108,17 @@ function toError(error: unknown): Error {
     return error;
   }
   return new Error(typeof error === "string" ? error : "Unknown non-Error thrown.");
+}
+
+function isRunReadyForBulletGeneration(status: unknown): boolean {
+  return (
+    status === STATUS.EXTRACTED ||
+    status === STATUS.QUEUED_GENERATE ||
+    status === STATUS.GENERATING ||
+    status === STATUS.QUEUED_PDF ||
+    status === STATUS.COMPILING_PDF ||
+    status === STATUS.COMPLETED
+  );
 }
 
 function getRequestContext(req: Request) {
@@ -1431,19 +1447,9 @@ serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization");
     const accessToken = parseBearerToken(authHeader);
+    const isInternalInvocation = accessToken === supabaseServiceRoleKey;
 
     adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
-
-    const {
-      data: { user },
-      error: userError,
-    } = await adminClient.auth.getUser(accessToken);
-
-    if (userError || !user) {
-      throw new HttpError(401, "UNAUTHORIZED", "Invalid or expired user token.");
-    }
-
-    authenticatedUserId = user.id;
 
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
@@ -1469,7 +1475,22 @@ serve(async (req) => {
       throw new HttpError(400, "INVALID_INPUT", "run_id and request_id are required.");
     }
 
-    const { data: run, error: runError } = await userClient
+    const runClient = isInternalInvocation ? adminClient : userClient;
+
+    if (!isInternalInvocation) {
+      const {
+        data: { user },
+        error: userError,
+      } = await adminClient.auth.getUser(accessToken);
+
+      if (userError || !user) {
+        throw new HttpError(401, "UNAUTHORIZED", "Invalid or expired user token.");
+      }
+
+      authenticatedUserId = user.id;
+    }
+
+    const { data: run, error: runError } = await runClient
       .from(RUNS_TABLE)
       .select("id, request_id, user_id, job_description, status, output")
       .eq("id", runId)
@@ -1491,6 +1512,10 @@ serve(async (req) => {
       throw new HttpError(409, "REQUEST_ID_MISMATCH", "Provided request_id does not match the run.");
     }
 
+    if (isInternalInvocation) {
+      authenticatedUserId = runUserId;
+    }
+
     if (runUserId !== authenticatedUserId) {
       throw new HttpError(403, "FORBIDDEN", "Run does not belong to authenticated user.");
     }
@@ -1503,11 +1528,11 @@ serve(async (req) => {
       throw new HttpError(409, "RUN_TERMINAL", "Run is in terminal failed state.");
     }
 
-    if (run.status !== STATUS.EXTRACTED) {
+    if (!isRunReadyForBulletGeneration(run.status)) {
       throw new HttpError(409, "RUN_NOT_READY", "Run is not extracted yet.");
     }
 
-    const { data: resumeDoc, error: resumeDocError } = await userClient
+    const { data: resumeDoc, error: resumeDocError } = await runClient
       .from(DOCUMENTS_TABLE)
       .select("text")
       .eq("run_id", runId)
@@ -1547,6 +1572,7 @@ serve(async (req) => {
     const { data: updatedRun, error: updateError } = await adminClient
       .from(RUNS_TABLE)
       .update({
+        status: STATUS.GENERATING,
         output,
         error_code: null,
         error_message: null,
