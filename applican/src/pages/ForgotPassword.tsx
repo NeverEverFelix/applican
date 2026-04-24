@@ -65,26 +65,28 @@ export default function ForgotPassword() {
   return (
     <div className={styles.container}>
       <form className={styles.form} onSubmit={handleSubmit}>
-        <div className={styles.header}>
-          <img src={logo} alt="Logo" className={styles.logo} />
-          <p className={styles.mainText}>Enter Email</p>
-        </div>
+        <div className={styles.contentStack}>
+          <div className={styles.header}>
+            <img src={logo} alt="Logo" className={styles.logo} />
+            <p className={styles.mainText}>Enter Email</p>
+          </div>
 
-        <div className={styles.main}>
-          <input
-            type="email"
-            name="email"
-            placeholder="Email"
-            className={inputClassName}
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            autoComplete="email"
-          />
-          <button type="submit" className={styles.continue} disabled={!canSubmit}>
-            {isSubmitting ? "Sending..." : "Continue"}
-          </button>
-          {statusMessage ? <p className={styles.formMessageSuccess}>{statusMessage}</p> : null}
-          {errorMessage ? <p className={styles.formMessageError}>{errorMessage}</p> : null}
+          <div className={styles.main}>
+            <input
+              type="email"
+              name="email"
+              placeholder="Email"
+              className={inputClassName}
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              autoComplete="email"
+            />
+            <button type="submit" className={styles.continue} disabled={!canSubmit}>
+              {isSubmitting ? "Sending..." : "Continue"}
+            </button>
+            {statusMessage ? <p className={styles.formMessageSuccess}>{statusMessage}</p> : null}
+            {errorMessage ? <p className={styles.formMessageError}>{errorMessage}</p> : null}
+          </div>
         </div>
 
         <div className={styles.passwordStepActions}>

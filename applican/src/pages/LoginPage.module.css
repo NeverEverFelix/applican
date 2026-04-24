@@ -1,18 +1,22 @@
 /* src/pages/LoginPage.module.css */
 
 .container {
-  --page-padding: clamp(16px, 2vw, 24px);
-  --panel-height: min(992px, calc(100svh - (var(--page-padding) * 2)));
-  --panel-radius: clamp(40px, calc(var(--panel-height) * 0.0625), 62px);
-  --panel-inner-padding: clamp(24px, calc(var(--panel-height) * 0.0484), 48px);
-  --panel-offset: clamp(96px, calc(var(--panel-height) * 0.244), 242px);
-  --section-gap: clamp(24px, calc(var(--panel-height) * 0.0484), 48px);
-  height: 100svh;
+  --page-padding: clamp(20px, 2vw, 32px);
+  --panel-height: min(960px, calc(100svh - (var(--page-padding) * 2)));
+  --panel-radius: clamp(36px, 4vw, 56px);
+  --panel-padding-inline: clamp(28px, 3vw, 48px);
+  --panel-padding-top: clamp(56px, 7vh, 92px);
+  --panel-padding-bottom: clamp(40px, 6vh, 80px);
+  --header-offset: clamp(184px, 18vh, 364px);
+  --content-offset: -32px;
+  --section-gap: clamp(28px, 3vw, 40px);
+  --form-control-width: min(100%, 403px);
+  min-height: 100svh;
   display: grid;
-  grid-template-columns: 588px 840px;
-  gap: 16px;
-  align-items: center;
-  justify-content: start;
+  grid-template-columns: minmax(0, 588px) minmax(0, 840px);
+  gap: clamp(16px, 1.5vw, 24px);
+  align-items: stretch;
+  justify-content: center;
   padding: var(--page-padding);
   background: #151515;
   box-sizing: border-box;
@@ -21,17 +25,20 @@
 
 /* Card */
 .form {
-  width: 588px;
+  width: 100%;
   height: var(--panel-height);
   border-radius: var(--panel-radius);
   background: #000;
-
   display: flex;
   flex-direction: column;
   align-items: center;
-
-  padding: var(--panel-inner-padding);
+  padding: var(--panel-padding-top) var(--panel-padding-inline) var(--panel-padding-bottom);
   box-sizing: border-box;
+}
+
+.contentStack {
+  width: 100%;
+  transform: translateY(var(--content-offset));
 }
 
 /* Zones */
@@ -39,7 +46,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-top: var(--panel-offset);
+  margin-top: var(--header-offset);
 }
 
 .main {
@@ -47,7 +54,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-top: var(--section-gap); /* controlled gap from header -> main */
+  margin-top: var(--section-gap);
 }
 
 .footer {
@@ -55,8 +62,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-top: auto; /* KEY: pushes footer toward bottom of fixed-height card */
-  padding-bottom: var(--panel-offset);
+  margin-top: 0;
 }
 
 /* Elements */
@@ -70,13 +76,13 @@
   margin: 24px 0 0;
   text-align: center;
   color: #fff;
-  font-size: 64px;
+  font-size: clamp(48px, 4.4vw, 64px);
   line-height: 1.1;
-  white-space: nowrap;
 }
 
 .subText {
   margin: 16px 0 0;
+  max-width: 24ch;
   color: rgba(255, 255, 255, 0.5);
   font-size: 16px;
   line-height: 1.4;
@@ -89,7 +95,7 @@
 }
 
 .email {
-  width: 403px;
+  width: var(--form-control-width);
   height: 48px;
   padding: 0 12px;
   border-radius: 12px;
@@ -159,7 +165,7 @@
   -webkit-text-fill-color: #ec2542;
 }
 .password{
-  width: 403px;
+  width: var(--form-control-width);
   height: 48px;
   padding: 0 12px;
   border-radius: 12px;
@@ -190,7 +196,7 @@
 }
 .continue {
   margin-top: 24px;
-  width: 403px;
+  width: var(--form-control-width);
   height: 48px;
   background: #0068f4;
   color: #0d0d0d; /* if you want it dark like your screenshot; use #fff if you want white */
@@ -204,7 +210,7 @@
 }
 
 .formMessageError {
-  width: 403px;
+  width: var(--form-control-width);
   margin: 12px 0 0;
   color: #ec2542;
   font-size: 13px;
@@ -221,7 +227,7 @@
 }
 
 .AltLogin {
-  width: 403px;
+  width: var(--form-control-width);
   height: 48px;
   background-color: #151515;
   border-radius: 12px;
@@ -255,7 +261,6 @@
 .passwordStepActions {
   width: 100%;
   margin-top: auto;
-  padding-bottom: var(--panel-offset);
   display: flex;
   justify-content: center;
 }
@@ -271,7 +276,7 @@
 
 /* Right-side asset */
 .assetContainer {
-  width: 840px;
+  width: 100%;
   height: var(--panel-height);
   border-radius: var(--panel-radius);
   background: #000;
@@ -283,4 +288,14 @@
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+@media (max-width: 1180px) {
+  .container {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .assetContainer {
+    min-height: 320px;
+  }
 }

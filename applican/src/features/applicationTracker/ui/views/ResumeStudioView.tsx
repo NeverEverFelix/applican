@@ -332,7 +332,7 @@ export function ResumeStudioView() {
     showComputedResults,
   });
 
-  const currentRunOutput = createdRun?.row.output ?? persistedRunOutput;
+  const currentRunOutput = persistedRunOutput ?? createdRun?.row.output;
   const parsedOutput = useMemo(() => toResumeStudioOutput(currentRunOutput), [currentRunOutput]);
   const optimizationSections = useMemo(
     () => extractResumeOptimizationPresentationSections(currentRunOutput),
@@ -404,6 +404,7 @@ export function ResumeStudioView() {
       await wait(2500);
       setIsShowingAnalysisCompleteScreen(false);
       await wait(360);
+      setShouldRenderAnalysisCompleteScreen(false);
       setPersistedRunOutput(output);
       setLoadingAnimationOriginMs(null);
       setRevealedAnalysisCount(0);

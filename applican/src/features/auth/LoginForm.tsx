@@ -48,56 +48,58 @@ export default function LoginForm({
 
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
-      <div className={styles.header}>
-        <img src={logoSrc} alt="Logo" className={styles.logo} />
-        <p className={styles.mainText}>Welcome Back</p>
-        <p className={styles.subText}>
-          Don't have an account? <Link to="/signup">Sign up</Link>
-        </p>
-      </div>
-
-      <div className={styles.main}>
-        <input
-          type={isPasswordStep ? "password" : "email"}
-          name={isPasswordStep ? "password" : "email"}
-          placeholder={isPasswordStep ? "Password" : "Email"}
-          className={inputClassName}
-          value={isPasswordStep ? flow.password : flow.email}
-          onChange={(event) => {
-            if (isPasswordStep) {
-              flow.onPasswordChange(event.target.value);
-              return;
-            }
-            flow.onEmailChange(event.target.value);
-          }}
-          autoComplete={isPasswordStep ? "current-password" : "email"}
-        />
-        <button
-          type="submit"
-          className={styles.continue}
-          disabled={!canSubmit || isSubmitting}
-        >
-          {isSubmitting ? "Continuing..." : "Continue"}
-        </button>
-        {authError ? <p className={styles.formMessageError}>{authError}</p> : null}
-      </div>
-
-      {!isPasswordStep && (
-        <div className={styles.footer}>
-          <p className={styles.orText}>OR</p>
-          <button
-            type="button"
-            className={styles.AltLogin}
-            onClick={() => onGoogleSignIn?.()}
-          >
-            <img src={googleIconSrc} alt="Google" />
-            <span>Sign in with Google</span>
-          </button>
-          <Link to="/forgot-password" className={styles.forgotPassword}>
-            Forgot password?
-          </Link>
+      <div className={styles.contentStack}>
+        <div className={styles.header}>
+          <img src={logoSrc} alt="Logo" className={styles.logo} />
+          <p className={styles.mainText}>Welcome Back</p>
+          <p className={styles.subText}>
+            Don't have an account? <Link to="/signup">Sign up</Link>
+          </p>
         </div>
-      )}
+
+        <div className={styles.main}>
+          <input
+            type={isPasswordStep ? "password" : "email"}
+            name={isPasswordStep ? "password" : "email"}
+            placeholder={isPasswordStep ? "Password" : "Email"}
+            className={inputClassName}
+            value={isPasswordStep ? flow.password : flow.email}
+            onChange={(event) => {
+              if (isPasswordStep) {
+                flow.onPasswordChange(event.target.value);
+                return;
+              }
+              flow.onEmailChange(event.target.value);
+            }}
+            autoComplete={isPasswordStep ? "current-password" : "email"}
+          />
+          <button
+            type="submit"
+            className={styles.continue}
+            disabled={!canSubmit || isSubmitting}
+          >
+            {isSubmitting ? "Continuing..." : "Continue"}
+          </button>
+          {authError ? <p className={styles.formMessageError}>{authError}</p> : null}
+        </div>
+
+        {!isPasswordStep && (
+          <div className={styles.footer}>
+            <p className={styles.orText}>OR</p>
+            <button
+              type="button"
+              className={styles.AltLogin}
+              onClick={() => onGoogleSignIn?.()}
+            >
+              <img src={googleIconSrc} alt="Google" />
+              <span>Sign in with Google</span>
+            </button>
+            <Link to="/forgot-password" className={styles.forgotPassword}>
+              Forgot password?
+            </Link>
+          </div>
+        )}
+      </div>
 
       {isPasswordStep && (
         <div className={styles.passwordStepActions}>

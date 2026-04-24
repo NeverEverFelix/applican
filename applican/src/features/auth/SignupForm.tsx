@@ -56,94 +56,96 @@ export default function SignupForm({
 
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
-      <div className={styles.header}>
-        <img src={logoSrc} alt="Logo" className={styles.logo} />
-        <p className={styles.mainText}>Create An Account</p>
-        <p className={styles.subText}>
-          Join hundreds of others speeding up their job search using Applican.
-        </p>
-      </div>
+      <div className={styles.contentStack}>
+        <div className={styles.header}>
+          <img src={logoSrc} alt="Logo" className={styles.logo} />
+          <p className={styles.mainText}>Create An Account</p>
+          <p className={styles.subText}>
+            Join hundreds of others speeding up their job search using Applican.
+          </p>
+        </div>
 
-      <div className={styles.main}>
+        <div className={styles.main}>
+          {!isPasswordStep && (
+            <div className={styles.inputGroup}>
+              <input
+                type="email"
+                name="email"
+                placeholder="Email"
+                autoComplete="email"
+                className={emailClassName}
+                value={flow.email}
+                onChange={(event) => flow.onEmailChange(event.target.value)}
+              />
+
+              <input
+                type="text"
+                name="name"
+                placeholder="Full Name"
+                autoComplete="name"
+                className={nameClassName}
+                value={flow.name}
+                onChange={(event) => flow.onNameChange(event.target.value)}
+                onBlur={flow.onNameBlur}
+              />
+
+              <input
+                type="text"
+                name="jobrole"
+                placeholder="Job role"
+                autoComplete="organization-title"
+                className={jobRoleClassName}
+                value={flow.jobRole}
+                onChange={(event) => flow.onJobRoleChange(event.target.value)}
+              />
+            </div>
+          )}
+
+          {isPasswordStep && (
+            <input
+              type="password"
+              name="password"
+              placeholder="Password"
+              autoComplete="new-password"
+              className={inputClassName}
+              value={flow.password}
+              onChange={(event) => flow.onPasswordChange(event.target.value)}
+            />
+          )}
+
+          {!isPasswordStep && (
+            <button
+              type="button"
+              className={styles.continue}
+              disabled={!canContinue || isSubmitting}
+              onClick={handleContinue}
+            >
+              Continue
+            </button>
+          )}
+          {isPasswordStep && (
+            <button
+              type="submit"
+              className={styles.continue}
+              disabled={!canSignUp || isSubmitting}
+            >
+              {isSubmitting ? "Signing up..." : "Sign Up"}
+            </button>
+          )}
+          {authError ? <p className={styles.formMessageError}>{authError}</p> : null}
+          {successMessage ? <p className={styles.formMessageSuccess}>{successMessage}</p> : null}
+        </div>
+
         {!isPasswordStep && (
-          <div className={styles.inputGroup}>
-            <input
-              type="email"
-              name="email"
-              placeholder="Email"
-              autoComplete="email"
-              className={emailClassName}
-              value={flow.email}
-              onChange={(event) => flow.onEmailChange(event.target.value)}
-            />
-
-            <input
-              type="text"
-              name="name"
-              placeholder="Full Name"
-              autoComplete="name"
-              className={nameClassName}
-              value={flow.name}
-              onChange={(event) => flow.onNameChange(event.target.value)}
-              onBlur={flow.onNameBlur}
-            />
-
-            <input
-              type="text"
-              name="jobrole"
-              placeholder="Job role"
-              autoComplete="organization-title"
-              className={jobRoleClassName}
-              value={flow.jobRole}
-              onChange={(event) => flow.onJobRoleChange(event.target.value)}
-            />
+          <div className={styles.footer}>
+            <p className={styles.orText}>OR</p>
+            <button type="button" className={styles.AltLogin} onClick={() => onGoogleSignIn?.()}>
+              <img src={googleIconSrc} alt="Google" />
+              <span>Continue with Google</span>
+            </button>
           </div>
         )}
-
-        {isPasswordStep && (
-          <input
-            type="password"
-            name="password"
-            placeholder="Password"
-            autoComplete="new-password"
-            className={inputClassName}
-            value={flow.password}
-            onChange={(event) => flow.onPasswordChange(event.target.value)}
-          />
-        )}
-
-        {!isPasswordStep && (
-          <button
-            type="button"
-            className={styles.continue}
-            disabled={!canContinue || isSubmitting}
-            onClick={handleContinue}
-          >
-            Continue
-          </button>
-        )}
-        {isPasswordStep && (
-          <button
-            type="submit"
-            className={styles.continue}
-            disabled={!canSignUp || isSubmitting}
-          >
-            {isSubmitting ? "Signing up..." : "Sign Up"}
-          </button>
-        )}
-        {authError ? <p className={styles.formMessageError}>{authError}</p> : null}
-        {successMessage ? <p className={styles.formMessageSuccess}>{successMessage}</p> : null}
       </div>
-
-      {!isPasswordStep && (
-        <div className={styles.footer}>
-          <p className={styles.orText}>OR</p>
-          <button type="button" className={styles.AltLogin} onClick={() => onGoogleSignIn?.()}>
-            <img src={googleIconSrc} alt="Google" />
-            <span>Continue with Google</span>
-          </button>
-        </div>
-      )}
 
       {isPasswordStep && (
         <div className={styles.passwordStepActions}>

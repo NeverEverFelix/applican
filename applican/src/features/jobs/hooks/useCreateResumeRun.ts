@@ -3,9 +3,10 @@ import { useCallback, useRef, useState } from "react";
 import { captureEvent } from "../../../posthog";
 import { createResumeRun } from "../api/createResumeRun";
 import { deleteResumeRun } from "../api/deleteResumeRun";
+import { enqueueResumeRunForGeneration } from "../api/enqueueResumeRunForGeneration";
 import { getResumeRun } from "../api/getResumeRun";
-import { invokeGenerateBullets } from "../api/invokeGenerateBullets";
 import { requeueResumeRun } from "../api/requeueResumeRun";
+import { waitForRunCompletion } from "../api/waitForRunCompletion";
 import { waitForRunExtraction } from "../api/waitForRunExtraction";
 import { RESUME_RUN_STATUS, isResumeRunPastExtraction } from "../model/constants";
 import type { CreateResumeRunResult, ResumeRunRow } from "../model/types";
@@ -178,12 +179,6 @@ function createFailedResult(
   };
 }
 
-function delay(ms: number) {
-  return new Promise<void>((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
 function getRunProgressSnapshot(status: ResumeRunRow["status"] | undefined): {
   phase: Exclude<PersistedRunPhase, "failed">;
   message: string;
@@ -234,7 +229,7 @@ function buildPersistedRunResult(session: PersistedRunSession): CreateResumeRunR
           session.status ??
           (session.phase === "failed"
             ? RESUME_RUN_STATUS.FAILED
-            : session.row?.status ?? RESUME_RUN_STATUS.EXTRACTING),
+            : RESUME_RUN_STATUS.EXTRACTING),
         error_code: null,
         error_message: session.errorMessage || null,
         output: null,
@@ -313,35 +308,6 @@ function persistCompletedRunOutput(output: unknown) {
 
   window.localStorage.setItem(PERSISTED_RUN_OUTPUT_KEY, JSON.stringify(output));
   window.localStorage.setItem(PERSISTED_SHOW_RESULTS_KEY, JSON.stringify(true));
-}
-
-async function invokeGenerateBulletsWithRetry(params: { runId: string; requestId: string }) {
-  const maxAttempts = 4;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
-      return await invokeGenerateBullets(params);
-    } catch (error) {
-      const message =
-        typeof error === "object" && error && "message" in error && typeof error.message === "string"
-          ? error.message
-          : "";
-      const isExtractionRace = message.includes("still being extracted");
-      const canRetry = isExtractionRace && attempt < maxAttempts;
-
-      if (!canRetry) {
-        Sentry.captureException(error, {
-          tags: { feature: "resume_studio", action: "generate_bullets" },
-          extra: params,
-        });
-        throw error;
-      }
-
-      await delay(1_500);
-    }
-  }
-
-  throw new Error("Failed to generate bullets after multiple retries.");
 }
 
 export function useCreateResumeRun(): UseCreateResumeRunResult {
@@ -537,16 +503,36 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
           return CANCELLED_RESULT;
         }
 
-        updatePersistedStage(executionId, created, "generating", "Generating bullets...", 78);
+        updatePersistedStage(executionId, created, "generating", "Queueing generation...", 74);
         captureEvent("rag_started", {
           run_id: created.row.id,
           request_id: created.requestId,
         });
-        let generated: Awaited<ReturnType<typeof invokeGenerateBulletsWithRetry>>;
+
+        let generatedRow: ResumeRunRow;
         try {
-          generated = await invokeGenerateBulletsWithRetry({
+          const enqueued = await enqueueResumeRunForGeneration({
             runId: created.row.id,
-            requestId: created.requestId,
+          });
+          if (isExecutionIgnored(executionId)) {
+            await cancelCreatedRunIfNeeded(executionId, created);
+            return CANCELLED_RESULT;
+          }
+
+          updatePersistedStage(
+            executionId,
+            { requestId: created.requestId, row: enqueued },
+            "generating",
+            "Waiting for generation worker...",
+            78,
+          );
+
+          generatedRow = await waitForRunCompletion({
+            runId: created.row.id,
+            onProgress: (row) => {
+              const snapshot = getRunProgressSnapshot(row.status);
+              updatePersistedStage(executionId, { requestId: created.requestId, row }, snapshot.phase, snapshot.message, snapshot.percent);
+            },
           });
           if (isExecutionIgnored(executionId)) {
             await cancelCreatedRunIfNeeded(executionId, created);
@@ -567,7 +553,7 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
 
         const nextRun = {
           requestId: created.requestId,
-          row: generated.run,
+          row: generatedRow,
         };
         finalizeSuccess(executionId, nextRun);
         return { ok: true as const, createdRun: nextRun };
@@ -753,7 +739,7 @@ export function useCreateResumeRun(): UseCreateResumeRunResult {
       }
 
       return await executeRun(executionId, latestRun, {
-        startFromGenerating: isResumeRunPastExtraction(latestRow.status),
+        startFromGenerating: isResumeRunPastExtraction(latestRow.status ?? ""),
       });
     } catch (error) {
       if (isExecutionIgnored(executionId)) {
