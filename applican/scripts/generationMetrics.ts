@@ -5,6 +5,8 @@ type GenerationMetrics = {
   queue_wait_ms?: number | null;
   total_generation_ms?: number | null;
   generate_bullets_ms?: number | null;
+  openai_roundtrip_ms?: number | null;
+  model_normalize_ms?: number | null;
 };
 
 type ResumeRunRow = {
@@ -100,6 +102,8 @@ async function main() {
             queue_wait_ms: metrics.queue_wait_ms ?? null,
             total_generation_ms: metrics.total_generation_ms ?? null,
             generate_bullets_ms: metrics.generate_bullets_ms ?? null,
+            openai_roundtrip_ms: metrics.openai_roundtrip_ms ?? null,
+            model_normalize_ms: metrics.model_normalize_ms ?? null,
           }
         : null;
     })
@@ -114,11 +118,19 @@ async function main() {
   const queueWaitValues = runs
     .map((run) => run.queue_wait_ms)
     .filter((value): value is number => typeof value === "number");
+  const openAiRoundtripValues = runs
+    .map((run) => run.openai_roundtrip_ms)
+    .filter((value): value is number => typeof value === "number");
+  const modelNormalizeValues = runs
+    .map((run) => run.model_normalize_ms)
+    .filter((value): value is number => typeof value === "number");
 
   console.log(`Completed runs scanned: ${rows.length}`);
   console.log(`Runs with generation metrics: ${runs.length}`);
   console.log(`Total generation: avg ${formatMs(average(totalGenerationValues))}, p50 ${formatMs(percentile(totalGenerationValues, 0.5))}, p95 ${formatMs(percentile(totalGenerationValues, 0.95))}`);
   console.log(`Generate bullets: avg ${formatMs(average(generateBulletsValues))}, p50 ${formatMs(percentile(generateBulletsValues, 0.5))}, p95 ${formatMs(percentile(generateBulletsValues, 0.95))}`);
+  console.log(`OpenAI roundtrip: avg ${formatMs(average(openAiRoundtripValues))}, p50 ${formatMs(percentile(openAiRoundtripValues, 0.5))}, p95 ${formatMs(percentile(openAiRoundtripValues, 0.95))}`);
+  console.log(`Model normalize: avg ${formatMs(average(modelNormalizeValues))}, p50 ${formatMs(percentile(modelNormalizeValues, 0.5))}, p95 ${formatMs(percentile(modelNormalizeValues, 0.95))}`);
   console.log(`Queue wait: avg ${formatMs(average(queueWaitValues))}, p50 ${formatMs(percentile(queueWaitValues, 0.5))}, p95 ${formatMs(percentile(queueWaitValues, 0.95))}`);
 
   const slowestRuns = runs
@@ -134,7 +146,7 @@ async function main() {
   console.log(`Slowest ${slowestRuns.length} runs by total_generation_ms:`);
   for (const run of slowestRuns) {
     console.log(
-      `${run.id} ${formatMs(run.total_generation_ms)} bullets=${formatMs(run.generate_bullets_ms)} queue=${formatMs(run.queue_wait_ms)} completed_by=${run.completed_by} created_at=${run.created_at}`,
+      `${run.id} ${formatMs(run.total_generation_ms)} bullets=${formatMs(run.generate_bullets_ms)} openai=${formatMs(run.openai_roundtrip_ms ?? null)} normalize=${formatMs(run.model_normalize_ms ?? null)} queue=${formatMs(run.queue_wait_ms)} completed_by=${run.completed_by} created_at=${run.created_at}`,
     );
   }
 }
