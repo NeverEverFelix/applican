@@ -256,7 +256,7 @@ export async function runGenerationWorkerOnce() {
             build_tailored_resume_ms: tailoredResumeMs,
             save_generated_resume_ms: saveResumeMs,
             merge_tailored_resume_ms: mergeOutputMs,
-            queue_pdf_ms: markCompletedMs,
+            mark_completed_ms: markCompletedMs,
           },
         })
       );

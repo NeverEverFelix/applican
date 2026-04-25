@@ -6,8 +6,6 @@ export const RESUME_RUN_STATUS = {
   EXTRACTED: "extracted",
   QUEUED_GENERATE: "queued_generate",
   GENERATING: "generating",
-  QUEUED_PDF: "queued_pdf",
-  COMPILING_PDF: "compiling_pdf",
   COMPLETED: "completed",
   FAILED: "failed",
 } as const;
@@ -17,8 +15,6 @@ export function isResumeRunPastExtraction(status: string): boolean {
     status === RESUME_RUN_STATUS.EXTRACTED ||
     status === RESUME_RUN_STATUS.QUEUED_GENERATE ||
     status === RESUME_RUN_STATUS.GENERATING ||
-    status === RESUME_RUN_STATUS.QUEUED_PDF ||
-    status === RESUME_RUN_STATUS.COMPILING_PDF ||
     status === RESUME_RUN_STATUS.COMPLETED
   );
 }

@@ -22,8 +22,6 @@ const STATUS = {
   EXTRACTED: "extracted",
   QUEUED_GENERATE: "queued_generate",
   GENERATING: "generating",
-  QUEUED_PDF: "queued_pdf",
-  COMPILING_PDF: "compiling_pdf",
   COMPLETED: "completed",
   FAILED: "failed",
 };
@@ -115,8 +113,6 @@ function isRunReadyForBulletGeneration(status: unknown): boolean {
     status === STATUS.EXTRACTED ||
     status === STATUS.QUEUED_GENERATE ||
     status === STATUS.GENERATING ||
-    status === STATUS.QUEUED_PDF ||
-    status === STATUS.COMPILING_PDF ||
     status === STATUS.COMPLETED
   );
 }

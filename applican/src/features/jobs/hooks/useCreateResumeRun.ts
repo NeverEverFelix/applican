@@ -44,7 +44,7 @@ export type ResumeRunErrorFeedback = {
   message: string;
 };
 
-type PersistedRunPhase = "extracting" | "generating" | "compiling" | "failed";
+type PersistedRunPhase = "extracting" | "generating" | "failed";
 
 type PersistedRunSession = {
   runId?: string;
@@ -184,14 +184,6 @@ function getRunProgressSnapshot(status: ResumeRunRow["status"] | undefined): {
   message: string;
   percent: number;
 } {
-  if (status === RESUME_RUN_STATUS.QUEUED_PDF || status === RESUME_RUN_STATUS.COMPILING_PDF) {
-    return {
-      phase: "compiling",
-      message: "Preparing PDF...",
-      percent: 92,
-    };
-  }
-
   if (isResumeRunPastExtraction(status ?? "")) {
     return {
       phase: "generating",
@@ -252,7 +244,6 @@ function isPersistedRunSession(value: unknown): value is PersistedRunSession {
     (maybe.status === undefined || typeof maybe.status === "string") &&
     (maybe.phase === "extracting" ||
       maybe.phase === "generating" ||
-      maybe.phase === "compiling" ||
       maybe.phase === "failed") &&
     typeof maybe.progressMessage === "string" &&
     typeof maybe.progressPercent === "number" &&

@@ -285,7 +285,7 @@ export async function saveGenerationStageMetrics(params: {
     build_tailored_resume_ms: number;
     save_generated_resume_ms: number;
     merge_tailored_resume_ms: number;
-    queue_pdf_ms: number;
+    mark_completed_ms: number;
   };
 }): Promise<void> {
   const { supabase, runId, userId, existingOutput, metrics } = params;
