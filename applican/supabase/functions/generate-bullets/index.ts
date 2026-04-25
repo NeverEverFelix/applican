@@ -259,7 +259,7 @@ async function callOpenAI(
   resumeText: string,
   requestId: string,
 ): Promise<ResumeStudioOutput> {
-  const model = Deno.env.get("OPENAI_MODEL") ?? "gpt-4.1";
+  const model = Deno.env.get("OPENAI_MODEL") ?? "gpt-4.1-mini";
   const sourceExperienceSections = parseExperienceSections(resumeText);
   const parsedSourceExperienceSections = parseExperienceSections(resumeText);
   const parserDebug = buildParserDebug(resumeText, parsedSourceExperienceSections);
