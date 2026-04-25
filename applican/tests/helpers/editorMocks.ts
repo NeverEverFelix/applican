@@ -16,14 +16,4 @@ export async function mockEditorEmptyState(page: Page) {
       body: "null",
     });
   });
-
-  await page.route("**/functions/v1/compile-tailored-resume-pdf", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        signed_url: "data:application/pdf;base64,JVBERi0xLjQKJcTl8uXrCg==",
-      }),
-    });
-  });
 }

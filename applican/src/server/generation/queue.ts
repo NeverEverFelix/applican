@@ -226,7 +226,7 @@ export async function mergeTailoredResumeIntoRunOutput(params: {
   }
 }
 
-export async function markRunQueuedForPdf(params: {
+export async function markRunCompleted(params: {
   supabase: SupabaseClient;
   runId: string;
   userId: string;
@@ -236,7 +236,7 @@ export async function markRunQueuedForPdf(params: {
   const { error } = await supabase
     .from("resume_runs")
     .update({
-      status: "queued_pdf",
+      status: "completed",
       error_code: null,
       error_message: null,
     })
@@ -244,7 +244,7 @@ export async function markRunQueuedForPdf(params: {
     .eq("user_id", userId);
 
   if (error) {
-    throw new Error(`Failed to mark run ${runId} queued for PDF: ${error.message}`);
+    throw new Error(`Failed to mark run ${runId} completed: ${error.message}`);
   }
 }
 

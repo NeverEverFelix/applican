@@ -2,7 +2,7 @@ import {
   claimNextGenerateRun,
   heartbeatGenerateRun,
   loadGenerationRunContext,
-  markRunQueuedForPdf,
+  markRunCompleted,
   markGenerationRunFailure,
   mergeTailoredResumeIntoRunOutput,
   resetStaleGenerateRuns,
@@ -39,6 +39,22 @@ function delay(ms: number): Promise<void> {
   });
 }
 
+function startHeartbeatLoop(params: {
+  intervalMs: number;
+  heartbeat: () => Promise<void>;
+}): () => void {
+  const timer = setInterval(() => {
+    params.heartbeat().catch((error) => {
+      const message = error instanceof Error ? error.message : "Unknown generation heartbeat failure.";
+      console.error(`[generation-worker] ${message}`);
+    });
+  }, params.intervalMs);
+
+  return () => {
+    clearInterval(timer);
+  };
+}
+
 function getRequiredEnv(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) {
@@ -52,6 +68,7 @@ export async function runGenerationWorkerOnce() {
   const claimedBy = getWorkerIdentity();
   const staleSeconds = getPositiveIntegerEnv("GENERATION_STALE_SECONDS", 300);
   const staleLimit = getPositiveIntegerEnv("GENERATION_STALE_LIMIT", 25);
+  const heartbeatIntervalMs = Math.max(1_000, Math.floor((staleSeconds * 1000) / 3));
   let activeRunId = "";
   let activeUserId = "";
 
@@ -92,151 +109,164 @@ export async function runGenerationWorkerOnce() {
     });
 
     console.info(`[generation-worker] Heartbeat recorded for run ${run.id}.`);
+    const stopHeartbeat = startHeartbeatLoop({
+      intervalMs: heartbeatIntervalMs,
+      heartbeat: () =>
+        heartbeatGenerateRun({
+          supabase,
+          runId: run.id,
+          claimedBy,
+        }),
+    });
 
-    const { result: context, durationMs: loadContextMs } = await measureStage(() =>
-      loadGenerationRunContext({
-        supabase,
-        runId: run.id,
-        claimedBy,
-      })
-    );
+    try {
+      const { result: context, durationMs: loadContextMs } = await measureStage(() =>
+        loadGenerationRunContext({
+          supabase,
+          runId: run.id,
+          claimedBy,
+        })
+      );
 
-    activeUserId = context.run.user_id;
+      activeUserId = context.run.user_id;
 
-    console.info(
-      `[generation-worker] Loaded run ${context.run.id} context in ${loadContextMs}ms with job description length ${context.run.job_description.length} and resume text length ${context.resumeDocument?.text.length ?? 0}.`,
-    );
+      console.info(
+        `[generation-worker] Loaded run ${context.run.id} context in ${loadContextMs}ms with job description length ${context.run.job_description.length} and resume text length ${context.resumeDocument?.text.length ?? 0}.`,
+      );
 
-    const { result: preparedInputs, durationMs: prepareInputsMs } = await measureStage(() =>
-      prepareGenerationInputs(context)
-    );
+      const { result: preparedInputs, durationMs: prepareInputsMs } = await measureStage(() =>
+        prepareGenerationInputs(context)
+      );
 
-    console.info(
-      `[generation-worker] Prepared run ${preparedInputs.runId} for generation with request ${preparedInputs.requestId} in ${prepareInputsMs}ms.`,
-    );
+      console.info(
+        `[generation-worker] Prepared run ${preparedInputs.runId} for generation with request ${preparedInputs.requestId} in ${prepareInputsMs}ms.`,
+      );
 
-    const openAiApiKey = getRequiredEnv("OPENAI_API_KEY");
-    const model = process.env.OPENAI_MODEL?.trim() || "gpt-4.1-mini";
-    const sourceExperienceSections = parseExperienceSections(preparedInputs.resumeText);
-    const parserDebug = buildParserDebug(preparedInputs.resumeText, sourceExperienceSections);
-    const { result: generatedOutput, durationMs: generateBulletsMs } = await measureStage(() =>
-      executeGenerateBullets({
-        openAiApiKey,
-        model,
-        jobDescription: preparedInputs.jobDescription,
-        resumeText: preparedInputs.resumeText,
-        requestId: preparedInputs.requestId,
-        sourceExperienceSections,
-        parserDebug,
-      })
-    );
+      const openAiApiKey = getRequiredEnv("OPENAI_API_KEY");
+      const model = process.env.OPENAI_MODEL?.trim() || "gpt-4.1-mini";
+      const sourceExperienceSections = parseExperienceSections(preparedInputs.resumeText);
+      const parserDebug = buildParserDebug(preparedInputs.resumeText, sourceExperienceSections);
+      const { result: generatedOutput, durationMs: generateBulletsMs } = await measureStage(() =>
+        executeGenerateBullets({
+          openAiApiKey,
+          model,
+          jobDescription: preparedInputs.jobDescription,
+          resumeText: preparedInputs.resumeText,
+          requestId: preparedInputs.requestId,
+          sourceExperienceSections,
+          parserDebug,
+        })
+      );
 
-    console.info(
-      `[generation-worker] Generated bullets for run ${preparedInputs.runId} in ${generateBulletsMs}ms with match score ${generatedOutput.match.score}.`,
-    );
+      console.info(
+        `[generation-worker] Generated bullets for run ${preparedInputs.runId} in ${generateBulletsMs}ms with match score ${generatedOutput.match.score}.`,
+      );
 
-    const { durationMs: saveOutputMs } = await measureStage(() =>
-      saveGeneratedRunOutput({
-        supabase,
-        runId: preparedInputs.runId,
-        userId: preparedInputs.userId,
-        output: generatedOutput,
-      })
-    );
+      const { durationMs: saveOutputMs } = await measureStage(() =>
+        saveGeneratedRunOutput({
+          supabase,
+          runId: preparedInputs.runId,
+          userId: preparedInputs.userId,
+          output: generatedOutput,
+        })
+      );
 
-    console.info(
-      `[generation-worker] Saved generated output for run ${preparedInputs.runId} in ${saveOutputMs}ms.`,
-    );
+      console.info(
+        `[generation-worker] Saved generated output for run ${preparedInputs.runId} in ${saveOutputMs}ms.`,
+      );
 
-    const { result: tailoredResume, durationMs: tailoredResumeMs } = await measureStage(() =>
-      executeTailoredResume({
-        runOutput: generatedOutput,
-        resumeText: preparedInputs.resumeText,
-      })
-    );
+      const { result: tailoredResume, durationMs: tailoredResumeMs } = await measureStage(() =>
+        executeTailoredResume({
+          runOutput: generatedOutput,
+          resumeText: preparedInputs.resumeText,
+        })
+      );
 
-    console.info(
-      `[generation-worker] Built tailored resume for run ${preparedInputs.runId} in ${tailoredResumeMs}ms as ${tailoredResume.filename}.`,
-    );
+      console.info(
+        `[generation-worker] Built tailored resume for run ${preparedInputs.runId} in ${tailoredResumeMs}ms as ${tailoredResume.filename}.`,
+      );
 
-    const { result: savedResume, durationMs: saveResumeMs } = await measureStage(() =>
-      saveGeneratedResumeArtifact({
-        supabase,
-        runId: preparedInputs.runId,
-        userId: preparedInputs.userId,
-        requestId: preparedInputs.requestId,
-        template: tailoredResume.template,
-        filename: tailoredResume.filename,
-        latex: tailoredResume.latex,
-      })
-    );
-
-    console.info(
-      `[generation-worker] Saved generated resume ${savedResume.id} for run ${preparedInputs.runId} in ${saveResumeMs}ms.`,
-    );
-
-    const { durationMs: mergeOutputMs } = await measureStage(() =>
-      mergeTailoredResumeIntoRunOutput({
-        supabase,
-        runId: preparedInputs.runId,
-        userId: preparedInputs.userId,
-        existingOutput: generatedOutput,
-        tailoredResume: {
-          id: savedResume.id,
+      const { result: savedResume, durationMs: saveResumeMs } = await measureStage(() =>
+        saveGeneratedResumeArtifact({
+          supabase,
+          runId: preparedInputs.runId,
+          userId: preparedInputs.userId,
+          requestId: preparedInputs.requestId,
           template: tailoredResume.template,
           filename: tailoredResume.filename,
           latex: tailoredResume.latex,
-        },
-      })
-    );
+        })
+      );
 
-    console.info(
-      `[generation-worker] Merged tailored resume metadata into run ${preparedInputs.runId} output in ${mergeOutputMs}ms.`,
-    );
+      console.info(
+        `[generation-worker] Saved generated resume ${savedResume.id} for run ${preparedInputs.runId} in ${saveResumeMs}ms.`,
+      );
 
-    const { durationMs: queuePdfMs } = await measureStage(() =>
-      markRunQueuedForPdf({
-        supabase,
-        runId: preparedInputs.runId,
-        userId: preparedInputs.userId,
-      })
-    );
-
-    console.info(
-      `[generation-worker] Marked run ${preparedInputs.runId} queued for PDF in ${queuePdfMs}ms.`,
-    );
-
-    const { durationMs: saveMetricsMs } = await measureStage(() =>
-      saveGenerationStageMetrics({
-        supabase,
-        runId: preparedInputs.runId,
-        userId: preparedInputs.userId,
-        existingOutput: {
-          ...generatedOutput,
-          tailored_resume: {
+      const { durationMs: mergeOutputMs } = await measureStage(() =>
+        mergeTailoredResumeIntoRunOutput({
+          supabase,
+          runId: preparedInputs.runId,
+          userId: preparedInputs.userId,
+          existingOutput: generatedOutput,
+          tailoredResume: {
             id: savedResume.id,
             template: tailoredResume.template,
-            generated_at: new Date().toISOString(),
             filename: tailoredResume.filename,
             latex: tailoredResume.latex,
           },
-        },
-        metrics: {
-          load_context_ms: loadContextMs,
-          prepare_inputs_ms: prepareInputsMs,
-          generate_bullets_ms: generateBulletsMs,
-          save_output_ms: saveOutputMs,
-          build_tailored_resume_ms: tailoredResumeMs,
-          save_generated_resume_ms: saveResumeMs,
-          merge_tailored_resume_ms: mergeOutputMs,
-          queue_pdf_ms: queuePdfMs,
-        },
-      })
-    );
+        })
+      );
 
-    console.info(
-      `[generation-worker] Saved generation stage metrics for run ${preparedInputs.runId} in ${saveMetricsMs}ms.`,
-    );
+      console.info(
+        `[generation-worker] Merged tailored resume metadata into run ${preparedInputs.runId} output in ${mergeOutputMs}ms.`,
+      );
+
+      const { durationMs: markCompletedMs } = await measureStage(() =>
+        markRunCompleted({
+          supabase,
+          runId: preparedInputs.runId,
+          userId: preparedInputs.userId,
+        })
+      );
+
+      console.info(
+        `[generation-worker] Marked run ${preparedInputs.runId} completed in ${markCompletedMs}ms.`,
+      );
+
+      const { durationMs: saveMetricsMs } = await measureStage(() =>
+        saveGenerationStageMetrics({
+          supabase,
+          runId: preparedInputs.runId,
+          userId: preparedInputs.userId,
+          existingOutput: {
+            ...generatedOutput,
+            tailored_resume: {
+              id: savedResume.id,
+              template: tailoredResume.template,
+              generated_at: new Date().toISOString(),
+              filename: tailoredResume.filename,
+              latex: tailoredResume.latex,
+            },
+          },
+          metrics: {
+            load_context_ms: loadContextMs,
+            prepare_inputs_ms: prepareInputsMs,
+            generate_bullets_ms: generateBulletsMs,
+            save_output_ms: saveOutputMs,
+            build_tailored_resume_ms: tailoredResumeMs,
+            save_generated_resume_ms: saveResumeMs,
+            merge_tailored_resume_ms: mergeOutputMs,
+            queue_pdf_ms: markCompletedMs,
+          },
+        })
+      );
+
+      console.info(
+        `[generation-worker] Saved generation stage metrics for run ${preparedInputs.runId} in ${saveMetricsMs}ms.`,
+      );
+    } finally {
+      stopHeartbeat();
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown generation worker failure.";
     if (activeRunId && activeUserId) {
@@ -256,7 +286,12 @@ export async function startGenerationWorker() {
   const pollIntervalMs = getPositiveIntegerEnv("GENERATION_POLL_INTERVAL_MS", 5000);
 
   while (true) {
-    await runGenerationWorkerOnce();
+    try {
+      await runGenerationWorkerOnce();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown generation worker failure.";
+      console.error(`[generation-worker] ${message}`);
+    }
     await delay(pollIntervalMs);
   }
 }
