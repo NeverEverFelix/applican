@@ -193,7 +193,7 @@ async function runGenerationWorkerSlotOnce(params: {
       const model = process.env.OPENAI_MODEL?.trim() || "gpt-4.1-mini";
       const sourceExperienceSections = parseExperienceSections(preparedInputs.resumeText);
       const parserDebug = buildParserDebug(preparedInputs.resumeText, sourceExperienceSections);
-      const { result: generatedOutput, durationMs: generateBulletsMs } = await measureStage(() =>
+      const { result: generatedBulletResult, durationMs: generateBulletsMs } = await measureStage(() =>
         executeGenerateBullets({
           openAiApiKey,
           model,
@@ -204,9 +204,11 @@ async function runGenerationWorkerSlotOnce(params: {
           parserDebug,
         })
       );
+      const generatedOutput = generatedBulletResult.output;
+      const generationExecutionMetrics = generatedBulletResult.metrics;
 
       console.info(
-        `[generation-worker] Generated bullets for run ${preparedInputs.runId} in ${generateBulletsMs}ms with match score ${generatedOutput.match.score}.`,
+        `[generation-worker] Generated bullets for run ${preparedInputs.runId} in ${generateBulletsMs}ms (OpenAI ${generationExecutionMetrics.openai_roundtrip_ms}ms, normalize ${generationExecutionMetrics.model_normalize_ms}ms) with match score ${generatedOutput.match.score}.`,
       );
 
       const { result: tailoredResume, durationMs: tailoredResumeMs } = await measureStage(() =>
@@ -257,6 +259,8 @@ async function runGenerationWorkerSlotOnce(params: {
             load_context_ms: loadContextMs,
             prepare_inputs_ms: prepareInputsMs,
             generate_bullets_ms: generateBulletsMs,
+            openai_roundtrip_ms: generationExecutionMetrics.openai_roundtrip_ms,
+            model_normalize_ms: generationExecutionMetrics.model_normalize_ms,
             build_tailored_resume_ms: tailoredResumeMs,
             save_generated_resume_ms: saveResumeMs,
           },

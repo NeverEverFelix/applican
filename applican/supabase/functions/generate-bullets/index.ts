@@ -265,7 +265,7 @@ async function callOpenAI(
   const parserDebug = buildParserDebug(resumeText, parsedSourceExperienceSections);
 
   try {
-    return await executeGenerateBullets({
+    const result = await executeGenerateBullets({
       openAiApiKey,
       model,
       jobDescription,
@@ -274,6 +274,7 @@ async function callOpenAI(
       sourceExperienceSections: parsedSourceExperienceSections,
       parserDebug,
     });
+    return result.output;
   } catch (error) {
     if (error instanceof Error) {
       if (error.message === "Model response was not a JSON object." || error.message === "Model response was not valid JSON.") {

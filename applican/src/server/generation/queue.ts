@@ -186,6 +186,8 @@ function buildCompletedRunOutput(params: {
     load_context_ms: number;
     prepare_inputs_ms: number;
     generate_bullets_ms: number;
+    openai_roundtrip_ms: number;
+    model_normalize_ms: number;
     build_tailored_resume_ms: number;
     save_generated_resume_ms: number;
   };
@@ -264,6 +266,8 @@ export async function completeGeneratedRun(params: {
     load_context_ms: number;
     prepare_inputs_ms: number;
     generate_bullets_ms: number;
+    openai_roundtrip_ms: number;
+    model_normalize_ms: number;
     build_tailored_resume_ms: number;
     save_generated_resume_ms: number;
   };
