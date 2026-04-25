@@ -39,6 +39,36 @@ const NON_EXPERIENCE_SECTION_HEADERS = new Set([
   "community involvement",
 ]);
 
+const HIGH_SIGNAL_JOB_DESCRIPTION_HEADERS = new Set([
+  "job description",
+  "about the role",
+  "responsibilities",
+  "key responsibilities",
+  "what you ll do",
+  "what you will do",
+  "requirements",
+  "minimum qualifications",
+  "preferred qualifications",
+  "qualifications",
+  "what we re looking for",
+  "what we are looking for",
+  "skills",
+  "preferred skills",
+  "experience",
+  "about you",
+]);
+
+const HIGH_SIGNAL_RESUME_HEADERS = new Set([
+  "summary",
+  "professional summary",
+  "projects",
+  "project experience",
+  "technical skills",
+  "skills",
+  "education",
+  "certifications",
+]);
+
 function normalizeHeadingText(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -50,6 +80,39 @@ function compactPromptText(value: string): string {
     .join("\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function getPromptCharacterLimit(name: string, fallback: number): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed >= 500 ? parsed : fallback;
+}
+
+function trimLinesToCharacterBudget(
+  lines: string[],
+  maxChars: number,
+): string[] {
+  const kept: string[] = [];
+  let totalChars = 0;
+
+  for (const line of lines) {
+    const nextChars = totalChars + line.length + (kept.length > 0 ? 1 : 0);
+    if (nextChars > maxChars) {
+      break;
+    }
+    kept.push(line);
+    totalChars = nextChars;
+  }
+
+  while (kept[kept.length - 1] === "") {
+    kept.pop();
+  }
+
+  return kept;
 }
 
 function isBoilerplateJobDescriptionLine(normalized: string): boolean {
@@ -74,6 +137,7 @@ function isBoilerplateJobDescriptionLine(normalized: string): boolean {
 }
 
 function buildPromptJobDescription(jobDescription: string): string {
+  const maxChars = getPromptCharacterLimit("OPENAI_PROMPT_JOB_DESCRIPTION_MAX_CHARS", 4500);
   const lines = jobDescription
     .replace(/\f/g, "\n")
     .split(/\r?\n/)
@@ -81,6 +145,7 @@ function buildPromptJobDescription(jobDescription: string): string {
 
   const keptLines: string[] = [];
   let skippingBoilerplateBlock = false;
+  let insideHighSignalBlock = false;
 
   for (const line of lines) {
     if (!line) {
@@ -91,6 +156,16 @@ function buildPromptJobDescription(jobDescription: string): string {
     }
 
     const normalized = normalizeHeadingText(line);
+    if (HIGH_SIGNAL_JOB_DESCRIPTION_HEADERS.has(normalized)) {
+      insideHighSignalBlock = true;
+      keptLines.push(line);
+      continue;
+    }
+
+    if (insideHighSignalBlock && normalized && NON_EXPERIENCE_SECTION_HEADERS.has(normalized)) {
+      insideHighSignalBlock = false;
+    }
+
     if (isBoilerplateJobDescriptionLine(normalized)) {
       skippingBoilerplateBlock = true;
       continue;
@@ -108,10 +183,12 @@ function buildPromptJobDescription(jobDescription: string): string {
       }
     }
 
-    keptLines.push(line);
+    if (insideHighSignalBlock || keptLines.length < 40) {
+      keptLines.push(line);
+    }
   }
 
-  const compacted = compactPromptText(keptLines.join("\n"));
+  const compacted = compactPromptText(trimLinesToCharacterBudget(keptLines, maxChars).join("\n"));
   return compacted || compactPromptText(jobDescription);
 }
 
@@ -123,6 +200,7 @@ function buildPromptExperienceSections(sourceExperienceSections: ParsedExperienc
 }
 
 function buildPromptResumeContext(resumeText: string): string {
+  const maxChars = getPromptCharacterLimit("OPENAI_PROMPT_RESUME_CONTEXT_MAX_CHARS", 3500);
   const lines = resumeText
     .replace(/\f/g, "\n")
     .split(/\r?\n/)
@@ -130,6 +208,8 @@ function buildPromptResumeContext(resumeText: string): string {
 
   const filteredLines: string[] = [];
   let insideExperienceSection = false;
+  let currentHeader = "";
+  let linesKeptForCurrentHeader = 0;
 
   for (const line of lines) {
     if (!line) {
@@ -150,11 +230,22 @@ function buildPromptResumeContext(resumeText: string): string {
     }
 
     if (!insideExperienceSection) {
-      filteredLines.push(line);
+      if (NON_EXPERIENCE_SECTION_HEADERS.has(normalized)) {
+        currentHeader = normalized;
+        linesKeptForCurrentHeader = 0;
+        filteredLines.push(line);
+        continue;
+      }
+
+      const sectionLineLimit = HIGH_SIGNAL_RESUME_HEADERS.has(currentHeader) ? 8 : 4;
+      if (linesKeptForCurrentHeader < sectionLineLimit) {
+        filteredLines.push(line);
+        linesKeptForCurrentHeader += 1;
+      }
     }
   }
 
-  const compacted = compactPromptText(filteredLines.join("\n"));
+  const compacted = compactPromptText(trimLinesToCharacterBudget(filteredLines, maxChars).join("\n"));
   return compacted || compactPromptText(resumeText);
 }
 
@@ -401,17 +492,15 @@ export function buildGenerateBulletsOpenAiRequest(params: {
         content: [
           "You are a resume optimization assistant.",
           "Return only valid JSON matching the schema.",
-          "Score how well resume text matches the job description from 0-100.",
-          "Extract the company name, role title, location, and industry from the job description.",
-          "Extract the required experience (for example, '5+ years') and job type (remote, hybrid, onsite, unknown).",
+          "Score how well the resume matches the job from 0-100.",
+          "Extract company, title, location, industry, required experience, and job type from the job description.",
           "Provide exactly 3 strengths and exactly 2 gaps.",
           "Provide structured optimization rewrites that are concise and ATS-friendly.",
-          "Keep rewritten bullets concise, specific, and measurable.",
-          "Prefer a single sentence per rewritten bullet and generally keep each rewritten bullet between 18 and 30 words.",
-          "Avoid filler, repeated context, stacked adjectives, and unnecessary lead-in phrases.",
+          "Keep rewritten bullets concise, specific, measurable, and generally one sentence between 18 and 30 words.",
+          "Avoid filler, repeated context, stacked adjectives, and unnecessary lead-ins.",
           "Preserve every source experience section in the same order they are provided unless a section is truly empty.",
-          "For each experience optimization, keep role_before equal to the source section title and use original values copied exactly from the provided source bullet text when action='replace'.",
-          "Also return selected_skills, experience_rewrites, project_optimizations, projects_rewrites, and education to support resume LaTeX generation.",
+          "For each experience optimization, keep role_before equal to the source section title and copy original values exactly when action='replace'.",
+          "Also return selected_skills, experience_rewrites, project_optimizations, projects_rewrites, and education for LaTeX generation.",
         ].join(" "),
       },
       {
@@ -420,7 +509,6 @@ export function buildGenerateBulletsOpenAiRequest(params: {
           `Job description:\n${compactJobDescription}`,
           `Resume context (summary, projects, skills, education, and other non-experience sections):\n${promptResumeContext || "[No extractable text available]"}`,
           `Source experience sections JSON:\n${JSON.stringify(promptExperienceSections)}`,
-          "Infer company, role title, and industry from the job description when possible.",
           "For optimization bullets and project_optimizations bullets, use action='replace' for edits to existing bullets and action='add' for new bullets.",
           "Return one experience optimization entry for each source experience section, in the same order as the source experience sections JSON.",
           "When action='replace', original must exactly match one source bullet from the corresponding source experience section.",
