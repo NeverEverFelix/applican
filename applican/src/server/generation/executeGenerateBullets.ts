@@ -4,6 +4,9 @@ import { buildGenerateBulletsOpenAiRequest } from "./openAiRequest.ts";
 import { measureStage } from "../observability/timing.ts";
 
 type FetchLike = typeof fetch;
+const OPENAI_RATE_LIMIT_STATUS = 429;
+const DEFAULT_MAX_RATE_LIMIT_RETRIES = 2;
+const DEFAULT_RETRY_BASE_DELAY_MS = 1000;
 
 export type GenerateBulletsExecutionMetrics = {
   openai_roundtrip_ms: number;
@@ -36,6 +39,57 @@ export class GenerateBulletsExecutionError extends Error {
 
 function buildContentPreview(value: string, limit = 500): string {
   return value.slice(0, limit);
+}
+
+function getPositiveIntegerEnv(name: string, fallback: number): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function extractRetryDelayMs(params: {
+  response: Response;
+  payload: unknown;
+  attempt: number;
+}): number {
+  const retryAfterHeader = params.response.headers.get("retry-after");
+  if (retryAfterHeader) {
+    const seconds = Number.parseFloat(retryAfterHeader);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return Math.ceil(seconds * 1000);
+    }
+  }
+
+  const payloadMessage =
+    params.payload && typeof params.payload === "object" && "error" in params.payload &&
+      params.payload.error && typeof params.payload.error === "object" && "message" in params.payload.error &&
+      typeof params.payload.error.message === "string"
+      ? params.payload.error.message
+      : "";
+
+  const waitMatch = payloadMessage.match(/try again in ([\d.]+)s/i);
+  if (waitMatch) {
+    const seconds = Number.parseFloat(waitMatch[1] ?? "");
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return Math.ceil(seconds * 1000);
+    }
+  }
+
+  const baseDelayMs = getPositiveIntegerEnv(
+    "OPENAI_RATE_LIMIT_RETRY_BASE_DELAY_MS",
+    DEFAULT_RETRY_BASE_DELAY_MS,
+  );
+  return baseDelayMs * (params.attempt + 1);
 }
 
 function extractAssistantText(content: unknown): string {
@@ -91,19 +145,37 @@ export async function executeGenerateBullets(params: {
     resumeText,
     sourceExperienceSections,
   });
+  const maxRateLimitRetries = getPositiveIntegerEnv(
+    "OPENAI_RATE_LIMIT_MAX_RETRIES",
+    DEFAULT_MAX_RATE_LIMIT_RETRIES,
+  );
 
   const { result: responsePayload, durationMs: openAiRoundtripMs } = await measureStage(async () => {
-    const response = await fetchImpl("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${openAiApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
-    });
+    let attempt = 0;
 
-    const payload = await response.json();
-    return { response, payload };
+    while (true) {
+      const response = await fetchImpl("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${openAiApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const payload = await response.json();
+      if (response.status !== OPENAI_RATE_LIMIT_STATUS || attempt >= maxRateLimitRetries) {
+        return { response, payload };
+      }
+
+      const retryDelayMs = extractRetryDelayMs({
+        response,
+        payload,
+        attempt,
+      });
+      await delay(retryDelayMs);
+      attempt += 1;
+    }
   });
 
   const { response, payload } = responsePayload;
