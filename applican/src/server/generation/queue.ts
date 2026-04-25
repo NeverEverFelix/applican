@@ -194,10 +194,7 @@ export async function saveGeneratedRunOutput(params: {
   }
 }
 
-export async function mergeTailoredResumeIntoRunOutput(params: {
-  supabase: SupabaseClient;
-  runId: string;
-  userId: string;
+function buildCompletedRunOutput(params: {
   existingOutput: unknown;
   tailoredResume: {
     id: string;
@@ -205,15 +202,28 @@ export async function mergeTailoredResumeIntoRunOutput(params: {
     filename: string;
     latex: string;
   };
-}): Promise<void> {
-  const { supabase, runId, userId, existingOutput, tailoredResume } = params;
-
+  metrics: {
+    queue_wait_ms: number | null;
+    load_context_ms: number;
+    prepare_inputs_ms: number;
+    generate_bullets_ms: number;
+    save_output_ms: number;
+    build_tailored_resume_ms: number;
+    save_generated_resume_ms: number;
+  };
+}): Record<string, unknown> {
+  const { existingOutput, tailoredResume, metrics } = params;
   const baseOutput =
     existingOutput && typeof existingOutput === "object"
       ? { ...(existingOutput as Record<string, unknown>) }
       : {};
 
-  const nextOutput = {
+  const existingMeta =
+    baseOutput.meta && typeof baseOutput.meta === "object"
+      ? { ...(baseOutput.meta as Record<string, unknown>) }
+      : {};
+
+  return {
     ...baseOutput,
     tailored_resume: {
       id: tailoredResume.id,
@@ -222,43 +232,16 @@ export async function mergeTailoredResumeIntoRunOutput(params: {
       filename: tailoredResume.filename,
       latex: tailoredResume.latex,
     },
+    meta: {
+      ...existingMeta,
+      worker_metrics: {
+        generation: {
+          ...metrics,
+          updated_at: new Date().toISOString(),
+        },
+      },
+    },
   };
-
-  const { error } = await supabase
-    .from("resume_runs")
-    .update({
-      output: nextOutput,
-      error_code: null,
-      error_message: null,
-    })
-    .eq("id", runId)
-    .eq("user_id", userId);
-
-  if (error) {
-    throw new Error(`Failed to merge tailored resume into run output for run ${runId}: ${error.message}`);
-  }
-}
-
-export async function markRunCompleted(params: {
-  supabase: SupabaseClient;
-  runId: string;
-  userId: string;
-}): Promise<void> {
-  const { supabase, runId, userId } = params;
-
-  const { error } = await supabase
-    .from("resume_runs")
-    .update({
-      status: "completed",
-      error_code: null,
-      error_message: null,
-    })
-    .eq("id", runId)
-    .eq("user_id", userId);
-
-  if (error) {
-    throw new Error(`Failed to mark run ${runId} completed: ${error.message}`);
-  }
 }
 
 export async function markGenerationRunFailure(params: {
@@ -285,11 +268,17 @@ export async function markGenerationRunFailure(params: {
   }
 }
 
-export async function saveGenerationStageMetrics(params: {
+export async function completeGeneratedRun(params: {
   supabase: SupabaseClient;
   runId: string;
   userId: string;
   existingOutput: unknown;
+  tailoredResume: {
+    id: string;
+    template: string;
+    filename: string;
+    latex: string;
+  };
   metrics: {
     queue_wait_ms: number | null;
     load_context_ms: number;
@@ -298,38 +287,20 @@ export async function saveGenerationStageMetrics(params: {
     save_output_ms: number;
     build_tailored_resume_ms: number;
     save_generated_resume_ms: number;
-    merge_tailored_resume_ms: number;
-    mark_completed_ms: number;
   };
 }): Promise<void> {
-  const { supabase, runId, userId, existingOutput, metrics } = params;
+  const { supabase, runId, userId, existingOutput, tailoredResume, metrics } = params;
 
-  const baseOutput =
-    existingOutput && typeof existingOutput === "object"
-      ? { ...(existingOutput as Record<string, unknown>) }
-      : {};
-
-  const existingMeta =
-    baseOutput.meta && typeof baseOutput.meta === "object"
-      ? { ...(baseOutput.meta as Record<string, unknown>) }
-      : {};
-
-  const nextOutput = {
-    ...baseOutput,
-    meta: {
-      ...existingMeta,
-      worker_metrics: {
-        generation: {
-          ...metrics,
-          updated_at: new Date().toISOString(),
-        },
-      },
-    },
-  };
+  const nextOutput = buildCompletedRunOutput({
+    existingOutput,
+    tailoredResume,
+    metrics,
+  });
 
   const { error } = await supabase
     .from("resume_runs")
     .update({
+      status: "completed",
       output: nextOutput,
       error_code: null,
       error_message: null,
@@ -338,7 +309,7 @@ export async function saveGenerationStageMetrics(params: {
     .eq("user_id", userId);
 
   if (error) {
-    throw new Error(`Failed to save generation metrics for run ${runId}: ${error.message}`);
+    throw new Error(`Failed to finalize completed generation run ${runId}: ${error.message}`);
   }
 }
 

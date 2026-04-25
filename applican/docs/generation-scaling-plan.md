@@ -37,8 +37,6 @@ Current fields:
 - `save_output_ms`
 - `build_tailored_resume_ms`
 - `save_generated_resume_ms`
-- `merge_tailored_resume_ms`
-- `mark_completed_ms`
 
 ## What Still Matters
 

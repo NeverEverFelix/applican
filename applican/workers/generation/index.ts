@@ -1,13 +1,11 @@
 import {
   claimNextGenerateRun,
+  completeGeneratedRun,
   heartbeatGenerateRun,
   loadGenerationRunContext,
-  markRunCompleted,
   markGenerationRunFailure,
-  mergeTailoredResumeIntoRunOutput,
   resetStaleGenerateRuns,
   saveGeneratedResumeArtifact,
-  saveGenerationStageMetrics,
   saveGeneratedRunOutput,
 } from "../../src/server/generation/queue.ts";
 import { executeGenerateBullets } from "../../src/server/generation/executeGenerateBullets.ts";
@@ -239,8 +237,8 @@ async function runGenerationWorkerSlotOnce(params: {
         `[generation-worker] Saved generated resume ${savedResume.id} for run ${preparedInputs.runId} in ${saveResumeMs}ms.`,
       );
 
-      const { durationMs: mergeOutputMs } = await measureStage(() =>
-        mergeTailoredResumeIntoRunOutput({
+      const { durationMs: completeRunMs } = await measureStage(() =>
+        completeGeneratedRun({
           supabase,
           runId: preparedInputs.runId,
           userId: preparedInputs.userId,
@@ -251,40 +249,6 @@ async function runGenerationWorkerSlotOnce(params: {
             filename: tailoredResume.filename,
             latex: tailoredResume.latex,
           },
-        })
-      );
-
-      console.info(
-        `[generation-worker] Merged tailored resume metadata into run ${preparedInputs.runId} output in ${mergeOutputMs}ms.`,
-      );
-
-      const { durationMs: markCompletedMs } = await measureStage(() =>
-        markRunCompleted({
-          supabase,
-          runId: preparedInputs.runId,
-          userId: preparedInputs.userId,
-        })
-      );
-
-      console.info(
-        `[generation-worker] Marked run ${preparedInputs.runId} completed in ${markCompletedMs}ms.`,
-      );
-
-      const { durationMs: saveMetricsMs } = await measureStage(() =>
-        saveGenerationStageMetrics({
-          supabase,
-          runId: preparedInputs.runId,
-          userId: preparedInputs.userId,
-          existingOutput: {
-            ...generatedOutput,
-            tailored_resume: {
-              id: savedResume.id,
-              template: tailoredResume.template,
-              generated_at: new Date().toISOString(),
-              filename: tailoredResume.filename,
-              latex: tailoredResume.latex,
-            },
-          },
           metrics: {
             queue_wait_ms: queueWaitMs,
             load_context_ms: loadContextMs,
@@ -293,14 +257,12 @@ async function runGenerationWorkerSlotOnce(params: {
             save_output_ms: saveOutputMs,
             build_tailored_resume_ms: tailoredResumeMs,
             save_generated_resume_ms: saveResumeMs,
-            merge_tailored_resume_ms: mergeOutputMs,
-            mark_completed_ms: markCompletedMs,
           },
         })
       );
 
       console.info(
-        `[generation-worker] Saved generation stage metrics for run ${preparedInputs.runId} in ${saveMetricsMs}ms.`,
+        `[generation-worker] Finalized run ${preparedInputs.runId} in ${completeRunMs}ms with output, metrics, and completed status persisted.`,
       );
     } finally {
       stopHeartbeat();
