@@ -5,6 +5,8 @@ import {
   loadGenerationRunContext,
   type GenerationFailureDetails,
   markGenerationRunFailure,
+  recordCompletionFinalizeMetric,
+  requeueGenerationRun,
   resetStaleGenerateRuns,
   saveGeneratedResumeArtifact,
 } from "../../src/server/generation/queue.ts";
@@ -49,6 +51,30 @@ function delay(ms: number): Promise<void> {
   });
 }
 
+let activeGenerations = 0;
+
+function getGenerationActiveCap(rawConcurrency: number): number {
+  const configuredCap = getPositiveIntegerEnv("GENERATION_ACTIVE_CAP", rawConcurrency);
+  return Math.max(1, Math.min(rawConcurrency, configuredCap));
+}
+
+function tryAcquireGenerationPermit(cap: number): boolean {
+  if (activeGenerations >= cap) {
+    return false;
+  }
+
+  activeGenerations += 1;
+  return true;
+}
+
+function releaseGenerationPermit(): void {
+  activeGenerations = Math.max(0, activeGenerations - 1);
+}
+
+function getCurrentActiveGenerations(): number {
+  return activeGenerations;
+}
+
 function diffMilliseconds(startedAt: string | null, endedAt: string | null): number | null {
   if (!startedAt || !endedAt) {
     return null;
@@ -74,6 +100,28 @@ function diffMillisecondsFromNow(startedAt: string | null): number | null {
   }
 
   return Math.max(0, Date.now() - startMs);
+}
+
+function isRetryableGenerationFailure(error: unknown): boolean {
+  if (!(error instanceof GenerateBulletsExecutionError)) {
+    return false;
+  }
+
+  if (error.code === "OPENAI_NETWORK_ERROR") {
+    return true;
+  }
+
+  if (error.code !== "OPENAI_HTTP_ERROR") {
+    return false;
+  }
+
+  const httpStatus = typeof error.details.http_status === "number" ? error.details.http_status : null;
+  return httpStatus === 429 || (httpStatus !== null && httpStatus >= 500 && httpStatus < 600);
+}
+
+function buildGenerationRetryDelayMs(attemptCount: number): number {
+  const baseDelayMs = getPositiveIntegerEnv("GENERATION_RETRY_BASE_DELAY_MS", 5_000);
+  return baseDelayMs * Math.max(1, attemptCount);
 }
 
 function buildFailureDetails(params: {
@@ -167,6 +215,11 @@ async function runGenerationWorkerSlotOnce(params: {
   let activeQueueWaitMs: number | null = null;
   let activeOpenAiRoundtripMs: number | null = null;
   let activeModelNormalizeMs: number | null = null;
+  let activeParserPrepMs: number | null = null;
+  let activeSaveGeneratedResumeMs: number | null = null;
+  let activeFinalizeRunMs: number | null = null;
+  let activeGenerationAttemptCount: number | null = null;
+  let activeGenerationsAtStart = getCurrentActiveGenerations();
 
   const resetRuns = await resetStaleGenerateRuns({
     supabase,
@@ -226,6 +279,7 @@ async function runGenerationWorkerSlotOnce(params: {
       activeUserId = context.run.user_id;
       activeRequestId = context.run.request_id;
       activeGenerationClaimedAt = context.run.generation_claimed_at;
+      activeGenerationAttemptCount = context.run.generation_attempt_count;
       const queueWaitMs = diffMilliseconds(
         context.run.generation_queued_at,
         context.run.generation_claimed_at,
@@ -246,8 +300,17 @@ async function runGenerationWorkerSlotOnce(params: {
 
       const openAiApiKey = getRequiredEnv("OPENAI_API_KEY");
       const model = process.env.OPENAI_MODEL?.trim() || "gpt-4.1";
-      const sourceExperienceSections = parseExperienceSections(preparedInputs.resumeText);
-      const parserDebug = buildParserDebug(preparedInputs.resumeText, sourceExperienceSections);
+      const { result: parserInputs, durationMs: parserPrepMs } = await measureStage(() => {
+        const sourceExperienceSections = parseExperienceSections(preparedInputs.resumeText);
+        const parserDebug = buildParserDebug(preparedInputs.resumeText, sourceExperienceSections);
+        return {
+          sourceExperienceSections,
+          parserDebug,
+        };
+      });
+      activeParserPrepMs = parserPrepMs;
+      const sourceExperienceSections = parserInputs.sourceExperienceSections;
+      const parserDebug = parserInputs.parserDebug;
       const { result: generatedBulletResult, durationMs: generateBulletsMs } = await measureStage(() =>
         executeGenerateBullets({
           openAiApiKey,
@@ -265,7 +328,7 @@ async function runGenerationWorkerSlotOnce(params: {
       activeModelNormalizeMs = generationExecutionMetrics.model_normalize_ms;
 
       console.info(
-        `[generation-worker] Generated bullets for run ${preparedInputs.runId} in ${generateBulletsMs}ms (OpenAI ${generationExecutionMetrics.openai_roundtrip_ms}ms, normalize ${generationExecutionMetrics.model_normalize_ms}ms) with match score ${generatedOutput.match.score}.`,
+        `[generation-worker] Generated bullets for run ${preparedInputs.runId} in ${generateBulletsMs}ms (parser ${parserPrepMs}ms, OpenAI ${generationExecutionMetrics.openai_roundtrip_ms}ms, normalize ${generationExecutionMetrics.model_normalize_ms}ms) with match score ${generatedOutput.match.score} and active generations ${activeGenerationsAtStart}.`,
       );
 
       const { result: tailoredResume, durationMs: tailoredResumeMs } = await measureStage(() =>
@@ -290,6 +353,7 @@ async function runGenerationWorkerSlotOnce(params: {
           latex: tailoredResume.latex,
         })
       );
+      activeSaveGeneratedResumeMs = saveResumeMs;
 
       console.info(
         `[generation-worker] Saved generated resume ${savedResume.id} for run ${preparedInputs.runId} in ${saveResumeMs}ms.`,
@@ -297,7 +361,7 @@ async function runGenerationWorkerSlotOnce(params: {
 
       const totalGenerationMs = diffMillisecondsFromNow(context.run.generation_claimed_at);
 
-      const { durationMs: completeRunMs } = await measureStage(() =>
+      const { result: completionResult, durationMs: completeRunMs } = await measureStage(() =>
         completeGeneratedRun({
           supabase,
           runId: preparedInputs.runId,
@@ -311,10 +375,13 @@ async function runGenerationWorkerSlotOnce(params: {
           },
           metrics: {
             completed_by: claimedBy,
+            generation_attempt_count: context.run.generation_attempt_count,
+            active_generations_at_start: activeGenerationsAtStart,
             queue_wait_ms: queueWaitMs,
             total_generation_ms: totalGenerationMs,
             load_context_ms: loadContextMs,
             prepare_inputs_ms: prepareInputsMs,
+            parser_prep_ms: parserPrepMs,
             generate_bullets_ms: generateBulletsMs,
             openai_roundtrip_ms: generationExecutionMetrics.openai_roundtrip_ms,
             model_normalize_ms: generationExecutionMetrics.model_normalize_ms,
@@ -323,9 +390,18 @@ async function runGenerationWorkerSlotOnce(params: {
           },
         })
       );
+      activeFinalizeRunMs = completeRunMs;
+      if (completionResult.applied) {
+        await recordCompletionFinalizeMetric({
+          supabase,
+          runId: preparedInputs.runId,
+          userId: preparedInputs.userId,
+          finalizeRunMs: completeRunMs,
+        });
+      }
 
       console.info(
-        `[generation-worker] Finalized run ${preparedInputs.runId} in ${completeRunMs}ms with total generation time ${totalGenerationMs ?? "unknown"}ms.`,
+        `[generation-worker] Finalized run ${preparedInputs.runId} in ${completeRunMs}ms with total generation time ${totalGenerationMs ?? "unknown"}ms${completionResult.applied ? "" : " (no-op finalization because run was already finalized)"}.`,
       );
     } finally {
       stopHeartbeat();
@@ -347,6 +423,18 @@ async function runGenerationWorkerSlotOnce(params: {
       if (activeModelNormalizeMs !== null) {
         failureDetails.model_normalize_ms = activeModelNormalizeMs;
       }
+      if (activeParserPrepMs !== null) {
+        failureDetails.parser_prep_ms = activeParserPrepMs;
+      }
+      if (activeSaveGeneratedResumeMs !== null) {
+        failureDetails.save_generated_resume_ms = activeSaveGeneratedResumeMs;
+      }
+      if (activeFinalizeRunMs !== null) {
+        failureDetails.finalize_run_ms = activeFinalizeRunMs;
+      }
+      if (activeGenerationAttemptCount !== null) {
+        failureDetails.generation_attempt_count = activeGenerationAttemptCount;
+      }
 
       console.error(
         JSON.stringify({
@@ -360,14 +448,36 @@ async function runGenerationWorkerSlotOnce(params: {
         }),
       );
 
-      await markGenerationRunFailure({
-        supabase,
-        runId: activeRunId,
-        userId: activeUserId,
-        errorCode: failureDetails.code ?? "WORKER_GENERATION_FAILED",
-        errorMessage: message,
-        failureDetails,
-      });
+      const maxJobRetries = getPositiveIntegerEnv("GENERATION_MAX_JOB_RETRIES", 0);
+      const attemptCount = activeGenerationAttemptCount ?? 1;
+      if (isRetryableGenerationFailure(error) && attemptCount <= maxJobRetries) {
+        const retryDelayMs = buildGenerationRetryDelayMs(attemptCount);
+        const retryAt = new Date(Date.now() + retryDelayMs).toISOString();
+        await requeueGenerationRun({
+          supabase,
+          runId: activeRunId,
+          userId: activeUserId,
+          errorCode: failureDetails.code ?? "WORKER_GENERATION_FAILED",
+          errorMessage: message,
+          retryAt,
+          retryDetails: {
+            code: failureDetails.code ?? "WORKER_GENERATION_FAILED",
+            message,
+            retry_scheduled_at: retryAt,
+            retry_delay_ms: retryDelayMs,
+            attempt_count: attemptCount,
+          },
+        });
+      } else {
+        await markGenerationRunFailure({
+          supabase,
+          runId: activeRunId,
+          userId: activeUserId,
+          errorCode: failureDetails.code ?? "WORKER_GENERATION_FAILED",
+          errorMessage: message,
+          failureDetails,
+        });
+      }
     }
     throw error;
   }
@@ -378,14 +488,20 @@ async function runGenerationWorkerSlotOnce(params: {
 async function startGenerationWorkerSlot(params: {
   slotIndex: number;
   pollIntervalMs: number;
+  activeCap: number;
 }): Promise<void> {
-  const { slotIndex, pollIntervalMs } = params;
+  const { slotIndex, pollIntervalMs, activeCap } = params;
   const supabase = createAdminSupabaseClient();
   const claimedBy = buildWorkerSlotIdentity(slotIndex);
 
   console.info(`[generation-worker] Started slot ${slotIndex + 1} as ${claimedBy}.`);
 
   while (true) {
+    if (!tryAcquireGenerationPermit(activeCap)) {
+      await delay(pollIntervalMs);
+      continue;
+    }
+
     try {
       const claimedWork = await runGenerationWorkerSlotOnce({
         supabase,
@@ -399,6 +515,8 @@ async function startGenerationWorkerSlot(params: {
       const message = error instanceof Error ? error.message : "Unknown generation worker failure.";
       console.error(`[generation-worker] slot ${slotIndex + 1} ${message}`);
       await delay(pollIntervalMs);
+    } finally {
+      releaseGenerationPermit();
     }
   }
 }
@@ -406,9 +524,10 @@ async function startGenerationWorkerSlot(params: {
 export async function startGenerationWorker() {
   const pollIntervalMs = getPositiveIntegerEnv("GENERATION_POLL_INTERVAL_MS", 5000);
   const concurrency = getPositiveIntegerEnv("GENERATION_WORKER_CONCURRENCY", 1);
+  const activeCap = getGenerationActiveCap(concurrency);
 
   console.info(
-    `[generation-worker] Starting ${concurrency} slot(s) with poll interval ${pollIntervalMs}ms.`,
+    `[generation-worker] Starting ${concurrency} slot(s) with poll interval ${pollIntervalMs}ms and active cap ${activeCap}.`,
   );
 
   await Promise.all(
@@ -416,6 +535,7 @@ export async function startGenerationWorker() {
       startGenerationWorkerSlot({
         slotIndex,
         pollIntervalMs,
+        activeCap,
       })
     ),
   );

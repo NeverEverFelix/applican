@@ -29,6 +29,7 @@ export type GenerationRunContext = {
     created_at: string;
     generation_queued_at: string | null;
     generation_claimed_at: string | null;
+    generation_attempt_count: number | null;
   };
   resumeDocument: {
     run_id: string;
@@ -52,7 +53,19 @@ export type GenerationFailureDetails = {
   queue_wait_ms?: number | null;
   openai_roundtrip_ms?: number | null;
   model_normalize_ms?: number | null;
+  parser_prep_ms?: number | null;
+  save_generated_resume_ms?: number | null;
+  finalize_run_ms?: number | null;
+  generation_attempt_count?: number | null;
   failed_at?: string;
+};
+
+export type GenerationRetryDetails = {
+  code: string;
+  message: string;
+  retry_scheduled_at: string;
+  retry_delay_ms: number;
+  attempt_count: number;
 };
 
 export async function claimNextGenerateRun(params: {
@@ -141,7 +154,7 @@ export async function loadGenerationRunContext(params: {
   const { data: run, error: runError } = await supabase
     .from("resume_runs")
     .select(
-      "id, request_id, user_id, status, job_description, output, created_at, generation_queued_at, generation_claimed_at, generation_claimed_by",
+      "id, request_id, user_id, status, job_description, output, created_at, generation_queued_at, generation_claimed_at, generation_claimed_by, generation_attempt_count",
     )
     .eq("id", runId)
     .eq("status", "generating")
@@ -180,6 +193,8 @@ export async function loadGenerationRunContext(params: {
         typeof run.generation_queued_at === "string" ? run.generation_queued_at : null,
       generation_claimed_at:
         typeof run.generation_claimed_at === "string" ? run.generation_claimed_at : null,
+      generation_attempt_count:
+        typeof run.generation_attempt_count === "number" ? run.generation_attempt_count : null,
     },
     resumeDocument: resumeDocument
       ? {
@@ -200,10 +215,13 @@ function buildCompletedRunOutput(params: {
   };
   metrics: {
     completed_by: string;
+    generation_attempt_count: number | null;
+    active_generations_at_start: number;
     queue_wait_ms: number | null;
     total_generation_ms: number | null;
     load_context_ms: number;
     prepare_inputs_ms: number;
+    parser_prep_ms: number;
     generate_bullets_ms: number;
     openai_roundtrip_ms: number;
     model_normalize_ms: number;
@@ -281,12 +299,12 @@ export async function markGenerationRunFailure(params: {
   errorCode: string;
   errorMessage: string;
   failureDetails?: GenerationFailureDetails;
-}): Promise<void> {
+}): Promise<{ applied: boolean }> {
   const { supabase, runId, userId, errorCode, errorMessage, failureDetails } = params;
 
   const { data: existingRun, error: existingRunError } = await supabase
     .from("resume_runs")
-    .select("output")
+    .select("status, output")
     .eq("id", runId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -295,7 +313,15 @@ export async function markGenerationRunFailure(params: {
     throw new Error(`Failed to load existing output for generation run ${runId}: ${existingRunError.message}`);
   }
 
-  const { error } = await supabase
+  if (!existingRun) {
+    throw new Error(`Failed to mark generation run ${runId} failed: run not found.`);
+  }
+
+  if (existingRun.status !== "generating") {
+    return { applied: false };
+  }
+
+  const { data, error } = await supabase
     .from("resume_runs")
     .update({
       status: "failed",
@@ -309,11 +335,16 @@ export async function markGenerationRunFailure(params: {
       }),
     })
     .eq("id", runId)
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .eq("status", "generating")
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     throw new Error(`Failed to mark generation run ${runId} failed: ${error.message}`);
   }
+
+  return { applied: Boolean(data) };
 }
 
 export async function completeGeneratedRun(params: {
@@ -329,18 +360,42 @@ export async function completeGeneratedRun(params: {
   };
   metrics: {
     completed_by: string;
+    generation_attempt_count: number | null;
+    active_generations_at_start: number;
     queue_wait_ms: number | null;
     total_generation_ms: number | null;
     load_context_ms: number;
     prepare_inputs_ms: number;
+    parser_prep_ms: number;
     generate_bullets_ms: number;
     openai_roundtrip_ms: number;
     model_normalize_ms: number;
     build_tailored_resume_ms: number;
     save_generated_resume_ms: number;
   };
-}): Promise<void> {
+}): Promise<{ applied: boolean }> {
   const { supabase, runId, userId, existingOutput, tailoredResume, metrics } = params;
+
+  const { data: existingRun, error: existingRunError } = await supabase
+    .from("resume_runs")
+    .select("status")
+    .eq("id", runId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (existingRunError) {
+    throw new Error(
+      `Failed to load current status for completed generation run ${runId}: ${existingRunError.message}`,
+    );
+  }
+
+  if (!existingRun) {
+    throw new Error(`Failed to finalize completed generation run ${runId}: run not found.`);
+  }
+
+  if (existingRun.status !== "generating") {
+    return { applied: false };
+  }
 
   const nextOutput = buildCompletedRunOutput({
     existingOutput,
@@ -348,7 +403,7 @@ export async function completeGeneratedRun(params: {
     metrics,
   });
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("resume_runs")
     .update({
       status: "completed",
@@ -357,10 +412,157 @@ export async function completeGeneratedRun(params: {
       error_message: null,
     })
     .eq("id", runId)
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .eq("status", "generating")
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     throw new Error(`Failed to finalize completed generation run ${runId}: ${error.message}`);
+  }
+
+  return { applied: Boolean(data) };
+}
+
+export async function requeueGenerationRun(params: {
+  supabase: SupabaseClient;
+  runId: string;
+  userId: string;
+  errorCode: string;
+  errorMessage: string;
+  retryAt: string;
+  retryDetails: GenerationRetryDetails;
+}): Promise<{ applied: boolean }> {
+  const { supabase, runId, userId, errorCode, errorMessage, retryAt, retryDetails } = params;
+
+  const { data: existingRun, error: existingRunError } = await supabase
+    .from("resume_runs")
+    .select("status, output")
+    .eq("id", runId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (existingRunError) {
+    throw new Error(`Failed to load existing output for generation requeue ${runId}: ${existingRunError.message}`);
+  }
+
+  if (!existingRun) {
+    throw new Error(`Failed to requeue generation run ${runId}: run not found.`);
+  }
+
+  if (existingRun.status !== "generating") {
+    return { applied: false };
+  }
+
+  const baseOutput =
+    existingRun.output && typeof existingRun.output === "object"
+      ? { ...(existingRun.output as Record<string, unknown>) }
+      : {};
+  const existingMeta =
+    baseOutput.meta && typeof baseOutput.meta === "object"
+      ? { ...(baseOutput.meta as Record<string, unknown>) }
+      : {};
+
+  const { data, error } = await supabase
+    .from("resume_runs")
+    .update({
+      status: "queued_generate",
+      error_code: errorCode,
+      error_message: errorMessage,
+      generation_claimed_by: null,
+      generation_claimed_at: null,
+      generation_heartbeat_at: null,
+      generation_next_retry_at: retryAt,
+      output: {
+        ...baseOutput,
+        meta: {
+          ...existingMeta,
+          generation_retry: {
+            ...retryDetails,
+            updated_at: new Date().toISOString(),
+          },
+        },
+      },
+    })
+    .eq("id", runId)
+    .eq("user_id", userId)
+    .eq("status", "generating")
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to requeue generation run ${runId}: ${error.message}`);
+  }
+
+  return { applied: Boolean(data) };
+}
+
+export async function recordCompletionFinalizeMetric(params: {
+  supabase: SupabaseClient;
+  runId: string;
+  userId: string;
+  finalizeRunMs: number;
+}): Promise<void> {
+  const { supabase, runId, userId, finalizeRunMs } = params;
+
+  const { data: existingRun, error: existingRunError } = await supabase
+    .from("resume_runs")
+    .select("status, output")
+    .eq("id", runId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (existingRunError) {
+    throw new Error(
+      `Failed to load current output for finalize metric on generation run ${runId}: ${existingRunError.message}`,
+    );
+  }
+
+  if (!existingRun || existingRun.status !== "completed") {
+    return;
+  }
+
+  const baseOutput =
+    existingRun.output && typeof existingRun.output === "object"
+      ? { ...(existingRun.output as Record<string, unknown>) }
+      : {};
+  const existingMeta =
+    baseOutput.meta && typeof baseOutput.meta === "object"
+      ? { ...(baseOutput.meta as Record<string, unknown>) }
+      : {};
+  const existingWorkerMetrics =
+    existingMeta.worker_metrics && typeof existingMeta.worker_metrics === "object"
+      ? { ...(existingMeta.worker_metrics as Record<string, unknown>) }
+      : {};
+  const existingGenerationMetrics =
+    existingWorkerMetrics.generation && typeof existingWorkerMetrics.generation === "object"
+      ? { ...(existingWorkerMetrics.generation as Record<string, unknown>) }
+      : {};
+
+  const { error } = await supabase
+    .from("resume_runs")
+    .update({
+      output: {
+        ...baseOutput,
+        meta: {
+          ...existingMeta,
+          worker_metrics: {
+            ...existingWorkerMetrics,
+            generation: {
+              ...existingGenerationMetrics,
+              finalize_run_ms: finalizeRunMs,
+              updated_at: new Date().toISOString(),
+            },
+          },
+        },
+      },
+    })
+    .eq("id", runId)
+    .eq("user_id", userId)
+    .eq("status", "completed");
+
+  if (error) {
+    throw new Error(`Failed to record finalize metric for generation run ${runId}: ${error.message}`);
   }
 }
 
