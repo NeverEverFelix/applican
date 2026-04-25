@@ -36,6 +36,25 @@ export type GenerationRunContext = {
   } | null;
 };
 
+export type GenerationFailureDetails = {
+  code?: string;
+  stage?: string;
+  failed_by?: string;
+  request_id?: string;
+  http_status?: number | null;
+  http_status_text?: string | null;
+  provider_error_type?: string | null;
+  provider_error_code?: string | null;
+  content_length?: number | null;
+  content_preview?: string | null;
+  raw_type?: string | null;
+  total_generation_ms?: number | null;
+  queue_wait_ms?: number | null;
+  openai_roundtrip_ms?: number | null;
+  model_normalize_ms?: number | null;
+  failed_at?: string;
+};
+
 export async function claimNextGenerateRun(params: {
   supabase: SupabaseClient;
   claimedBy: string;
@@ -224,14 +243,57 @@ function buildCompletedRunOutput(params: {
   };
 }
 
+function buildFailedRunOutput(params: {
+  existingOutput: unknown;
+  errorCode: string;
+  errorMessage: string;
+  failureDetails?: GenerationFailureDetails;
+}): Record<string, unknown> {
+  const { existingOutput, errorCode, errorMessage, failureDetails } = params;
+  const baseOutput =
+    existingOutput && typeof existingOutput === "object"
+      ? { ...(existingOutput as Record<string, unknown>) }
+      : {};
+
+  const existingMeta =
+    baseOutput.meta && typeof baseOutput.meta === "object"
+      ? { ...(baseOutput.meta as Record<string, unknown>) }
+      : {};
+
+  return {
+    ...baseOutput,
+    meta: {
+      ...existingMeta,
+      failure: {
+        code: errorCode,
+        message: errorMessage,
+        ...(failureDetails ?? {}),
+        failed_at: failureDetails?.failed_at ?? new Date().toISOString(),
+      },
+    },
+  };
+}
+
 export async function markGenerationRunFailure(params: {
   supabase: SupabaseClient;
   runId: string;
   userId: string;
   errorCode: string;
   errorMessage: string;
+  failureDetails?: GenerationFailureDetails;
 }): Promise<void> {
-  const { supabase, runId, userId, errorCode, errorMessage } = params;
+  const { supabase, runId, userId, errorCode, errorMessage, failureDetails } = params;
+
+  const { data: existingRun, error: existingRunError } = await supabase
+    .from("resume_runs")
+    .select("output")
+    .eq("id", runId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (existingRunError) {
+    throw new Error(`Failed to load existing output for generation run ${runId}: ${existingRunError.message}`);
+  }
 
   const { error } = await supabase
     .from("resume_runs")
@@ -239,6 +301,12 @@ export async function markGenerationRunFailure(params: {
       status: "failed",
       error_code: errorCode,
       error_message: errorMessage,
+      output: buildFailedRunOutput({
+        existingOutput: existingRun?.output ?? null,
+        errorCode,
+        errorMessage,
+        failureDetails,
+      }),
     })
     .eq("id", runId)
     .eq("user_id", userId);

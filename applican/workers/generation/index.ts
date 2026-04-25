@@ -3,11 +3,15 @@ import {
   completeGeneratedRun,
   heartbeatGenerateRun,
   loadGenerationRunContext,
+  type GenerationFailureDetails,
   markGenerationRunFailure,
   resetStaleGenerateRuns,
   saveGeneratedResumeArtifact,
 } from "../../src/server/generation/queue.ts";
-import { executeGenerateBullets } from "../../src/server/generation/executeGenerateBullets.ts";
+import {
+  executeGenerateBullets,
+  GenerateBulletsExecutionError,
+} from "../../src/server/generation/executeGenerateBullets.ts";
 import { executeTailoredResume } from "../../src/server/generation/executeTailoredResume.ts";
 import { prepareGenerationInputs } from "../../src/server/generation/pipeline.ts";
 import { measureStage } from "../../src/server/observability/timing.ts";
@@ -72,6 +76,49 @@ function diffMillisecondsFromNow(startedAt: string | null): number | null {
   return Math.max(0, Date.now() - startMs);
 }
 
+function buildFailureDetails(params: {
+  error: unknown;
+  claimedBy: string;
+  requestId: string;
+  queueWaitMs: number | null;
+  totalGenerationMs: number | null;
+}): GenerationFailureDetails {
+  const { error, claimedBy, requestId, queueWaitMs, totalGenerationMs } = params;
+
+  if (error instanceof GenerateBulletsExecutionError) {
+    return {
+      code: error.code,
+      stage: error.stage,
+      failed_by: claimedBy,
+      request_id: requestId,
+      queue_wait_ms: queueWaitMs,
+      total_generation_ms: totalGenerationMs,
+      http_status:
+        typeof error.details.http_status === "number" ? error.details.http_status : null,
+      http_status_text:
+        typeof error.details.http_status_text === "string" ? error.details.http_status_text : null,
+      provider_error_type:
+        typeof error.details.provider_error_type === "string" ? error.details.provider_error_type : null,
+      provider_error_code:
+        typeof error.details.provider_error_code === "string" ? error.details.provider_error_code : null,
+      content_length:
+        typeof error.details.content_length === "number" ? error.details.content_length : null,
+      content_preview:
+        typeof error.details.content_preview === "string" ? error.details.content_preview : null,
+      raw_type: typeof error.details.raw_type === "string" ? error.details.raw_type : null,
+    };
+  }
+
+  return {
+    code: "WORKER_GENERATION_FAILED",
+    stage: "generation_worker",
+    failed_by: claimedBy,
+    request_id: requestId,
+    queue_wait_ms: queueWaitMs,
+    total_generation_ms: totalGenerationMs,
+  };
+}
+
 function startHeartbeatLoop(params: {
   intervalMs: number;
   heartbeat: () => Promise<void>;
@@ -115,6 +162,11 @@ async function runGenerationWorkerSlotOnce(params: {
   const heartbeatIntervalMs = Math.max(1_000, Math.floor((staleSeconds * 1000) / 3));
   let activeRunId = "";
   let activeUserId = "";
+  let activeRequestId = "";
+  let activeGenerationClaimedAt: string | null = null;
+  let activeQueueWaitMs: number | null = null;
+  let activeOpenAiRoundtripMs: number | null = null;
+  let activeModelNormalizeMs: number | null = null;
 
   const resetRuns = await resetStaleGenerateRuns({
     supabase,
@@ -172,10 +224,13 @@ async function runGenerationWorkerSlotOnce(params: {
       );
 
       activeUserId = context.run.user_id;
+      activeRequestId = context.run.request_id;
+      activeGenerationClaimedAt = context.run.generation_claimed_at;
       const queueWaitMs = diffMilliseconds(
         context.run.generation_queued_at,
         context.run.generation_claimed_at,
       );
+      activeQueueWaitMs = queueWaitMs;
 
       console.info(
         `[generation-worker] Loaded run ${context.run.id} context in ${loadContextMs}ms with queue wait ${queueWaitMs ?? "unknown"}ms, job description length ${context.run.job_description.length}, and resume text length ${context.resumeDocument?.text.length ?? 0}.`,
@@ -206,6 +261,8 @@ async function runGenerationWorkerSlotOnce(params: {
       );
       const generatedOutput = generatedBulletResult.output;
       const generationExecutionMetrics = generatedBulletResult.metrics;
+      activeOpenAiRoundtripMs = generationExecutionMetrics.openai_roundtrip_ms;
+      activeModelNormalizeMs = generationExecutionMetrics.model_normalize_ms;
 
       console.info(
         `[generation-worker] Generated bullets for run ${preparedInputs.runId} in ${generateBulletsMs}ms (OpenAI ${generationExecutionMetrics.openai_roundtrip_ms}ms, normalize ${generationExecutionMetrics.model_normalize_ms}ms) with match score ${generatedOutput.match.score}.`,
@@ -276,12 +333,40 @@ async function runGenerationWorkerSlotOnce(params: {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown generation worker failure.";
     if (activeRunId && activeUserId) {
+      const totalGenerationMs = diffMillisecondsFromNow(activeGenerationClaimedAt);
+      const failureDetails = buildFailureDetails({
+        error,
+        claimedBy,
+        requestId: activeRequestId,
+        queueWaitMs: activeQueueWaitMs,
+        totalGenerationMs,
+      });
+      if (activeOpenAiRoundtripMs !== null) {
+        failureDetails.openai_roundtrip_ms = activeOpenAiRoundtripMs;
+      }
+      if (activeModelNormalizeMs !== null) {
+        failureDetails.model_normalize_ms = activeModelNormalizeMs;
+      }
+
+      console.error(
+        JSON.stringify({
+          level: "error",
+          code: failureDetails.code ?? "WORKER_GENERATION_FAILED",
+          message,
+          run_id: activeRunId,
+          user_id: activeUserId,
+          request_id: activeRequestId || null,
+          ...failureDetails,
+        }),
+      );
+
       await markGenerationRunFailure({
         supabase,
         runId: activeRunId,
         userId: activeUserId,
-        errorCode: "WORKER_GENERATION_FAILED",
+        errorCode: failureDetails.code ?? "WORKER_GENERATION_FAILED",
         errorMessage: message,
+        failureDetails,
       });
     }
     throw error;

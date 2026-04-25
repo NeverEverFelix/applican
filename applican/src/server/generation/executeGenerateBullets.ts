@@ -15,6 +15,29 @@ export type GenerateBulletsExecutionResult = {
   metrics: GenerateBulletsExecutionMetrics;
 };
 
+export class GenerateBulletsExecutionError extends Error {
+  readonly code: string;
+  readonly stage: string;
+  readonly details: Record<string, unknown>;
+
+  constructor(params: {
+    code: string;
+    message: string;
+    stage: string;
+    details?: Record<string, unknown>;
+  }) {
+    super(params.message);
+    this.name = "GenerateBulletsExecutionError";
+    this.code = params.code;
+    this.stage = params.stage;
+    this.details = params.details ?? {};
+  }
+}
+
+function buildContentPreview(value: string, limit = 500): string {
+  return value.slice(0, limit);
+}
+
 function extractAssistantText(content: unknown): string {
   if (typeof content === "string") {
     return content;
@@ -92,7 +115,27 @@ export async function executeGenerateBullets(params: {
         typeof payload.error.message === "string"
         ? payload.error.message
         : "OpenAI request failed.";
-    throw new Error(message);
+    throw new GenerateBulletsExecutionError({
+      code: "OPENAI_HTTP_ERROR",
+      message,
+      stage: "openai_request",
+      details: {
+        http_status: response.status,
+        http_status_text: response.statusText,
+        provider_error_type:
+          payload && typeof payload === "object" && "error" in payload &&
+            payload.error && typeof payload.error === "object" && "type" in payload.error &&
+            typeof payload.error.type === "string"
+            ? payload.error.type
+            : null,
+        provider_error_code:
+          payload && typeof payload === "object" && "error" in payload &&
+            payload.error && typeof payload.error === "object" && "code" in payload.error &&
+            typeof payload.error.code === "string"
+            ? payload.error.code
+            : null,
+      },
+    });
   }
 
   const content =
@@ -101,14 +144,29 @@ export async function executeGenerateBullets(params: {
       : "";
 
   if (!content) {
-    throw new Error("Model returned empty output.");
+    throw new GenerateBulletsExecutionError({
+      code: "OPENAI_EMPTY_RESPONSE",
+      message: "Model returned empty output.",
+      stage: "openai_response",
+      details: {
+        content_length: 0,
+      },
+    });
   }
 
   let raw: unknown;
   try {
     raw = JSON.parse(content);
   } catch {
-    throw new Error("Model response was not valid JSON.");
+    throw new GenerateBulletsExecutionError({
+      code: "OPENAI_INVALID_JSON",
+      message: "Model response was not valid JSON.",
+      stage: "openai_response_parse",
+      details: {
+        content_length: content.length,
+        content_preview: buildContentPreview(content),
+      },
+    });
   }
 
   try {
@@ -131,8 +189,25 @@ export async function executeGenerateBullets(params: {
     };
   } catch (error) {
     if (error instanceof Error && error.message === "Model response was not a JSON object.") {
-      throw new Error(error.message);
+      throw new GenerateBulletsExecutionError({
+        code: "OPENAI_INVALID_JSON_OBJECT",
+        message: error.message,
+        stage: "model_normalize",
+        details: {
+          raw_type: Array.isArray(raw) ? "array" : typeof raw,
+        },
+      });
     }
-    throw error;
+    if (error instanceof GenerateBulletsExecutionError) {
+      throw error;
+    }
+    throw new GenerateBulletsExecutionError({
+      code: "MODEL_NORMALIZE_FAILED",
+      message: error instanceof Error ? error.message : "Model output normalization failed.",
+      stage: "model_normalize",
+      details: {
+        raw_type: Array.isArray(raw) ? "array" : typeof raw,
+      },
+    });
   }
 }
