@@ -57,6 +57,10 @@ function delay(ms: number): Promise<void> {
   });
 }
 
+function isRetryableOpenAiStatus(status: number): boolean {
+  return status === OPENAI_RATE_LIMIT_STATUS || (status >= 500 && status < 600);
+}
+
 function extractRetryDelayMs(params: {
   response: Response;
   payload: unknown;
@@ -154,17 +158,36 @@ export async function executeGenerateBullets(params: {
     let attempt = 0;
 
     while (true) {
-      const response = await fetchImpl("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${openAiApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      });
+      let response: Response;
+      try {
+        response = await fetchImpl("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${openAiApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        });
+      } catch (error) {
+        if (attempt >= maxRateLimitRetries) {
+          throw new GenerateBulletsExecutionError({
+            code: "OPENAI_NETWORK_ERROR",
+            message: error instanceof Error ? error.message : "OpenAI request failed before a response was received.",
+            stage: "openai_request",
+          });
+        }
+
+        const retryDelayMs = getPositiveIntegerEnv(
+          "OPENAI_RATE_LIMIT_RETRY_BASE_DELAY_MS",
+          DEFAULT_RETRY_BASE_DELAY_MS,
+        ) * (attempt + 1);
+        await delay(retryDelayMs);
+        attempt += 1;
+        continue;
+      }
 
       const payload = await response.json();
-      if (response.status !== OPENAI_RATE_LIMIT_STATUS || attempt >= maxRateLimitRetries) {
+      if (!isRetryableOpenAiStatus(response.status) || attempt >= maxRateLimitRetries) {
         return { response, payload };
       }
 
