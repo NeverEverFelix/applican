@@ -13,6 +13,36 @@ type OpenAiChatCompletionRequest = {
   }>;
 };
 
+const EXPERIENCE_SECTION_HEADERS = new Set([
+  "experience",
+  "professional experience",
+  "work experience",
+  "relevant experience",
+  "employment history",
+  "career history",
+]);
+
+const NON_EXPERIENCE_SECTION_HEADERS = new Set([
+  "summary",
+  "professional summary",
+  "projects",
+  "project experience",
+  "technical skills",
+  "skills",
+  "education",
+  "certifications",
+  "awards",
+  "publications",
+  "leadership",
+  "activities",
+  "volunteer experience",
+  "community involvement",
+]);
+
+function normalizeHeadingText(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
 function compactPromptText(value: string): string {
   return value
     .split("\n")
@@ -27,6 +57,42 @@ function buildPromptExperienceSections(sourceExperienceSections: ParsedExperienc
     title: section.title,
     bullets: section.bullets,
   }));
+}
+
+function buildPromptResumeContext(resumeText: string): string {
+  const lines = resumeText
+    .replace(/\f/g, "\n")
+    .split(/\r?\n/)
+    .map((line) => line.trim());
+
+  const filteredLines: string[] = [];
+  let insideExperienceSection = false;
+
+  for (const line of lines) {
+    if (!line) {
+      if (filteredLines[filteredLines.length - 1] !== "") {
+        filteredLines.push("");
+      }
+      continue;
+    }
+
+    const normalized = normalizeHeadingText(line);
+    if (EXPERIENCE_SECTION_HEADERS.has(normalized)) {
+      insideExperienceSection = true;
+      continue;
+    }
+
+    if (insideExperienceSection && NON_EXPERIENCE_SECTION_HEADERS.has(normalized)) {
+      insideExperienceSection = false;
+    }
+
+    if (!insideExperienceSection) {
+      filteredLines.push(line);
+    }
+  }
+
+  const compacted = compactPromptText(filteredLines.join("\n"));
+  return compacted || compactPromptText(resumeText);
 }
 
 function buildJsonSchema() {
@@ -256,7 +322,7 @@ export function buildGenerateBulletsOpenAiRequest(params: {
 }): OpenAiChatCompletionRequest {
   const { model, jobDescription, resumeText, sourceExperienceSections } = params;
   const compactJobDescription = compactPromptText(jobDescription);
-  const compactResumeText = compactPromptText(resumeText);
+  const promptResumeContext = buildPromptResumeContext(resumeText);
   const promptExperienceSections = buildPromptExperienceSections(sourceExperienceSections);
 
   return {
@@ -286,7 +352,7 @@ export function buildGenerateBulletsOpenAiRequest(params: {
         role: "user",
         content: [
           `Job description:\n${compactJobDescription}`,
-          `Resume text:\n${compactResumeText || "[No extractable text available]"}`,
+          `Resume context (summary, projects, skills, education, and other non-experience sections):\n${promptResumeContext || "[No extractable text available]"}`,
           `Source experience sections JSON:\n${JSON.stringify(promptExperienceSections)}`,
           "Infer company, role title, and industry from the job description when possible.",
           "For optimization bullets and project_optimizations bullets, use action='replace' for edits to existing bullets and action='add' for new bullets.",
