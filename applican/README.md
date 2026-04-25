@@ -96,7 +96,7 @@ supabase secrets set \
 Optional:
 
 ```bash
-supabase secrets set OPENAI_MODEL=gpt-4.1-mini --project-ref gvfiiqggcxpitswxloqb
+supabase secrets set OPENAI_MODEL=gpt-4.1 --project-ref gvfiiqggcxpitswxloqb
 ```
 
 Sentry (Edge Functions):

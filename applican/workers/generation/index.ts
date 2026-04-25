@@ -190,7 +190,7 @@ async function runGenerationWorkerSlotOnce(params: {
       );
 
       const openAiApiKey = getRequiredEnv("OPENAI_API_KEY");
-      const model = process.env.OPENAI_MODEL?.trim() || "gpt-4.1-mini";
+      const model = process.env.OPENAI_MODEL?.trim() || "gpt-4.1";
       const sourceExperienceSections = parseExperienceSections(preparedInputs.resumeText);
       const parserDebug = buildParserDebug(preparedInputs.resumeText, sourceExperienceSections);
       const { result: generatedBulletResult, durationMs: generateBulletsMs } = await measureStage(() =>
