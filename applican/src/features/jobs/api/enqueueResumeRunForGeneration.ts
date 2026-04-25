@@ -18,6 +18,7 @@ export async function enqueueResumeRunForGeneration({
     .from(RESUME_RUNS_TABLE)
     .update({
       status: RESUME_RUN_STATUS.QUEUED_GENERATE,
+      generation_queued_at: new Date().toISOString(),
       error_code: null,
       error_message: null,
     })

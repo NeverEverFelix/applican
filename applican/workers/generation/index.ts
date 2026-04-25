@@ -48,6 +48,20 @@ function delay(ms: number): Promise<void> {
   });
 }
 
+function diffMilliseconds(startedAt: string | null, endedAt: string | null): number | null {
+  if (!startedAt || !endedAt) {
+    return null;
+  }
+
+  const startMs = Date.parse(startedAt);
+  const endMs = Date.parse(endedAt);
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+    return null;
+  }
+
+  return Math.max(0, endMs - startMs);
+}
+
 function startHeartbeatLoop(params: {
   intervalMs: number;
   heartbeat: () => Promise<void>;
@@ -148,9 +162,13 @@ async function runGenerationWorkerSlotOnce(params: {
       );
 
       activeUserId = context.run.user_id;
+      const queueWaitMs = diffMilliseconds(
+        context.run.generation_queued_at,
+        context.run.generation_claimed_at,
+      );
 
       console.info(
-        `[generation-worker] Loaded run ${context.run.id} context in ${loadContextMs}ms with job description length ${context.run.job_description.length} and resume text length ${context.resumeDocument?.text.length ?? 0}.`,
+        `[generation-worker] Loaded run ${context.run.id} context in ${loadContextMs}ms with queue wait ${queueWaitMs ?? "unknown"}ms, job description length ${context.run.job_description.length}, and resume text length ${context.resumeDocument?.text.length ?? 0}.`,
       );
 
       const { result: preparedInputs, durationMs: prepareInputsMs } = await measureStage(() =>
@@ -268,6 +286,7 @@ async function runGenerationWorkerSlotOnce(params: {
             },
           },
           metrics: {
+            queue_wait_ms: queueWaitMs,
             load_context_ms: loadContextMs,
             prepare_inputs_ms: prepareInputsMs,
             generate_bullets_ms: generateBulletsMs,

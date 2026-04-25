@@ -9,6 +9,9 @@ export type GenerationQueueRun = {
   resume_path?: string | null;
   resume_filename?: string | null;
   output?: unknown;
+  created_at?: string | null;
+  updated_at?: string | null;
+  generation_queued_at?: string | null;
   generation_claimed_by?: string | null;
   generation_claimed_at?: string | null;
   generation_heartbeat_at?: string | null;
@@ -23,6 +26,9 @@ export type GenerationRunContext = {
     status: string;
     job_description: string;
     output: unknown;
+    created_at: string;
+    generation_queued_at: string | null;
+    generation_claimed_at: string | null;
   };
   resumeDocument: {
     run_id: string;
@@ -115,7 +121,9 @@ export async function loadGenerationRunContext(params: {
 
   const { data: run, error: runError } = await supabase
     .from("resume_runs")
-    .select("id, request_id, user_id, status, job_description, output, generation_claimed_by")
+    .select(
+      "id, request_id, user_id, status, job_description, output, created_at, generation_queued_at, generation_claimed_at, generation_claimed_by",
+    )
     .eq("id", runId)
     .eq("status", "generating")
     .single();
@@ -148,6 +156,11 @@ export async function loadGenerationRunContext(params: {
       status: typeof run.status === "string" ? run.status : "",
       job_description: typeof run.job_description === "string" ? run.job_description : "",
       output: run.output ?? null,
+      created_at: typeof run.created_at === "string" ? run.created_at : "",
+      generation_queued_at:
+        typeof run.generation_queued_at === "string" ? run.generation_queued_at : null,
+      generation_claimed_at:
+        typeof run.generation_claimed_at === "string" ? run.generation_claimed_at : null,
     },
     resumeDocument: resumeDocument
       ? {
@@ -278,6 +291,7 @@ export async function saveGenerationStageMetrics(params: {
   userId: string;
   existingOutput: unknown;
   metrics: {
+    queue_wait_ms: number | null;
     load_context_ms: number;
     prepare_inputs_ms: number;
     generate_bullets_ms: number;

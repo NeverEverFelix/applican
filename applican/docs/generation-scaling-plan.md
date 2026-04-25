@@ -30,6 +30,7 @@ Generation timing is stored in `resume_runs.output.meta.worker_metrics.generatio
 
 Current fields:
 
+- `queue_wait_ms`
 - `load_context_ms`
 - `prepare_inputs_ms`
 - `generate_bullets_ms`
@@ -63,6 +64,10 @@ That pattern says generation concurrency is currently capped by available active
 - `GENERATION_POLL_INTERVAL_MS`: idle backoff when no queued generation work is available
 - `GENERATION_STALE_SECONDS`: lease duration before a generation claim is treated as stale
 - `GENERATION_STALE_LIMIT`: max stale generation claims reset per loop iteration
+
+## New Queue Metric
+
+Generation enqueue now records `generation_queued_at` on the `resume_runs` row. When the worker completes a run, it saves `queue_wait_ms` into `resume_runs.output.meta.worker_metrics.generation`, giving a direct measure of how long work sat in `queued_generate` before a worker claimed it.
 
 ## Follow-Up Work
 
