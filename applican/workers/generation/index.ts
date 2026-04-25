@@ -23,6 +23,15 @@ function getWorkerIdentity(): string {
     `local-${process.pid}`;
 }
 
+function buildWorkerSlotIdentity(slotIndex: number): string {
+  const baseIdentity = getWorkerIdentity();
+  if (slotIndex <= 0) {
+    return `${baseIdentity}:${process.pid}`;
+  }
+
+  return `${baseIdentity}:${process.pid}:${slotIndex + 1}`;
+}
+
 function getPositiveIntegerEnv(name: string, fallback: number): number {
   const raw = process.env[name]?.trim();
   if (!raw) {
@@ -65,7 +74,18 @@ function getRequiredEnv(name: string): string {
 
 export async function runGenerationWorkerOnce() {
   const supabase = createAdminSupabaseClient();
-  const claimedBy = getWorkerIdentity();
+  const claimedBy = buildWorkerSlotIdentity(0);
+  return runGenerationWorkerSlotOnce({
+    supabase,
+    claimedBy,
+  });
+}
+
+async function runGenerationWorkerSlotOnce(params: {
+  supabase: ReturnType<typeof createAdminSupabaseClient>;
+  claimedBy: string;
+}): Promise<boolean> {
+  const { supabase, claimedBy } = params;
   const staleSeconds = getPositiveIntegerEnv("GENERATION_STALE_SECONDS", 300);
   const staleLimit = getPositiveIntegerEnv("GENERATION_STALE_LIMIT", 25);
   const heartbeatIntervalMs = Math.max(1_000, Math.floor((staleSeconds * 1000) / 3));
@@ -91,8 +111,7 @@ export async function runGenerationWorkerOnce() {
   });
 
   if (!run) {
-    console.info(`[generation-worker] No queued generation runs available for ${claimedBy}.`);
-    return;
+    return false;
   }
 
   console.info(
@@ -280,20 +299,54 @@ export async function runGenerationWorkerOnce() {
     }
     throw error;
   }
+
+  return true;
+}
+
+async function startGenerationWorkerSlot(params: {
+  slotIndex: number;
+  pollIntervalMs: number;
+}): Promise<void> {
+  const { slotIndex, pollIntervalMs } = params;
+  const supabase = createAdminSupabaseClient();
+  const claimedBy = buildWorkerSlotIdentity(slotIndex);
+
+  console.info(`[generation-worker] Started slot ${slotIndex + 1} as ${claimedBy}.`);
+
+  while (true) {
+    try {
+      const claimedWork = await runGenerationWorkerSlotOnce({
+        supabase,
+        claimedBy,
+      });
+
+      if (!claimedWork) {
+        await delay(pollIntervalMs);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown generation worker failure.";
+      console.error(`[generation-worker] slot ${slotIndex + 1} ${message}`);
+      await delay(pollIntervalMs);
+    }
+  }
 }
 
 export async function startGenerationWorker() {
   const pollIntervalMs = getPositiveIntegerEnv("GENERATION_POLL_INTERVAL_MS", 5000);
+  const concurrency = getPositiveIntegerEnv("GENERATION_WORKER_CONCURRENCY", 1);
 
-  while (true) {
-    try {
-      await runGenerationWorkerOnce();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown generation worker failure.";
-      console.error(`[generation-worker] ${message}`);
-    }
-    await delay(pollIntervalMs);
-  }
+  console.info(
+    `[generation-worker] Starting ${concurrency} slot(s) with poll interval ${pollIntervalMs}ms.`,
+  );
+
+  await Promise.all(
+    Array.from({ length: concurrency }, (_, slotIndex) =>
+      startGenerationWorkerSlot({
+        slotIndex,
+        pollIntervalMs,
+      })
+    ),
+  );
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
