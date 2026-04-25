@@ -203,7 +203,9 @@ function buildCompletedRunOutput(params: {
     latex: string;
   };
   metrics: {
+    completed_by: string;
     queue_wait_ms: number | null;
+    total_generation_ms: number | null;
     load_context_ms: number;
     prepare_inputs_ms: number;
     generate_bullets_ms: number;
@@ -280,7 +282,9 @@ export async function completeGeneratedRun(params: {
     latex: string;
   };
   metrics: {
+    completed_by: string;
     queue_wait_ms: number | null;
+    total_generation_ms: number | null;
     load_context_ms: number;
     prepare_inputs_ms: number;
     generate_bullets_ms: number;

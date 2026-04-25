@@ -11,6 +11,7 @@
     "test": "vitest run",
     "typecheck:server": "tsc -p tsconfig.server.json",
     "worker:generation": "node --import=dotenv/config --import=tsx workers/generation/index.ts",
+    "metrics:generation": "node --import=dotenv/config --import=tsx scripts/generationMetrics.ts",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ui": "playwright test --ui",

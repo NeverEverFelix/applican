@@ -60,6 +60,19 @@ function diffMilliseconds(startedAt: string | null, endedAt: string | null): num
   return Math.max(0, endMs - startMs);
 }
 
+function diffMillisecondsFromNow(startedAt: string | null): number | null {
+  if (!startedAt) {
+    return null;
+  }
+
+  const startMs = Date.parse(startedAt);
+  if (!Number.isFinite(startMs)) {
+    return null;
+  }
+
+  return Math.max(0, Date.now() - startMs);
+}
+
 function startHeartbeatLoop(params: {
   intervalMs: number;
   heartbeat: () => Promise<void>;
@@ -237,6 +250,8 @@ async function runGenerationWorkerSlotOnce(params: {
         `[generation-worker] Saved generated resume ${savedResume.id} for run ${preparedInputs.runId} in ${saveResumeMs}ms.`,
       );
 
+      const totalGenerationMs = diffMillisecondsFromNow(context.run.generation_claimed_at);
+
       const { durationMs: completeRunMs } = await measureStage(() =>
         completeGeneratedRun({
           supabase,
@@ -250,7 +265,9 @@ async function runGenerationWorkerSlotOnce(params: {
             latex: tailoredResume.latex,
           },
           metrics: {
+            completed_by: claimedBy,
             queue_wait_ms: queueWaitMs,
+            total_generation_ms: totalGenerationMs,
             load_context_ms: loadContextMs,
             prepare_inputs_ms: prepareInputsMs,
             generate_bullets_ms: generateBulletsMs,
@@ -262,7 +279,7 @@ async function runGenerationWorkerSlotOnce(params: {
       );
 
       console.info(
-        `[generation-worker] Finalized run ${preparedInputs.runId} in ${completeRunMs}ms with output, metrics, and completed status persisted.`,
+        `[generation-worker] Finalized run ${preparedInputs.runId} in ${completeRunMs}ms with total generation time ${totalGenerationMs ?? "unknown"}ms.`,
       );
     } finally {
       stopHeartbeat();
