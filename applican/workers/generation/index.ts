@@ -6,7 +6,6 @@ import {
   markGenerationRunFailure,
   resetStaleGenerateRuns,
   saveGeneratedResumeArtifact,
-  saveGeneratedRunOutput,
 } from "../../src/server/generation/queue.ts";
 import { executeGenerateBullets } from "../../src/server/generation/executeGenerateBullets.ts";
 import { executeTailoredResume } from "../../src/server/generation/executeTailoredResume.ts";
@@ -210,19 +209,6 @@ async function runGenerationWorkerSlotOnce(params: {
         `[generation-worker] Generated bullets for run ${preparedInputs.runId} in ${generateBulletsMs}ms with match score ${generatedOutput.match.score}.`,
       );
 
-      const { durationMs: saveOutputMs } = await measureStage(() =>
-        saveGeneratedRunOutput({
-          supabase,
-          runId: preparedInputs.runId,
-          userId: preparedInputs.userId,
-          output: generatedOutput,
-        })
-      );
-
-      console.info(
-        `[generation-worker] Saved generated output for run ${preparedInputs.runId} in ${saveOutputMs}ms.`,
-      );
-
       const { result: tailoredResume, durationMs: tailoredResumeMs } = await measureStage(() =>
         executeTailoredResume({
           runOutput: generatedOutput,
@@ -271,7 +257,6 @@ async function runGenerationWorkerSlotOnce(params: {
             load_context_ms: loadContextMs,
             prepare_inputs_ms: prepareInputsMs,
             generate_bullets_ms: generateBulletsMs,
-            save_output_ms: saveOutputMs,
             build_tailored_resume_ms: tailoredResumeMs,
             save_generated_resume_ms: saveResumeMs,
           },

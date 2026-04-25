@@ -171,29 +171,6 @@ export async function loadGenerationRunContext(params: {
   };
 }
 
-export async function saveGeneratedRunOutput(params: {
-  supabase: SupabaseClient;
-  runId: string;
-  userId: string;
-  output: unknown;
-}): Promise<void> {
-  const { supabase, runId, userId, output } = params;
-
-  const { error } = await supabase
-    .from("resume_runs")
-    .update({
-      output,
-      error_code: null,
-      error_message: null,
-    })
-    .eq("id", runId)
-    .eq("user_id", userId);
-
-  if (error) {
-    throw new Error(`Failed to save generated output for run ${runId}: ${error.message}`);
-  }
-}
-
 function buildCompletedRunOutput(params: {
   existingOutput: unknown;
   tailoredResume: {
@@ -209,7 +186,6 @@ function buildCompletedRunOutput(params: {
     load_context_ms: number;
     prepare_inputs_ms: number;
     generate_bullets_ms: number;
-    save_output_ms: number;
     build_tailored_resume_ms: number;
     save_generated_resume_ms: number;
   };
@@ -288,7 +264,6 @@ export async function completeGeneratedRun(params: {
     load_context_ms: number;
     prepare_inputs_ms: number;
     generate_bullets_ms: number;
-    save_output_ms: number;
     build_tailored_resume_ms: number;
     save_generated_resume_ms: number;
   };
