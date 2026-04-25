@@ -13,6 +13,22 @@ type OpenAiChatCompletionRequest = {
   }>;
 };
 
+function compactPromptText(value: string): string {
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function buildPromptExperienceSections(sourceExperienceSections: ParsedExperienceSection[]) {
+  return sourceExperienceSections.map((section) => ({
+    title: section.title,
+    bullets: section.bullets,
+  }));
+}
+
 function buildJsonSchema() {
   return {
     name: "resume_studio_output_v2",
@@ -239,6 +255,9 @@ export function buildGenerateBulletsOpenAiRequest(params: {
   sourceExperienceSections: ParsedExperienceSection[];
 }): OpenAiChatCompletionRequest {
   const { model, jobDescription, resumeText, sourceExperienceSections } = params;
+  const compactJobDescription = compactPromptText(jobDescription);
+  const compactResumeText = compactPromptText(resumeText);
+  const promptExperienceSections = buildPromptExperienceSections(sourceExperienceSections);
 
   return {
     model,
@@ -266,9 +285,9 @@ export function buildGenerateBulletsOpenAiRequest(params: {
       {
         role: "user",
         content: [
-          `Job description:\n${jobDescription}`,
-          `Resume text:\n${resumeText || "[No extractable text available]"}`,
-          `Source experience sections JSON:\n${JSON.stringify(sourceExperienceSections)}`,
+          `Job description:\n${compactJobDescription}`,
+          `Resume text:\n${compactResumeText || "[No extractable text available]"}`,
+          `Source experience sections JSON:\n${JSON.stringify(promptExperienceSections)}`,
           "Infer company, role title, and industry from the job description when possible.",
           "For optimization bullets and project_optimizations bullets, use action='replace' for edits to existing bullets and action='add' for new bullets.",
           "Return one experience optimization entry for each source experience section, in the same order as the source experience sections JSON.",
