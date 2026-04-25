@@ -52,6 +52,69 @@ function compactPromptText(value: string): string {
     .trim();
 }
 
+function isBoilerplateJobDescriptionLine(normalized: string): boolean {
+  if (!normalized) {
+    return false;
+  }
+
+  if (
+    normalized.startsWith("benefits include") ||
+    normalized.startsWith("in addition to our open door policy") ||
+    normalized.startsWith("tjx considers all applicants") ||
+    normalized.startsWith("applicants with arrest or conviction records") ||
+    normalized.startsWith("address") ||
+    normalized.startsWith("location") ||
+    normalized.startsWith("this position has a starting pay range") ||
+    normalized.startsWith("report this listing")
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function buildPromptJobDescription(jobDescription: string): string {
+  const lines = jobDescription
+    .replace(/\f/g, "\n")
+    .split(/\r?\n/)
+    .map((line) => line.trim());
+
+  const keptLines: string[] = [];
+  let skippingBoilerplateBlock = false;
+
+  for (const line of lines) {
+    if (!line) {
+      if (!skippingBoilerplateBlock && keptLines[keptLines.length - 1] !== "") {
+        keptLines.push("");
+      }
+      continue;
+    }
+
+    const normalized = normalizeHeadingText(line);
+    if (isBoilerplateJobDescriptionLine(normalized)) {
+      skippingBoilerplateBlock = true;
+      continue;
+    }
+
+    if (skippingBoilerplateBlock) {
+      if (
+        normalized.startsWith("job description") ||
+        normalized.startsWith("opportunity grow your career") ||
+        normalized.startsWith("who we re looking for you")
+      ) {
+        skippingBoilerplateBlock = false;
+      } else {
+        continue;
+      }
+    }
+
+    keptLines.push(line);
+  }
+
+  const compacted = compactPromptText(keptLines.join("\n"));
+  return compacted || compactPromptText(jobDescription);
+}
+
 function buildPromptExperienceSections(sourceExperienceSections: ParsedExperienceSection[]) {
   return sourceExperienceSections.map((section) => ({
     title: section.title,
@@ -321,7 +384,7 @@ export function buildGenerateBulletsOpenAiRequest(params: {
   sourceExperienceSections: ParsedExperienceSection[];
 }): OpenAiChatCompletionRequest {
   const { model, jobDescription, resumeText, sourceExperienceSections } = params;
-  const compactJobDescription = compactPromptText(jobDescription);
+  const compactJobDescription = buildPromptJobDescription(jobDescription);
   const promptResumeContext = buildPromptResumeContext(resumeText);
   const promptExperienceSections = buildPromptExperienceSections(sourceExperienceSections);
 
