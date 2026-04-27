@@ -1,0 +1,8 @@
+# i guess whats needed next for feedback loop
+optimization_section_expanded
+bullet_expanded
+optimized_bullet_copied
+resume_downloaded
+latex_editor_opened
+resume_edited
+new_run_started

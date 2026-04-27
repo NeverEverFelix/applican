@@ -55,6 +55,145 @@ export type GenerationFailureDetails = {
   failed_at?: string;
 };
 
+export type StartGenerationRunResult =
+  | {
+      kind: "started";
+      run: {
+        id: string;
+        request_id: string;
+        user_id: string;
+        status: string;
+        job_description: string;
+        output: unknown;
+        created_at: string;
+        generation_queued_at: string | null;
+        generation_claimed_at: string | null;
+        generation_attempt_count: number | null;
+      };
+    }
+  | {
+      kind: "noop";
+      status: string;
+      userId: string;
+      requestId: string;
+    };
+
+export async function startGenerationRun(params: {
+  supabase: SupabaseClient;
+  runId: string;
+  claimedBy: string;
+}): Promise<StartGenerationRunResult> {
+  const { supabase, runId, claimedBy } = params;
+
+  const { data: existingRun, error: existingRunError } = await supabase
+    .from("resume_runs")
+    .select(
+      "id, request_id, user_id, status, job_description, output, created_at, generation_queued_at, generation_attempt_count",
+    )
+    .eq("id", runId)
+    .single();
+
+  if (existingRunError || !existingRun) {
+    throw new Error(
+      `Failed to load generation run ${runId} before starting: ${existingRunError?.message ?? "Run not found."}`,
+    );
+  }
+
+  const existingStatus = typeof existingRun.status === "string" ? existingRun.status : "";
+  const requestId = typeof existingRun.request_id === "string" ? existingRun.request_id : "";
+  const userId = typeof existingRun.user_id === "string" ? existingRun.user_id : "";
+
+  if (existingStatus === "completed" || existingStatus === "failed" || existingStatus === "generating") {
+    return {
+      kind: "noop",
+      status: existingStatus,
+      userId,
+      requestId,
+    };
+  }
+
+  if (existingStatus !== "queued_generate") {
+    throw new Error(
+      `Generation run ${runId} is not ready for processing. Current status: ${existingStatus || "unknown"}.`,
+    );
+  }
+
+  const nextAttemptCount =
+    typeof existingRun.generation_attempt_count === "number"
+      ? existingRun.generation_attempt_count + 1
+      : 1;
+  const claimedAt = new Date().toISOString();
+
+  const { data: startedRun, error: startedRunError } = await supabase
+    .from("resume_runs")
+    .update({
+      status: "generating",
+      generation_claimed_by: claimedBy,
+      generation_claimed_at: claimedAt,
+      generation_heartbeat_at: claimedAt,
+      generation_attempt_count: nextAttemptCount,
+    })
+    .eq("id", runId)
+    .eq("status", "queued_generate")
+    .select(
+      "id, request_id, user_id, status, job_description, output, created_at, generation_queued_at, generation_claimed_at, generation_attempt_count",
+    )
+    .maybeSingle();
+
+  if (startedRunError) {
+    throw new Error(`Failed to start generation run ${runId}: ${startedRunError.message}`);
+  }
+
+  if (!startedRun) {
+    const { data: currentRun, error: currentRunError } = await supabase
+      .from("resume_runs")
+      .select("status, request_id, user_id")
+      .eq("id", runId)
+      .single();
+
+    if (currentRunError || !currentRun) {
+      throw new Error(
+        `Failed to reload generation run ${runId} after start race: ${currentRunError?.message ?? "Run not found."}`,
+      );
+    }
+
+    const currentStatus = typeof currentRun.status === "string" ? currentRun.status : "";
+    if (currentStatus === "completed" || currentStatus === "failed" || currentStatus === "generating") {
+      return {
+        kind: "noop",
+        status: currentStatus,
+        userId: typeof currentRun.user_id === "string" ? currentRun.user_id : "",
+        requestId: typeof currentRun.request_id === "string" ? currentRun.request_id : "",
+      };
+    }
+
+    throw new Error(
+      `Generation run ${runId} could not be started and remained in unexpected status ${currentStatus || "unknown"}.`,
+    );
+  }
+
+  return {
+    kind: "started",
+    run: {
+      id: startedRun.id,
+      request_id: typeof startedRun.request_id === "string" ? startedRun.request_id : "",
+      user_id: typeof startedRun.user_id === "string" ? startedRun.user_id : "",
+      status: typeof startedRun.status === "string" ? startedRun.status : "",
+      job_description: typeof startedRun.job_description === "string" ? startedRun.job_description : "",
+      output: startedRun.output ?? null,
+      created_at: typeof startedRun.created_at === "string" ? startedRun.created_at : "",
+      generation_queued_at:
+        typeof startedRun.generation_queued_at === "string" ? startedRun.generation_queued_at : null,
+      generation_claimed_at:
+        typeof startedRun.generation_claimed_at === "string" ? startedRun.generation_claimed_at : null,
+      generation_attempt_count:
+        typeof startedRun.generation_attempt_count === "number"
+          ? startedRun.generation_attempt_count
+          : nextAttemptCount,
+    },
+  };
+}
+
 export async function claimNextGenerateRun(params: {
   supabase: SupabaseClient;
   claimedBy: string;

@@ -1,9 +1,14 @@
 import { supabase } from "../../../lib/supabaseClient";
-import { RESUME_RUN_STATUS, RESUME_RUNS_TABLE } from "../model/constants";
 import type { ResumeRunRow } from "../model/types";
 
 type EnqueueResumeRunForGenerationInput = {
   runId: string;
+};
+
+type RequestGenerationEnqueueResponse = {
+  run?: unknown;
+  error_code?: unknown;
+  error_message?: unknown;
 };
 
 export async function enqueueResumeRunForGeneration({
@@ -14,36 +19,23 @@ export async function enqueueResumeRunForGeneration({
     throw new Error("Failed to enqueue resume run: run id is required.");
   }
 
-  const { data: updated, error: updateError } = await supabase
-    .from(RESUME_RUNS_TABLE)
-    .update({
-      status: RESUME_RUN_STATUS.QUEUED_GENERATE,
-      generation_queued_at: new Date().toISOString(),
-      error_code: null,
-      error_message: null,
-    })
-    .eq("id", normalizedRunId)
-    .eq("status", RESUME_RUN_STATUS.EXTRACTED)
-    .select("*")
-    .maybeSingle();
+  const { data, error } = await supabase.functions.invoke("request-generation-enqueue", {
+    body: {
+      run_id: normalizedRunId,
+    },
+  });
 
-  if (updateError) {
-    throw new Error(`Failed to enqueue resume run: ${updateError.message}`);
+  if (error) {
+    const message = typeof error.message === "string" && error.message.trim()
+      ? error.message
+      : "Unknown function error.";
+    throw new Error(`Failed to enqueue resume run: ${message}`);
   }
 
-  if (updated) {
-    return updated as ResumeRunRow;
+  const payload = data as RequestGenerationEnqueueResponse | null;
+  if (!payload || typeof payload !== "object" || !("run" in payload) || !payload.run) {
+    throw new Error("Failed to enqueue resume run: invalid response from function.");
   }
 
-  const { data: existing, error: existingError } = await supabase
-    .from(RESUME_RUNS_TABLE)
-    .select("*")
-    .eq("id", normalizedRunId)
-    .single();
-
-  if (existingError || !existing) {
-    throw new Error(`Failed to load resume run after enqueue attempt: ${existingError?.message ?? "Run not found."}`);
-  }
-
-  return existing as ResumeRunRow;
+  return payload.run as ResumeRunRow;
 }
