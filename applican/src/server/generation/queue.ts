@@ -18,6 +18,32 @@ export type GenerationQueueRun = {
   generation_attempt_count?: number | null;
 };
 
+export async function listQueuedGenerationRuns(params: {
+  supabase: SupabaseClient;
+  limit?: number;
+}): Promise<GenerationQueueRun[]> {
+  const { supabase, limit = 25 } = params;
+
+  const { data, error } = await supabase
+    .from("resume_runs")
+    .select(
+      "id, request_id, user_id, status, generation_queued_at, generation_claimed_at, generation_attempt_count",
+    )
+    .eq("status", "queued_generate")
+    .order("generation_queued_at", { ascending: true, nullsFirst: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(`Failed to list queued generation runs: ${error.message}`);
+  }
+
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  return data as GenerationQueueRun[];
+}
+
 export type GenerationRunContext = {
   run: {
     id: string;

@@ -7,6 +7,7 @@ services:
     ports:
       - "8080:80"
     depends_on:
+      - redis
       - applicanrag
       - resume-extract
     restart: unless-stopped
@@ -37,6 +38,15 @@ services:
       WORKER_ATTACH_TO_API: "true"
     ports:
       - "3000:3000"
+    restart: unless-stopped
+    networks:
+      - applican-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: applican-redis
+    ports:
+      - "6379:6379"
     restart: unless-stopped
     networks:
       - applican-net

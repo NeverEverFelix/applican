@@ -16,6 +16,11 @@ export type GenerationQueueJobData = {
   schemaVersion?: number;
 };
 
+export type EnqueueGenerationJobResult = {
+  created: boolean;
+  jobId: string;
+};
+
 let generationQueue: Queue<GenerationQueueJobData> | null = null;
 
 function getQueue() {
@@ -35,13 +40,22 @@ function getQueue() {
 export async function enqueueGenerationJob(
   data: GenerationQueueJobData,
   options?: Omit<JobsOptions, "jobId">,
-) {
+): Promise<EnqueueGenerationJobResult> {
   const runId = data.runId.trim();
   if (!runId) {
     throw new Error("Failed to enqueue generation job: run id is required.");
   }
 
-  return await getQueue().add(
+  const queue = getQueue();
+  const existingJob = await queue.getJob(runId);
+  if (existingJob) {
+    return {
+      created: false,
+      jobId: runId,
+    };
+  }
+
+  const job = await queue.add(
     GENERATION_QUEUE_NAME,
     {
       ...data,
@@ -54,6 +68,11 @@ export async function enqueueGenerationJob(
       jobId: runId,
     },
   );
+
+  return {
+    created: true,
+    jobId: job.id ? String(job.id) : runId,
+  };
 }
 
 export function createGenerationWorker(processor: Processor<GenerationQueueJobData>) {
