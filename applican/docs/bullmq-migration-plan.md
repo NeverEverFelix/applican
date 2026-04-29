@@ -213,11 +213,16 @@ Likely touch:
 
 ### Phase 3: Add a BullMQ Generation Worker
 
-Refactor the current generation worker so the processing body stays mostly the same, but the claim loop disappears.
+Status: completed.
 
-Likely work in:
+The active generation worker now consumes BullMQ jobs and starts runs by `runId` instead of polling Postgres for claims.
+
+Primary runtime pieces:
 
 - [workers/generation/index.ts](/Users/felixm/Desktop/applican/applican/workers/generation/index.ts:1)
+- [workers/generation-enqueuer/index.ts](/Users/felixm/Desktop/applican/applican/workers/generation-enqueuer/index.ts:1)
+- [src/server/queue/generationQueue.ts](/Users/felixm/Desktop/applican/applican/src/server/queue/generationQueue.ts:1)
+- [supabase/functions/request-generation-enqueue/index.ts](/Users/felixm/Desktop/applican/applican/supabase/functions/request-generation-enqueue/index.ts:1)
 
 Expected removals or reductions:
 

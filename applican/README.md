@@ -136,6 +136,87 @@ supabase secrets set \
   --project-ref gvfiiqggcxpitswxloqb
 ```
 
+## BullMQ Generation Deployment
+
+The production generation queue now runs on BullMQ + Render Key Value. Supabase still remains the canonical run-state store.
+
+Render services:
+
+- background worker 1: BullMQ generation consumer
+- background worker 2: generation enqueuer
+- Render Key Value: Redis-compatible queue backend
+
+### Supabase function
+
+Deploy the trusted enqueue boundary:
+
+```bash
+supabase functions deploy request-generation-enqueue --project-ref gvfiiqggcxpitswxloqb
+```
+
+### Render Worker: BullMQ Generation Consumer
+
+Start command:
+
+```bash
+npm run worker:generation
+```
+
+Required env:
+
+```text
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
+OPENAI_API_KEY=<openai-key>
+OPENAI_MODEL=gpt-4.1-mini
+REDIS_URL=<render-key-value-internal-url>
+BULLMQ_PREFIX=applican
+GENERATION_WORKER_CONCURRENCY=1
+```
+
+Optional tuning:
+
+```text
+GENERATION_QUEUE_ATTEMPTS=3
+GENERATION_QUEUE_BACKOFF_MS=5000
+GENERATION_QUEUE_REMOVE_ON_COMPLETE_COUNT=500
+GENERATION_QUEUE_REMOVE_ON_FAIL_COUNT=1000
+GENERATION_HEARTBEAT_INTERVAL_MS=10000
+```
+
+### Render Worker: Generation Enqueuer
+
+Start command:
+
+```bash
+npm run worker:generation-enqueue
+```
+
+Required env:
+
+```text
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
+REDIS_URL=<render-key-value-internal-url>
+BULLMQ_PREFIX=applican
+GENERATION_ENQUEUER_POLL_INTERVAL_MS=1000
+GENERATION_ENQUEUER_BATCH_SIZE=25
+```
+
+### Render Key Value
+
+Recommended settings:
+
+- use the internal connection URL as `REDIS_URL`
+- keep the Key Value instance in the same region as both workers
+- use `noeviction` for queue safety
+
+### Postgres Queue Retirement
+
+The active production generation worker path is now BullMQ-only.
+
+The old Postgres polling/claim loop should no longer be used as the generation worker start command after the BullMQ cutover is complete.
+
 ## Stripe Production Checklist
 
 Stripe billing is already wired through these edge functions:

@@ -1,12 +1,10 @@
 import {
-  claimNextGenerateRun,
   completeGeneratedRun,
   heartbeatGenerateRun,
   loadGenerationRunContext,
   startGenerationRun,
   type GenerationFailureDetails,
   markGenerationRunFailure,
-  resetStaleGenerateRuns,
   saveGeneratedResumeArtifact,
 } from "../../src/server/generation/queue.ts";
 import {
@@ -47,12 +45,6 @@ function getPositiveIntegerEnv(name: string, fallback: number): number {
 
   const parsed = Number.parseInt(raw, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 }
 
 function diffMilliseconds(startedAt: string | null, endedAt: string | null): number | null {
@@ -149,243 +141,6 @@ function getRequiredEnv(name: string): string {
   return value;
 }
 
-function getGenerationQueueDriver(): "postgres" | "bullmq" {
-  const value = process.env.GENERATION_QUEUE_DRIVER?.trim().toLowerCase();
-  return value === "bullmq" ? "bullmq" : "postgres";
-}
-
-export async function runGenerationWorkerOnce() {
-  const supabase = createAdminSupabaseClient();
-  const claimedBy = buildWorkerSlotIdentity(0);
-  return runGenerationWorkerSlotOnce({
-    supabase,
-    claimedBy,
-  });
-}
-
-async function runGenerationWorkerSlotOnce(params: {
-  supabase: ReturnType<typeof createAdminSupabaseClient>;
-  claimedBy: string;
-}): Promise<boolean> {
-  const { supabase, claimedBy } = params;
-  const staleSeconds = getPositiveIntegerEnv("GENERATION_STALE_SECONDS", 300);
-  const staleLimit = getPositiveIntegerEnv("GENERATION_STALE_LIMIT", 25);
-  const heartbeatIntervalMs = Math.max(1_000, Math.floor((staleSeconds * 1000) / 3));
-  let activeRunId = "";
-  let activeUserId = "";
-  let activeRequestId = "";
-  let activeGenerationClaimedAt: string | null = null;
-  let activeQueueWaitMs: number | null = null;
-  let activeOpenAiRoundtripMs: number | null = null;
-  let activeModelNormalizeMs: number | null = null;
-
-  const resetRuns = await resetStaleGenerateRuns({
-    supabase,
-    staleSeconds,
-    limit: staleLimit,
-  });
-
-  if (resetRuns.length > 0) {
-    console.info(
-      `[generation-worker] Reset ${resetRuns.length} stale generation run(s) before claiming new work.`,
-    );
-  }
-
-  const run = await claimNextGenerateRun({
-    supabase,
-    claimedBy,
-    leaseSeconds: staleSeconds,
-  });
-
-  if (!run) {
-    return false;
-  }
-
-  console.info(
-    `[generation-worker] Claimed run ${run.id} for user ${run.user_id} with status ${run.status}.`,
-  );
-  activeRunId = run.id;
-  activeUserId = run.user_id;
-
-  try {
-    await heartbeatGenerateRun({
-      supabase,
-      runId: run.id,
-      claimedBy,
-    });
-
-    console.info(`[generation-worker] Heartbeat recorded for run ${run.id}.`);
-    const stopHeartbeat = startHeartbeatLoop({
-      intervalMs: heartbeatIntervalMs,
-      heartbeat: () =>
-        heartbeatGenerateRun({
-          supabase,
-          runId: run.id,
-          claimedBy,
-        }),
-    });
-
-    try {
-      const { result: context, durationMs: loadContextMs } = await measureStage(() =>
-        loadGenerationRunContext({
-          supabase,
-          runId: run.id,
-          claimedBy,
-        })
-      );
-
-      activeUserId = context.run.user_id;
-      activeRequestId = context.run.request_id;
-      activeGenerationClaimedAt = context.run.generation_claimed_at;
-      const queueWaitMs = diffMilliseconds(
-        context.run.generation_queued_at,
-        context.run.generation_claimed_at,
-      );
-      activeQueueWaitMs = queueWaitMs;
-
-      console.info(
-        `[generation-worker] Loaded run ${context.run.id} context in ${loadContextMs}ms with queue wait ${queueWaitMs ?? "unknown"}ms, job description length ${context.run.job_description.length}, and resume text length ${context.resumeDocument?.text.length ?? 0}.`,
-      );
-
-      const { result: preparedInputs, durationMs: prepareInputsMs } = await measureStage(() =>
-        prepareGenerationInputs(context)
-      );
-
-      console.info(
-        `[generation-worker] Prepared run ${preparedInputs.runId} for generation with request ${preparedInputs.requestId} in ${prepareInputsMs}ms.`,
-      );
-
-      const openAiApiKey = getRequiredEnv("OPENAI_API_KEY");
-      const model = process.env.OPENAI_MODEL?.trim() || "gpt-4.1";
-      const sourceExperienceSections = parseExperienceSections(preparedInputs.resumeText);
-      const parserDebug = buildParserDebug(preparedInputs.resumeText, sourceExperienceSections);
-      const { result: generatedBulletResult, durationMs: generateBulletsMs } = await measureStage(() =>
-        executeGenerateBullets({
-          openAiApiKey,
-          model,
-          jobDescription: preparedInputs.jobDescription,
-          resumeText: preparedInputs.resumeText,
-          requestId: preparedInputs.requestId,
-          sourceExperienceSections,
-          parserDebug,
-        })
-      );
-      const generatedOutput = generatedBulletResult.output;
-      const generationExecutionMetrics = generatedBulletResult.metrics;
-      activeOpenAiRoundtripMs = generationExecutionMetrics.openai_roundtrip_ms;
-      activeModelNormalizeMs = generationExecutionMetrics.model_normalize_ms;
-
-      console.info(
-        `[generation-worker] Generated bullets for run ${preparedInputs.runId} in ${generateBulletsMs}ms (OpenAI ${generationExecutionMetrics.openai_roundtrip_ms}ms, normalize ${generationExecutionMetrics.model_normalize_ms}ms) with match score ${generatedOutput.match.score}.`,
-      );
-
-      const { result: tailoredResume, durationMs: tailoredResumeMs } = await measureStage(() =>
-        executeTailoredResume({
-          runOutput: generatedOutput,
-          resumeText: preparedInputs.resumeText,
-        })
-      );
-
-      console.info(
-        `[generation-worker] Built tailored resume for run ${preparedInputs.runId} in ${tailoredResumeMs}ms as ${tailoredResume.filename}.`,
-      );
-
-      const { result: savedResume, durationMs: saveResumeMs } = await measureStage(() =>
-        saveGeneratedResumeArtifact({
-          supabase,
-          runId: preparedInputs.runId,
-          userId: preparedInputs.userId,
-          requestId: preparedInputs.requestId,
-          template: tailoredResume.template,
-          filename: tailoredResume.filename,
-          latex: tailoredResume.latex,
-        })
-      );
-
-      console.info(
-        `[generation-worker] Saved generated resume ${savedResume.id} for run ${preparedInputs.runId} in ${saveResumeMs}ms.`,
-      );
-
-      const totalGenerationMs = diffMillisecondsFromNow(context.run.generation_claimed_at);
-
-      const { durationMs: completeRunMs } = await measureStage(() =>
-        completeGeneratedRun({
-          supabase,
-          runId: preparedInputs.runId,
-          userId: preparedInputs.userId,
-          existingOutput: generatedOutput,
-          tailoredResume: {
-            id: savedResume.id,
-            template: tailoredResume.template,
-            filename: tailoredResume.filename,
-            latex: tailoredResume.latex,
-          },
-          metrics: {
-            completed_by: claimedBy,
-            queue_wait_ms: queueWaitMs,
-            total_generation_ms: totalGenerationMs,
-            load_context_ms: loadContextMs,
-            prepare_inputs_ms: prepareInputsMs,
-            generate_bullets_ms: generateBulletsMs,
-            openai_roundtrip_ms: generationExecutionMetrics.openai_roundtrip_ms,
-            model_normalize_ms: generationExecutionMetrics.model_normalize_ms,
-            build_tailored_resume_ms: tailoredResumeMs,
-            save_generated_resume_ms: saveResumeMs,
-          },
-        })
-      );
-
-      console.info(
-        `[generation-worker] Finalized run ${preparedInputs.runId} in ${completeRunMs}ms with total generation time ${totalGenerationMs ?? "unknown"}ms.`,
-      );
-    } finally {
-      stopHeartbeat();
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown generation worker failure.";
-    if (activeRunId && activeUserId) {
-      const totalGenerationMs = diffMillisecondsFromNow(activeGenerationClaimedAt);
-      const failureDetails = buildFailureDetails({
-        error,
-        claimedBy,
-        requestId: activeRequestId,
-        queueWaitMs: activeQueueWaitMs,
-        totalGenerationMs,
-      });
-      if (activeOpenAiRoundtripMs !== null) {
-        failureDetails.openai_roundtrip_ms = activeOpenAiRoundtripMs;
-      }
-      if (activeModelNormalizeMs !== null) {
-        failureDetails.model_normalize_ms = activeModelNormalizeMs;
-      }
-
-      console.error(
-        JSON.stringify({
-          level: "error",
-          code: failureDetails.code ?? "WORKER_GENERATION_FAILED",
-          message,
-          run_id: activeRunId,
-          user_id: activeUserId,
-          request_id: activeRequestId || null,
-          ...failureDetails,
-        }),
-      );
-
-      await markGenerationRunFailure({
-        supabase,
-        runId: activeRunId,
-        userId: activeUserId,
-        errorCode: failureDetails.code ?? "WORKER_GENERATION_FAILED",
-        errorMessage: message,
-        failureDetails,
-      });
-    }
-    throw error;
-  }
-
-  return true;
-}
-
 async function runBullMqGenerationJobOnce(params: {
   supabase: ReturnType<typeof createAdminSupabaseClient>;
   claimedBy: string;
@@ -473,6 +228,10 @@ async function runBullMqGenerationJobOnce(params: {
         prepareGenerationInputs(context)
       );
 
+      console.info(
+        `[generation-worker] Prepared BullMQ run ${preparedInputs.runId} in ${prepareInputsMs}ms for request ${preparedInputs.requestId}.`,
+      );
+
       const openAiApiKey = getRequiredEnv("OPENAI_API_KEY");
       const model = process.env.OPENAI_MODEL?.trim() || "gpt-4.1";
       const sourceExperienceSections = parseExperienceSections(preparedInputs.resumeText);
@@ -493,11 +252,19 @@ async function runBullMqGenerationJobOnce(params: {
       activeOpenAiRoundtripMs = generationExecutionMetrics.openai_roundtrip_ms;
       activeModelNormalizeMs = generationExecutionMetrics.model_normalize_ms;
 
+      console.info(
+        `[generation-worker] Generated BullMQ bullets for run ${preparedInputs.runId} in ${generateBulletsMs}ms (OpenAI ${generationExecutionMetrics.openai_roundtrip_ms}ms, normalize ${generationExecutionMetrics.model_normalize_ms}ms).`,
+      );
+
       const { result: tailoredResume, durationMs: tailoredResumeMs } = await measureStage(() =>
         executeTailoredResume({
           runOutput: generatedOutput,
           resumeText: preparedInputs.resumeText,
         })
+      );
+
+      console.info(
+        `[generation-worker] Built BullMQ tailored resume for run ${preparedInputs.runId} in ${tailoredResumeMs}ms as ${tailoredResume.filename}.`,
       );
 
       const { result: savedResume, durationMs: saveResumeMs } = await measureStage(() =>
@@ -512,32 +279,42 @@ async function runBullMqGenerationJobOnce(params: {
         })
       );
 
+      console.info(
+        `[generation-worker] Saved BullMQ generated resume ${savedResume.id} for run ${preparedInputs.runId} in ${saveResumeMs}ms.`,
+      );
+
       const totalGenerationMs = diffMillisecondsFromNow(context.run.generation_claimed_at);
 
-      await completeGeneratedRun({
-        supabase,
-        runId: preparedInputs.runId,
-        userId: preparedInputs.userId,
-        existingOutput: generatedOutput,
-        tailoredResume: {
-          id: savedResume.id,
-          template: tailoredResume.template,
-          filename: tailoredResume.filename,
-          latex: tailoredResume.latex,
-        },
-        metrics: {
-          completed_by: claimedBy,
-          queue_wait_ms: queueWaitMs,
-          total_generation_ms: totalGenerationMs,
-          load_context_ms: loadContextMs,
-          prepare_inputs_ms: prepareInputsMs,
-          generate_bullets_ms: generateBulletsMs,
-          openai_roundtrip_ms: generationExecutionMetrics.openai_roundtrip_ms,
-          model_normalize_ms: generationExecutionMetrics.model_normalize_ms,
-          build_tailored_resume_ms: tailoredResumeMs,
-          save_generated_resume_ms: saveResumeMs,
-        },
-      });
+      const { durationMs: completeRunMs } = await measureStage(() =>
+        completeGeneratedRun({
+          supabase,
+          runId: preparedInputs.runId,
+          userId: preparedInputs.userId,
+          existingOutput: generatedOutput,
+          tailoredResume: {
+            id: savedResume.id,
+            template: tailoredResume.template,
+            filename: tailoredResume.filename,
+            latex: tailoredResume.latex,
+          },
+          metrics: {
+            completed_by: claimedBy,
+            queue_wait_ms: queueWaitMs,
+            total_generation_ms: totalGenerationMs,
+            load_context_ms: loadContextMs,
+            prepare_inputs_ms: prepareInputsMs,
+            generate_bullets_ms: generateBulletsMs,
+            openai_roundtrip_ms: generationExecutionMetrics.openai_roundtrip_ms,
+            model_normalize_ms: generationExecutionMetrics.model_normalize_ms,
+            build_tailored_resume_ms: tailoredResumeMs,
+            save_generated_resume_ms: saveResumeMs,
+          },
+        })
+      );
+
+      console.info(
+        `[generation-worker] Completed BullMQ run ${preparedInputs.runId} in ${completeRunMs}ms with queue wait ${queueWaitMs ?? "unknown"}ms and total generation time ${totalGenerationMs ?? "unknown"}ms.`,
+      );
     } finally {
       stopHeartbeat();
     }
@@ -572,34 +349,6 @@ async function runBullMqGenerationJobOnce(params: {
   }
 
   return true;
-}
-
-async function startGenerationWorkerSlot(params: {
-  slotIndex: number;
-  pollIntervalMs: number;
-}): Promise<void> {
-  const { slotIndex, pollIntervalMs } = params;
-  const supabase = createAdminSupabaseClient();
-  const claimedBy = buildWorkerSlotIdentity(slotIndex);
-
-  console.info(`[generation-worker] Started slot ${slotIndex + 1} as ${claimedBy}.`);
-
-  while (true) {
-    try {
-      const claimedWork = await runGenerationWorkerSlotOnce({
-        supabase,
-        claimedBy,
-      });
-
-      if (!claimedWork) {
-        await delay(pollIntervalMs);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown generation worker failure.";
-      console.error(`[generation-worker] slot ${slotIndex + 1} ${message}`);
-      await delay(pollIntervalMs);
-    }
-  }
 }
 
 async function startBullMqGenerationWorker(): Promise<void> {
@@ -646,28 +395,8 @@ async function startBullMqGenerationWorker(): Promise<void> {
 }
 
 export async function startGenerationWorker() {
-  const driver = getGenerationQueueDriver();
-  if (driver === "bullmq") {
-    console.info("[generation-worker] Starting BullMQ generation worker.");
-    await startBullMqGenerationWorker();
-    return;
-  }
-
-  const pollIntervalMs = getPositiveIntegerEnv("GENERATION_POLL_INTERVAL_MS", 5000);
-  const concurrency = getPositiveIntegerEnv("GENERATION_WORKER_CONCURRENCY", 1);
-
-  console.info(
-    `[generation-worker] Starting ${concurrency} slot(s) with poll interval ${pollIntervalMs}ms.`,
-  );
-
-  await Promise.all(
-    Array.from({ length: concurrency }, (_, slotIndex) =>
-      startGenerationWorkerSlot({
-        slotIndex,
-        pollIntervalMs,
-      })
-    ),
-  );
+  console.info("[generation-worker] Starting BullMQ generation worker.");
+  await startBullMqGenerationWorker();
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

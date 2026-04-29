@@ -12,7 +12,6 @@
     "typecheck:server": "tsc -p tsconfig.server.json",
     "worker:generation": "node --import=dotenv/config --import=tsx workers/generation/index.ts",
     "worker:generation-enqueue": "node --import=dotenv/config --import=tsx workers/generation-enqueuer/index.ts",
-    "worker:generation:bullmq": "GENERATION_QUEUE_DRIVER=bullmq node --import=dotenv/config --import=tsx workers/generation/index.ts",
     "metrics:generation": "node --import=dotenv/config --import=tsx scripts/generationMetrics.ts",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",

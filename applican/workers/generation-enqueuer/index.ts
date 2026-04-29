@@ -30,6 +30,10 @@ async function enqueueQueuedRunsOnce(): Promise<number> {
     return 0;
   }
 
+  console.info(
+    `[generation-enqueuer] Found ${queuedRuns.length} queued generation run(s) waiting for BullMQ handoff.`,
+  );
+
   let enqueuedCount = 0;
   for (const run of queuedRuns) {
     const result = await enqueueGenerationJob({
@@ -40,6 +44,9 @@ async function enqueueQueuedRunsOnce(): Promise<number> {
     });
     if (result.created) {
       enqueuedCount += 1;
+      console.info(
+        `[generation-enqueuer] Enqueued BullMQ job ${result.jobId} for run ${run.id} queued at ${run.generation_queued_at ?? "unknown"}.`,
+      );
     }
   }
 
