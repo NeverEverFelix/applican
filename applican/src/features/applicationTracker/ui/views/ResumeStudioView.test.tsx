@@ -5,9 +5,10 @@ import type { ReactNode } from "react";
 import { ResumeStudioView } from "./ResumeStudioView";
 import type { CreateResumeRunResult } from "../../../jobs/model/types";
 
-const { useCreateResumeRunMock, getLatestResumeRunForEditorMock } = vi.hoisted(() => ({
+const { useCreateResumeRunMock, getLatestResumeRunForEditorMock, captureEventMock } = vi.hoisted(() => ({
   useCreateResumeRunMock: vi.fn(),
   getLatestResumeRunForEditorMock: vi.fn(async () => null),
+  captureEventMock: vi.fn(),
 }));
 
 vi.mock("@posthog/react", () => ({
@@ -30,6 +31,10 @@ vi.mock("../../../jobs/hooks/useCreateResumeRun", () => ({
 
 vi.mock("../../../jobs/api/getLatestResumeRunForEditor", () => ({
   getLatestResumeRunForEditor: getLatestResumeRunForEditorMock,
+}));
+
+vi.mock("../../../../posthog", () => ({
+  captureEvent: captureEventMock,
 }));
 
 vi.mock("../../../../screens/loading/LoadingScreen.tsx", () => ({
@@ -207,9 +212,94 @@ beforeEach(() => {
     hasPersistedRunState: false,
   });
   getLatestResumeRunForEditorMock.mockResolvedValue(null);
+  captureEventMock.mockReset();
 });
 
 describe("ResumeStudioView", () => {
+  it("tracks results viewed, section expansion, and starting a new analysis from results", () => {
+    window.localStorage.setItem("applican:resume-studio:show-results", JSON.stringify(true));
+    window.localStorage.setItem(
+      "applican:resume-studio:last-run-output",
+      JSON.stringify({
+        job: {
+          company: "Wavform",
+          title: "Product Support Engineer",
+        },
+        match: {
+          score: 87,
+          label: "87% Match",
+          summary: "Strong support alignment.",
+        },
+        analysis: {
+          strengths: ["Strong troubleshooting background"],
+          gaps: ["Needs more direct SaaS metrics"],
+        },
+        optimization_sections: [
+          {
+            id: "exp:0",
+            kind: "experience",
+            source_index: 0,
+            display_title: "Product Support Engineer",
+            bullets: [
+              {
+                id: "exp:0:0",
+                source_index: 0,
+                original: "Original bullet",
+                optimized: "Optimized bullet",
+                action: "replace",
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    window.localStorage.setItem(
+      "applican:resume-studio:last-run-context",
+      JSON.stringify({
+        run_id: "run-1",
+        request_id: "request-1",
+        job_title: "Product Support Engineer",
+        match_score: 87,
+      }),
+    );
+
+    render(<ResumeStudioView />);
+
+    expect(captureEventMock).toHaveBeenCalledWith("results_viewed", {
+      run_id: "run-1",
+      request_id: "request-1",
+      company: "Wavform",
+      title: "Product Support Engineer",
+      match_score: 87,
+      strengths_count: 1,
+      gaps_count: 1,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Product Support Engineer/i }));
+
+    expect(captureEventMock).toHaveBeenCalledWith("optimization_section_expanded", {
+      run_id: "run-1",
+      request_id: "request-1",
+      section_id: "exp:0",
+      section_kind: "experience",
+      job_title: "Product Support Engineer",
+      match_score: 87,
+      action: "expand",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /new analysis/i }));
+
+    expect(captureEventMock).toHaveBeenCalledWith(
+      "new_run_started",
+      expect.objectContaining({
+        run_id: "run-1",
+        request_id: "request-1",
+        job_title: "Product Support Engineer",
+        match_score: 87,
+      }),
+    );
+  });
+
   it("renders optimization accordions from backend optimization_sections and reveals optimized bullets on expand", async () => {
     window.localStorage.setItem("applican:resume-studio:show-results", JSON.stringify(true));
     window.localStorage.setItem(
@@ -507,9 +597,7 @@ describe("ResumeStudioView", () => {
 
   it("keeps the loading flow visible while a successful submission transitions into the analysis-complete screen", async () => {
     vi.useFakeTimers();
-
-    const persistedResume = new File(["resume"], "resume.pdf", { type: "application/pdf" });
-    indexedDbFiles.set("latest_resume", persistedResume);
+    const uploadedResume = new File(["resume"], "resume.pdf", { type: "application/pdf" });
 
     const successfulRun = {
       requestId: "request-1",
@@ -570,9 +658,14 @@ describe("ResumeStudioView", () => {
 
     useCreateResumeRunMock.mockImplementation(() => useCreateResumeRunState);
 
-    const { rerender } = render(<ResumeStudioView />);
+    const { container, rerender } = render(<ResumeStudioView />);
 
-    await vi.runAllTimersAsync();
+    const fileInput = container.querySelector('input[type="file"]');
+    expect(fileInput).toBeTruthy();
+
+    fireEvent.change(fileInput as HTMLInputElement, {
+      target: { files: [uploadedResume] },
+    });
 
     fireEvent.change(screen.getByPlaceholderText("Paste a job description..."), {
       target: { value: "A".repeat(201) },

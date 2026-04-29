@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePostHog } from "@posthog/react";
 import gsap from "gsap";
 import styles from "../applicationTrack.module.css";
 import starIcon from "../../../../assets/Star.png";
@@ -20,6 +19,7 @@ import {
   extractResumeOptimizationPresentationSections,
   type ResumeOptimizationPresentationSection,
 } from "../../../../lib/resumeOptimizations";
+import { captureEvent } from "../../../../posthog";
 
 type ResumeStudioOutput = {
   job: {
@@ -35,6 +35,13 @@ type ResumeStudioOutput = {
     strengths: string[];
     gaps: string[];
   };
+};
+
+type ResumeStudioRunContext = {
+  run_id: string;
+  request_id: string;
+  job_title: string;
+  match_score: number;
 };
 
 const RESUME_FILE_DB_NAME = "applican_resume_file_db";
@@ -84,7 +91,13 @@ function validateResumeFile(file: File | null): string {
   return "";
 }
 
-function OptimizationSectionAccordion({ section }: { section: ResumeOptimizationPresentationSection }) {
+function OptimizationSectionAccordion({
+  section,
+  onExpand,
+}: {
+  section: ResumeOptimizationPresentationSection;
+  onExpand?: (section: ResumeOptimizationPresentationSection) => void;
+}) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -92,7 +105,15 @@ function OptimizationSectionAccordion({ section }: { section: ResumeOptimization
       <button
         type="button"
         className={styles.optimizationAccordionButton}
-        onClick={() => setIsOpen((current) => !current)}
+        onClick={() =>
+          setIsOpen((current) => {
+            const nextIsOpen = !current;
+            if (nextIsOpen) {
+              onExpand?.(section);
+            }
+            return nextIsOpen;
+          })
+        }
         aria-expanded={isOpen}
       >
         <span className={styles.optimizationJobTitle}>{section.display_title}</span>
@@ -135,7 +156,13 @@ function OptimizationSectionAccordion({ section }: { section: ResumeOptimization
     </section>
   );
 }
-function ResumeOptimizationsPanel({ sections }: { sections: ResumeOptimizationPresentationSection[] }) {
+function ResumeOptimizationsPanel({
+  sections,
+  onExpandSection,
+}: {
+  sections: ResumeOptimizationPresentationSection[];
+  onExpandSection?: (section: ResumeOptimizationPresentationSection) => void;
+}) {
   return (
     <div
       className={styles.resumeOptimizationsCanvas}
@@ -146,10 +173,25 @@ function ResumeOptimizationsPanel({ sections }: { sections: ResumeOptimizationPr
       }}
     >
       {sections.map((section, index) => (
-        <OptimizationSectionAccordion key={`${section.id}-${index}`} section={section} />
+        <OptimizationSectionAccordion
+          key={`${section.id}-${index}`}
+          section={section}
+          onExpand={onExpandSection}
+        />
       ))}
     </div>
   );
+}
+
+function buildRunContext(runId: string, requestId: string, output: unknown): ResumeStudioRunContext {
+  const root = output as { job?: { title?: unknown }; match?: { score?: unknown } } | null;
+
+  return {
+    run_id: runId,
+    request_id: requestId,
+    job_title: cleanString(root?.job?.title),
+    match_score: typeof root?.match?.score === "number" ? root.match.score : 0,
+  };
 }
 
 function openResumeFileDb(): Promise<IDBDatabase> {
@@ -265,7 +307,6 @@ function toResumeStudioOutput(value: unknown): ResumeStudioOutput | null {
 }
 
 export function ResumeStudioView() {
-  const posthog = usePostHog();
   const ANALYSIS_TYPING_SPEED = 28;
   const ANALYSIS_REVEAL_GAP_MS = 420;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -288,6 +329,10 @@ export function ResumeStudioView() {
   );
   const [persistedRunOutput, setPersistedRunOutput] = useLocalStorageState<unknown>(
     "applican:resume-studio:last-run-output",
+    null,
+  );
+  const [persistedRunContext, setPersistedRunContext] = useLocalStorageState<ResumeStudioRunContext | null>(
+    "applican:resume-studio:last-run-context",
     null,
   );
   const [loadingAnimationOriginMs, setLoadingAnimationOriginMs] = useLocalStorageState<number | null>(
@@ -331,8 +376,16 @@ export function ResumeStudioView() {
     hasPersistedOutput: persistedRunOutput !== null && persistedRunOutput !== undefined,
     showComputedResults,
   });
+  const resultsViewedAtRef = useRef<number | null>(null);
 
   const currentRunOutput = persistedRunOutput ?? createdRun?.row.output;
+  const currentRunContext = useMemo<ResumeStudioRunContext | null>(() => {
+    if (createdRun?.row.output && currentRunOutput === createdRun.row.output) {
+      return buildRunContext(createdRun.row.id, createdRun.requestId, createdRun.row.output);
+    }
+
+    return persistedRunContext;
+  }, [createdRun, currentRunOutput, persistedRunContext]);
   const parsedOutput = useMemo(() => toResumeStudioOutput(currentRunOutput), [currentRunOutput]);
   const optimizationSections = useMemo(
     () => extractResumeOptimizationPresentationSections(currentRunOutput),
@@ -398,7 +451,7 @@ export function ResumeStudioView() {
     });
 
   const completeSuccessfulRun = useCallback(
-    async (output: unknown) => {
+    async (output: unknown, runContext: ResumeStudioRunContext | null) => {
       setShouldRenderAnalysisCompleteScreen(true);
       setIsShowingAnalysisCompleteScreen(true);
       await wait(2500);
@@ -406,12 +459,13 @@ export function ResumeStudioView() {
       await wait(360);
       setShouldRenderAnalysisCompleteScreen(false);
       setPersistedRunOutput(output);
+      setPersistedRunContext(runContext);
       setLoadingAnimationOriginMs(null);
       setRevealedAnalysisCount(0);
       setShowComputedResults(true);
       setIsTransitioningToSuccessfulResult(false);
     },
-    [setLoadingAnimationOriginMs, setPersistedRunOutput, setShowComputedResults],
+    [setLoadingAnimationOriginMs, setPersistedRunContext, setPersistedRunOutput, setShowComputedResults],
   );
 
   useEffect(() => {
@@ -473,7 +527,10 @@ export function ResumeStudioView() {
       if (result.ok) {
         setIsTransitioningToSuccessfulResult(true);
         setIsShowingProgressScreen(false);
-        await completeSuccessfulRun(result.createdRun.row.output);
+        await completeSuccessfulRun(
+          result.createdRun.row.output,
+          buildRunContext(result.createdRun.row.id, result.createdRun.requestId, result.createdRun.row.output),
+        );
         return;
       }
 
@@ -508,6 +565,7 @@ export function ResumeStudioView() {
         if (!isActive || latestRun?.output === null || latestRun?.output === undefined) {
           return;
         }
+        setPersistedRunContext(buildRunContext(latestRun.id, latestRun.request_id, latestRun.output));
         setPersistedRunOutput(latestRun.output);
       } catch {
         // Ignore hydration failures and use local persisted output.
@@ -517,7 +575,7 @@ export function ResumeStudioView() {
     return () => {
       isActive = false;
     };
-  }, [createdRun?.row.output, setPersistedRunOutput]);
+  }, [createdRun?.row.output, setPersistedRunContext, setPersistedRunOutput]);
 
   const validateJobDescription = (value: string) => {
     if (value.trim().length > MIN_JOB_DESCRIPTION_LENGTH) {
@@ -642,14 +700,17 @@ export function ResumeStudioView() {
     }
 
     lastTrackedResultKeyRef.current = resultKey;
-    posthog.capture("results_viewed", {
+    resultsViewedAtRef.current = Date.now();
+    captureEvent("results_viewed", {
+      run_id: currentRunContext?.run_id,
+      request_id: currentRunContext?.request_id,
       company: parsedOutput.job.company,
       title: parsedOutput.job.title,
       match_score: parsedOutput.match.score,
       strengths_count: parsedOutput.analysis.strengths.length,
       gaps_count: parsedOutput.analysis.gaps.length,
     });
-  }, [analysisSequence.length, parsedOutput, posthog, shouldShowResults]);
+  }, [analysisSequence.length, currentRunContext, parsedOutput, shouldShowResults]);
 
   useEffect(() => {
     const roleTitle = shouldShowResults ? (parsedOutput?.job.title.trim() ?? "") : "";
@@ -705,7 +766,10 @@ export function ResumeStudioView() {
     }
 
     if (result.ok) {
-      await completeSuccessfulRun(result.createdRun.row.output);
+      await completeSuccessfulRun(
+        result.createdRun.row.output,
+        buildRunContext(result.createdRun.row.id, result.createdRun.requestId, result.createdRun.row.output),
+      );
       return;
     }
 
@@ -735,7 +799,10 @@ export function ResumeStudioView() {
     }
 
     if (result.ok) {
-      await completeSuccessfulRun(result.createdRun.row.output);
+      await completeSuccessfulRun(
+        result.createdRun.row.output,
+        buildRunContext(result.createdRun.row.id, result.createdRun.requestId, result.createdRun.row.output),
+      );
       return;
     }
 
@@ -744,7 +811,19 @@ export function ResumeStudioView() {
   };
 
   const onStartNewAnalysis = () => {
+    if (shouldShowResults && currentRunContext) {
+      captureEvent("new_run_started", {
+        run_id: currentRunContext.run_id,
+        request_id: currentRunContext.request_id,
+        job_title: parsedOutput?.job.title ?? currentRunContext.job_title,
+        match_score: parsedOutput?.match.score ?? currentRunContext.match_score,
+        seconds_since_results_viewed:
+          resultsViewedAtRef.current === null ? null : Math.round((Date.now() - resultsViewedAtRef.current) / 1000),
+      });
+    }
+
     lastTrackedResultKeyRef.current = "";
+    resultsViewedAtRef.current = null;
     hasAttemptedPersistedRunResumeRef.current = false;
     shouldAttemptInitialPersistedRunResumeRef.current = false;
     void clearPersistedResumeFile();
@@ -762,6 +841,7 @@ export function ResumeStudioView() {
     setSelectedFile(null);
     setJobDescription("");
     setUploadedFileName("");
+    setPersistedRunContext(null);
     setPersistedRunOutput(null);
     setRevealedAnalysisCount(0);
   };
@@ -780,9 +860,36 @@ export function ResumeStudioView() {
     setIsTransitioningToSuccessfulResult(false);
     setJobDescriptionValidationError("");
     setResumeValidationError("");
+    resultsViewedAtRef.current = null;
+    setPersistedRunContext(null);
     setPersistedRunOutput(null);
     setRevealedAnalysisCount(0);
-  }, [clearPersistedRunState, setLoadingAnimationOriginMs, setPersistedRunOutput, setShowComputedResults]);
+  }, [
+    clearPersistedRunState,
+    setLoadingAnimationOriginMs,
+    setPersistedRunContext,
+    setPersistedRunOutput,
+    setShowComputedResults,
+  ]);
+
+  const onExpandOptimizationSection = useCallback(
+    (section: ResumeOptimizationPresentationSection) => {
+      if (!currentRunContext || !parsedOutput) {
+        return;
+      }
+
+      captureEvent("optimization_section_expanded", {
+        run_id: currentRunContext.run_id,
+        request_id: currentRunContext.request_id,
+        section_id: section.id,
+        section_kind: section.kind,
+        job_title: parsedOutput.job.title,
+        match_score: parsedOutput.match.score,
+        action: "expand",
+      });
+    },
+    [currentRunContext, parsedOutput],
+  );
 
   const onCancelRun = useCallback(async () => {
     if (isCancellingRun) {
@@ -1069,7 +1176,10 @@ export function ResumeStudioView() {
                 content: (
                   <div className={styles.resumeOptimizationsContainer}>
                     <h3 className={styles.resumeOptimizationsTitle}>Resume Optimizations</h3>
-                    <ResumeOptimizationsPanel sections={optimizationSections} />
+                    <ResumeOptimizationsPanel
+                      sections={optimizationSections}
+                      onExpandSection={onExpandOptimizationSection}
+                    />
                   </div>
                 ),
               },

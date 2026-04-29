@@ -7,6 +7,7 @@ import StatusNotice from "../../../../components/feedback/StatusNotice";
 import { listGeneratedResumes } from "../../../jobs/api/listGeneratedResumes";
 import { getLatestResumeRunForEditor } from "../../../jobs/api/getLatestResumeRunForEditor";
 import type { GeneratedResumeRow } from "../../../jobs/model/types";
+import { captureEvent } from "../../../../posthog";
 import resumeIcon3 from "../../../../assets/resume-icons/resume-icon3.svg";
 import texFileIcon from "../../../../assets/.tex.svg";
 import downloadIcon from "../../../../assets/downloadIcon.svg";
@@ -55,6 +56,13 @@ type TailoredResumeOutput = {
   latex?: string;
 };
 
+type EditorResumeContext = {
+  resume_id: string;
+  run_id: string;
+  request_id: string | null;
+  filename: string;
+};
+
 function extractTailoredResumeFromOutput(output: unknown): TailoredResumeOutput | null {
   if (!output || typeof output !== "object") {
     return null;
@@ -88,13 +96,29 @@ export function EditorView() {
   const [generatedResumes, setGeneratedResumes] = useState<GeneratedResumeRow[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
   const [isEditorMode, setIsEditorMode] = useState(false);
+  const [activeResumeContext, setActiveResumeContext] = useState<EditorResumeContext | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const pendingFlipRef = useRef<ReturnType<typeof captureEditorFlipState> | null>(null);
+  const lastTrackedOpenKeyRef = useRef("");
+  const editTrackedKeysRef = useRef<Set<string>>(new Set());
+  const initialLatexByKeyRef = useRef<Record<string, string>>({});
+
+  const activeResumeKey =
+    activeResumeContext?.resume_id || activeResumeContext?.run_id
+      ? `${activeResumeContext?.resume_id ?? ""}|${activeResumeContext?.run_id ?? ""}`
+      : "";
 
   const onSelectHistoryItem = useCallback(async (row: GeneratedResumeRow) => {
     setSelectedResumeId(row.id);
     setFilename(row.filename);
     setLatex(row.latex);
+    setActiveResumeContext({
+      resume_id: row.id,
+      run_id: row.run_id,
+      request_id: row.request_id,
+      filename: row.filename,
+    });
+    initialLatexByKeyRef.current[`${row.id}|${row.run_id}`] = row.latex;
     setErrorMessage("");
   }, []);
 
@@ -130,8 +154,17 @@ export function EditorView() {
       });
 
       setLatex(response.tailored_resume.latex);
-      setFilename(response.tailored_resume.filename || "tailored-resume.tex");
-      setSelectedResumeId(response.tailored_resume.id ?? "");
+      const nextFilename = response.tailored_resume.filename || "tailored-resume.tex";
+      const nextResumeId = response.tailored_resume.id ?? "";
+      setFilename(nextFilename);
+      setSelectedResumeId(nextResumeId);
+      setActiveResumeContext({
+        resume_id: nextResumeId,
+        run_id: targetRunId,
+        request_id: targetRequestId ?? null,
+        filename: nextFilename,
+      });
+      initialLatexByKeyRef.current[`${nextResumeId}|${targetRunId}`] = response.tailored_resume.latex;
       await loadHistory(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to compile LaTeX.";
@@ -155,8 +188,17 @@ export function EditorView() {
         const existingTailored = extractTailoredResumeFromOutput(latestRun.output);
         if (existingTailored?.latex) {
           setLatex(existingTailored.latex);
-          setFilename(existingTailored.filename || "tailored-resume.tex");
-          setSelectedResumeId(existingTailored.id ?? "");
+          const nextFilename = existingTailored.filename || "tailored-resume.tex";
+          const nextResumeId = existingTailored.id ?? "";
+          setFilename(nextFilename);
+          setSelectedResumeId(nextResumeId);
+          setActiveResumeContext({
+            resume_id: nextResumeId,
+            run_id: latestRun.id,
+            request_id: latestRun.request_id,
+            filename: nextFilename,
+          });
+          initialLatexByKeyRef.current[`${nextResumeId}|${latestRun.id}`] = existingTailored.latex;
           return;
         }
 
@@ -177,7 +219,36 @@ export function EditorView() {
     pendingFlipRef.current = null;
   }, [isEditorMode]);
 
+  useEffect(() => {
+    if (!activeResumeContext) {
+      return;
+    }
+
+    const trackingKey = `${activeResumeContext.resume_id}|${activeResumeContext.run_id}`;
+    if (lastTrackedOpenKeyRef.current === trackingKey) {
+      return;
+    }
+
+    lastTrackedOpenKeyRef.current = trackingKey;
+    captureEvent("latex_editor_opened", {
+      resume_id: activeResumeContext.resume_id,
+      run_id: activeResumeContext.run_id,
+      request_id: activeResumeContext.request_id,
+      filename: activeResumeContext.filename,
+    });
+  }, [activeResumeContext]);
+
   const onDownloadTex = () => {
+    if (activeResumeContext) {
+      captureEvent("resume_downloaded", {
+        resume_id: activeResumeContext.resume_id,
+        run_id: activeResumeContext.run_id,
+        request_id: activeResumeContext.request_id,
+        filename: activeResumeContext.filename,
+        file_type: "tex",
+      });
+    }
+
     const blob = new Blob([latex], { type: "application/x-tex" });
     const objectUrl = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -203,6 +274,28 @@ export function EditorView() {
   };
 
   const shouldShowHistorySkeleton = isHistoryLoading && (generatedResumes.length === 0 || isHistoryRefreshAnimating);
+  const onEditorChange = (value: string | undefined) => {
+    const nextLatex = value ?? "";
+    setLatex(nextLatex);
+
+    if (!activeResumeContext || !activeResumeKey) {
+      return;
+    }
+
+    const initialLatex = initialLatexByKeyRef.current[activeResumeKey];
+    if (typeof initialLatex !== "string" || nextLatex === initialLatex || editTrackedKeysRef.current.has(activeResumeKey)) {
+      return;
+    }
+
+    editTrackedKeysRef.current.add(activeResumeKey);
+    captureEvent("resume_edited", {
+      resume_id: activeResumeContext.resume_id,
+      run_id: activeResumeContext.run_id,
+      request_id: activeResumeContext.request_id,
+      filename: activeResumeContext.filename,
+      action: "edit",
+    });
+  };
 
   return (
     <section className={styles.editorView}>
@@ -320,7 +413,7 @@ export function EditorView() {
             defaultLanguage="latex"
             language="latex"
             value={latex}
-            onChange={(value) => setLatex(value ?? "")}
+            onChange={onEditorChange}
             beforeMount={configureLatexLanguage}
             options={{
               minimap: { enabled: false },
