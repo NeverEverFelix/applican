@@ -126,3 +126,40 @@
   outline: 2px solid #3f86ff;
   outline-offset: 2px;
 }
+
+@media (max-width: 1279px) {
+  .stateControlStack {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+
+  .stateControlItem {
+    width: 100%;
+  }
+}
+
+@media (max-width: 767px) {
+  .stateControlStack {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+  }
+
+  .stateControlItem {
+    min-height: 44px;
+    height: auto;
+    padding: 10px 12px;
+    align-items: flex-start;
+  }
+
+  .stateControlItemActive {
+    min-height: 44px;
+    height: auto;
+  }
+
+  .stateControlLabelRow {
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+}

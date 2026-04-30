@@ -113,6 +113,7 @@ function OptimizationSectionAccordion({
   ) => Promise<void> | void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [openBulletIds, setOpenBulletIds] = useState<Record<string, boolean>>({});
   const [copiedBulletId, setCopiedBulletId] = useState<string | null>(null);
 
   return (
@@ -148,40 +149,79 @@ function OptimizationSectionAccordion({
       <div className={styles.optimizationAccordionBody} style={{ maxHeight: isOpen ? "2000px" : "0px" }}>
         <div className={styles.optimizationAccordionBodyInner}>
           <div className={styles.optimizationBulletList}>
-            {section.bullets.map((bullet) => (
-              <article key={bullet.id} className={styles.optimizationBulletItem}>
-                <p className={styles.optimizationAccordionBodyText}>{bullet.original ?? bullet.optimized ?? ""}</p>
-                {isOpen && bullet.optimized && bullet.optimized !== bullet.original ? (
-                  <div className={styles.optimizationBulletBodyInner}>
-                    <div className={styles.optimizationBulletCopiedRow}>
-                      <p
-                        className={[
-                          styles.optimizationAccordionBodyText,
-                          styles.optimizationAccordionBodyTextOptimized,
-                        ].join(" ")}
-                      >
-                        {bullet.optimized}
-                      </p>
+            {section.bullets.map((bullet) => {
+              const originalText = bullet.original ?? bullet.optimized ?? "";
+              const hasDistinctOptimization = Boolean(
+                bullet.optimized && bullet.original && bullet.optimized !== bullet.original,
+              );
+              const isBulletOpen = Boolean(openBulletIds[bullet.id]);
+
+              return (
+                <article key={bullet.id} className={styles.optimizationBulletItem}>
+                  {hasDistinctOptimization ? (
+                    <>
                       <button
                         type="button"
-                        className={styles.optimizationCopyButton}
-                        onClick={() => {
-                          void Promise.resolve(onCopyOptimizedBullet?.(section, bullet)).then(() => {
-                            setCopiedBulletId(bullet.id);
-                            window.setTimeout(() => {
-                              setCopiedBulletId((current) => (current === bullet.id ? null : current));
-                            }, 1500);
-                          });
-                        }}
-                        aria-label={`Copy optimized bullet from ${section.display_title}`}
+                        className={styles.optimizationBulletButton}
+                        onClick={() =>
+                          setOpenBulletIds((current) => ({
+                            ...current,
+                            [bullet.id]: !current[bullet.id],
+                          }))
+                        }
+                        aria-expanded={isBulletOpen}
                       >
-                        {copiedBulletId === bullet.id ? "Copied" : "Copy"}
+                        <span className={styles.optimizationBulletLabel}>{originalText}</span>
+                        <span
+                          className={[
+                            styles.optimizationBulletChevron,
+                            isBulletOpen ? styles.optimizationBulletChevronOpen : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                          aria-hidden="true"
+                        >
+                          +
+                        </span>
                       </button>
-                    </div>
-                  </div>
-                ) : null}
-              </article>
-            ))}
+                      {isBulletOpen ? (
+                        <div className={styles.optimizationBulletBody} style={{ maxHeight: "400px" }}>
+                          <div className={styles.optimizationBulletBodyInner}>
+                            <div className={styles.optimizationBulletCopiedRow}>
+                              <p
+                                className={[
+                                  styles.optimizationAccordionBodyText,
+                                  styles.optimizationAccordionBodyTextOptimized,
+                                ].join(" ")}
+                              >
+                                {bullet.optimized}
+                              </p>
+                              <button
+                                type="button"
+                                className={styles.optimizationCopyButton}
+                                onClick={() => {
+                                  void Promise.resolve(onCopyOptimizedBullet?.(section, bullet)).then(() => {
+                                    setCopiedBulletId(bullet.id);
+                                    window.setTimeout(() => {
+                                      setCopiedBulletId((current) => (current === bullet.id ? null : current));
+                                    }, 1500);
+                                  });
+                                }}
+                                aria-label="Copy optimized bullet"
+                              >
+                                {copiedBulletId === bullet.id ? "Copied" : "Copy"}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <p className={styles.optimizationAccordionBodyText}>{originalText}</p>
+                  )}
+                </article>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -998,7 +1038,15 @@ export function ResumeStudioView() {
     isShowingProgressScreen ||
     shouldRenderAnalysisCompleteScreen ||
     isShowingGenerationErrorScreen
-      ? [styles.resultsContent, isShowingProgressScreen ? styles.resultsContentLoading : ""].filter(Boolean).join(" ")
+      ? [
+          styles.resultsContent,
+          isShowingProgressScreen || shouldRenderAnalysisCompleteScreen || isShowingGenerationErrorScreen
+            ? styles.resultsContentCentered
+            : "",
+          isShowingProgressScreen ? styles.resultsContentLoading : "",
+        ]
+          .filter(Boolean)
+          .join(" ")
       : styles.content;
   const useScrollSectionsFlow = true;
 

@@ -285,7 +285,7 @@ describe("ResumeStudioView", () => {
       gaps_count: 1,
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /Product Support Engineer/i }));
+    fireEvent.click(screen.getAllByRole("button", { name: /Product Support Engineer/i })[0]!);
 
     expect(captureEventMock).toHaveBeenCalledWith("optimization_section_expanded", {
       run_id: "run-1",
@@ -363,8 +363,9 @@ describe("ResumeStudioView", () => {
 
     render(<ResumeStudioView />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Product Support Engineer/i }));
-    fireEvent.click(screen.getByRole("button", { name: /copy optimized bullet from product support engineer/i }));
+    fireEvent.click(screen.getAllByRole("button", { name: /Product Support Engineer/i })[0]!);
+    fireEvent.click(screen.getByRole("button", { name: /Original bullet/i }));
+    fireEvent.click(screen.getByRole("button", { name: /copy optimized bullet/i }));
 
     expect(writeTextMock).toHaveBeenCalledWith("Optimized bullet");
     await waitFor(() => {
@@ -423,7 +424,7 @@ describe("ResumeStudioView", () => {
 
     render(<ResumeStudioView />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Product Support Engineer/i }));
+    fireEvent.click(screen.getAllByRole("button", { name: /Product Support Engineer/i })[0]!);
 
     expect(captureEventMock).toHaveBeenCalledWith("optimization_section_expanded", {
       run_id: undefined,
@@ -476,7 +477,7 @@ describe("ResumeStudioView", () => {
     );
   });
 
-  it("renders optimization accordions from backend optimization_sections and reveals optimized bullets on expand", async () => {
+  it("renders optimization accordions from backend optimization_sections and reveals optimized bullets after opening a bullet row", async () => {
     window.localStorage.setItem("applican:resume-studio:show-results", JSON.stringify(true));
     window.localStorage.setItem(
       "applican:resume-studio:last-run-output",
@@ -533,7 +534,7 @@ describe("ResumeStudioView", () => {
 
     render(<ResumeStudioView />);
 
-    expect(screen.getByRole("button", { name: /Product Support Engineer/i })).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /Product Support Engineer/i })[0]).toBeTruthy();
     expect(screen.getByRole("button", { name: /Support Dashboard/i })).toBeTruthy();
     expect(
       screen.getByText(
@@ -546,7 +547,20 @@ describe("ResumeStudioView", () => {
       ),
     ).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: /Product Support Engineer/i }));
+    fireEvent.click(screen.getAllByRole("button", { name: /Product Support Engineer/i })[0]!);
+
+    expect(
+      screen.queryByText(
+        "Diagnosed and resolved production issues in APIs and PostgreSQL, enhancing query performance and system reliability",
+      ),
+    ).toBeNull();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name:
+          /Diagnosed and resolved production issues across APIs and PostgreSQL database queries, improving query performance and ensuring reliable functionality for end users/i,
+      }),
+    );
 
     expect(
       screen.getByText(

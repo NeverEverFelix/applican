@@ -7,11 +7,13 @@ const {
   listGeneratedResumesMock,
   getLatestResumeRunForEditorMock,
   invokeGenerateTailoredResumeMock,
+  invokeCompileTailoredResumePdfMock,
   captureEventMock,
 } = vi.hoisted(() => ({
   listGeneratedResumesMock: vi.fn(),
   getLatestResumeRunForEditorMock: vi.fn(),
   invokeGenerateTailoredResumeMock: vi.fn(),
+  invokeCompileTailoredResumePdfMock: vi.fn(),
   captureEventMock: vi.fn(),
 }));
 
@@ -38,6 +40,10 @@ vi.mock("../../../jobs/api/invokeGenerateTailoredResume", () => ({
   invokeGenerateTailoredResume: invokeGenerateTailoredResumeMock,
 }));
 
+vi.mock("../../../jobs/api/invokeCompileTailoredResumePdf", () => ({
+  invokeCompileTailoredResumePdf: invokeCompileTailoredResumePdfMock,
+}));
+
 vi.mock("../../../../posthog", () => ({
   captureEvent: captureEventMock,
 }));
@@ -58,6 +64,9 @@ describe("EditorView", () => {
     ]);
     getLatestResumeRunForEditorMock.mockResolvedValue(null);
     invokeGenerateTailoredResumeMock.mockReset();
+    invokeCompileTailoredResumePdfMock.mockResolvedValue({
+      signed_url: "https://example.com/resume.pdf",
+    });
     captureEventMock.mockReset();
     vi.stubGlobal(
       "URL",
@@ -66,6 +75,10 @@ describe("EditorView", () => {
         revokeObjectURL: vi.fn(),
       }),
     );
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: true,
+      blob: async () => new Blob(["pdf"], { type: "application/pdf" }),
+    })) as typeof fetch);
   });
 
   afterEach(() => {
@@ -75,6 +88,14 @@ describe("EditorView", () => {
 
   it("tracks opening, editing, and downloading a resume in the editor", async () => {
     render(<EditorView />);
+
+    await new Promise((resolve) => window.setTimeout(resolve, 1700));
+
+    await waitFor(() => {
+      expect(invokeCompileTailoredResumePdfMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(screen.getByTitle("Tailored resume PDF preview")).toBeTruthy();
 
     await waitFor(() => {
       expect(captureEventMock).toHaveBeenCalledWith("latex_editor_opened", {
@@ -126,5 +147,11 @@ describe("EditorView", () => {
       template: "jakes",
       source: "editor",
     });
-  });
+
+    fireEvent.click(screen.getByRole("button", { name: /download .pdf file/i }));
+
+    await waitFor(() => {
+      expect(invokeCompileTailoredResumePdfMock).toHaveBeenCalledTimes(2);
+    });
+  }, 10000);
 });

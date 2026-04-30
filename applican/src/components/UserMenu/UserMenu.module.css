@@ -141,3 +141,20 @@
     filter: blur(8px);
   }
 }
+
+@media (max-width: 1279px) {
+  .triggerButton {
+    width: 100%;
+    max-width: 216px;
+  }
+}
+
+@media (max-width: 767px) {
+  .triggerButton {
+    max-width: none;
+  }
+
+  .menuContent {
+    width: min(216px, calc(100vw - 24px));
+  }
+}

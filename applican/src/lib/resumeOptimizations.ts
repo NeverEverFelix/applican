@@ -133,6 +133,12 @@ function bulletTextMatchesSource(source: unknown, optimizationOriginal: unknown)
   );
 }
 
+function bulletTextsEquivalent(left: unknown, right: unknown): boolean {
+  const normalizedLeft = normalizeBulletText(cleanOptimizationBulletText(left));
+  const normalizedRight = normalizeBulletText(cleanOptimizationBulletText(right));
+  return Boolean(normalizedLeft) && Boolean(normalizedRight) && normalizedLeft === normalizedRight;
+}
+
 function isOptimizationBullet(value: OptimizationBullet | null): value is OptimizationBullet {
   return Boolean(value);
 }
@@ -792,19 +798,55 @@ function derivePresentationSectionsFromLegacyFields(
       const sourceBullets = Array.isArray(section.bullets) ? section.bullets : [];
       const rewriteBullets = Array.isArray(rewrite?.bullets) ? rewrite.bullets : [];
       const optimizationBullets = Array.isArray(optimization?.bullets) ? optimization.bullets : [];
+      const mappedOptimizationBullets = Array.from(
+        { length: sourceBullets.length },
+        () => null as (typeof optimizationBullets)[number] | null,
+      );
+      const usedSourceBulletIndices = new Set<number>();
+
+      optimizationBullets.forEach((optimizationBullet) => {
+        if (!optimizationBullet || optimizationBullet.action === "add") {
+          return;
+        }
+
+        const matchedSourceIndex = sourceBullets.findIndex((sourceBullet, sourceIndex) => {
+          if (usedSourceBulletIndices.has(sourceIndex)) {
+            return false;
+          }
+
+          return bulletTextMatchesSource(sourceBullet, optimizationBullet.original);
+        });
+
+        if (matchedSourceIndex === -1) {
+          return;
+        }
+
+        mappedOptimizationBullets[matchedSourceIndex] = optimizationBullet;
+        usedSourceBulletIndices.add(matchedSourceIndex);
+      });
 
       const bullets = sourceBullets
         .map((sourceBullet, bulletIndex) => {
-          const optimizationBullet = optimizationBullets[bulletIndex];
+          const optimizationBullet = mappedOptimizationBullets[bulletIndex];
           const rewriteBullet = rewriteBullets[bulletIndex];
           const canUseOptimizationBullet =
             optimizationBullet?.action !== "add" && bulletTextMatchesSource(sourceBullet, optimizationBullet?.original);
+          const optimizationRewrite = cleanOptimizationBulletText(optimizationBullet?.rewritten);
+          const cleanedRewriteBullet = cleanOptimizationBulletText(rewriteBullet);
+          const optimizedBullet =
+            canUseOptimizationBullet &&
+            !(
+              bulletTextsEquivalent(optimizationRewrite, sourceBullet) &&
+              cleanedRewriteBullet &&
+              !bulletTextsEquivalent(cleanedRewriteBullet, sourceBullet)
+            )
+              ? optimizationRewrite
+              : cleanedRewriteBullet;
           return toPresentationBullet(
             sectionId,
             bulletIndex,
             cleanString(sourceBullet),
-            (canUseOptimizationBullet ? cleanOptimizationBulletText(optimizationBullet?.rewritten) : "") ||
-              cleanOptimizationBulletText(rewriteBullet),
+            optimizedBullet,
             canUseOptimizationBullet ? "replace" : "replace",
           );
         })

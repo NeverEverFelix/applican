@@ -382,6 +382,131 @@ describe("resumeOptimizations", () => {
     ]);
   });
 
+  it("matches optimization bullets by source text instead of raw bullet index", () => {
+    const sections = extractResumeOptimizationPresentationSections({
+      source_experience_sections: [
+        {
+          title: "Technical Support Specialist",
+          bullets: [
+            "Resolved Active Directory credential failures to restore secure user access",
+            "Managed high-volume support requests across ticketing systems, email, and in-person channels, consistently meeting SLA response and resolution targets",
+          ],
+        },
+      ],
+      optimizations: [
+        {
+          experience_title: "Technical Support Specialist",
+          bullets: [
+            {
+              action: "replace",
+              original:
+                "Managed high-volume support requests across ticketing systems, email, and in-person channels, consistently meeting SLA response and resolution targets",
+              rewritten:
+                "Managed high-volume support requests across ticketing, email, and in-person channels while consistently meeting SLA response and resolution targets",
+            },
+          ],
+        },
+      ],
+      tailored_resume_input: {
+        experience_rewrites: [
+          {
+            title: "Technical Support Specialist",
+            bullets: [
+              "Resolved Active Directory credential failures to restore secure user access",
+              "Managed high-volume support requests across ticketing, email, and in-person channels while consistently meeting SLA response and resolution targets",
+            ],
+          },
+        ],
+        projects_rewrites: [],
+      },
+    });
+
+    expect(sections).toEqual([
+      {
+        id: "exp:0",
+        kind: "experience",
+        source_index: 0,
+        display_title: "Technical Support Specialist",
+        bullets: [
+          {
+            id: "exp:0:0",
+            source_index: 0,
+            original: "Resolved Active Directory credential failures to restore secure user access",
+            optimized: "Resolved Active Directory credential failures to restore secure user access",
+            action: "replace",
+          },
+          {
+            id: "exp:0:1",
+            source_index: 1,
+            original:
+              "Managed high-volume support requests across ticketing systems, email, and in-person channels, consistently meeting SLA response and resolution targets",
+            optimized:
+              "Managed high-volume support requests across ticketing, email, and in-person channels while consistently meeting SLA response and resolution targets",
+            action: "replace",
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("prefers rewrite bullets when an optimization rewrite is identical to the source bullet", () => {
+    const sections = extractResumeOptimizationPresentationSections({
+      source_experience_sections: [
+        {
+          title: "Technical Support Specialist",
+          bullets: [
+            "Managed high-volume support requests across ticketing systems, email, and in-person channels, consistently meeting SLA response and resolution targets",
+          ],
+        },
+      ],
+      optimizations: [
+        {
+          experience_title: "Technical Support Specialist",
+          bullets: [
+            {
+              action: "replace",
+              original:
+                "Managed high-volume support requests across ticketing systems, email, and in-person channels, consistently meeting SLA response and resolution targets",
+              rewritten:
+                "Managed high-volume support requests across ticketing systems, email, and in-person channels, consistently meeting SLA response and resolution targets",
+            },
+          ],
+        },
+      ],
+      tailored_resume_input: {
+        experience_rewrites: [
+          {
+            title: "Technical Support Specialist",
+            bullets: [
+              "Managed high-volume support requests across ticketing, email, and in-person channels while consistently meeting SLA response and resolution targets",
+            ],
+          },
+        ],
+        projects_rewrites: [],
+      },
+    });
+
+    expect(sections).toEqual([
+      {
+        id: "exp:0",
+        kind: "experience",
+        source_index: 0,
+        display_title: "Technical Support Specialist",
+        bullets: [
+          {
+            id: "exp:0:0",
+            source_index: 0,
+            original:
+              "Managed high-volume support requests across ticketing systems, email, and in-person channels, consistently meeting SLA response and resolution targets",
+            optimized:
+              "Managed high-volume support requests across ticketing, email, and in-person channels while consistently meeting SLA response and resolution targets",
+            action: "replace",
+          },
+        ],
+      },
+    ]);
+  });
+
   it("prefers backend optimization_sections over local derivation when present", () => {
     const sections = extractResumeOptimizationPresentationSections({
       optimization_sections: [

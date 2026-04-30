@@ -1,7 +1,7 @@
 .container {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
-  grid-template-columns: 216px auto;
+  grid-template-columns: minmax(0, 216px) minmax(0, 1fr);
   column-gap: 36px;
   background: #151515;
   padding: 24px 24px 24px 12px;
@@ -10,7 +10,8 @@
 }
 
 .userInfoContainer {
-  width: 216px;
+  width: 100%;
+  max-width: 216px;
   height: auto;
   grid-column: 1;
   justify-self: start;
@@ -21,10 +22,12 @@
 }
 
 .studioArea {
-  width: 1152px;
+  width: 100%;
+  max-width: 1152px;
   grid-column: 2;
   justify-self: end;
   position: relative;
+  min-width: 0;
 }
 
 .studioUserCard {
@@ -33,4 +36,40 @@
   left: 78px;
   z-index: 2;
   pointer-events: none;
+}
+
+@media (max-width: 1279px) {
+  .container {
+    grid-template-columns: 1fr;
+    row-gap: 24px;
+    padding: 20px 16px 24px;
+  }
+
+  .userInfoContainer {
+    max-width: none;
+    width: 100%;
+    gap: 24px;
+  }
+
+  .studioArea {
+    max-width: none;
+    justify-self: stretch;
+  }
+
+  .studioUserCard {
+    left: 32px;
+  }
+}
+
+@media (max-width: 767px) {
+  .container {
+    padding: 16px 12px 20px;
+    row-gap: 16px;
+  }
+
+  .studioUserCard {
+    position: static;
+    margin-bottom: 12px;
+    pointer-events: auto;
+  }
 }

@@ -44,6 +44,10 @@ function normalizeBulletText(value: string): string {
     .trim();
 }
 
+function bulletTextsEquivalent(left: string, right: string): boolean {
+  return Boolean(left) && Boolean(right) && normalizeBulletText(left) === normalizeBulletText(right);
+}
+
 function collectUnique(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
 }
@@ -282,8 +286,13 @@ function rebuildExperienceOptimizations(
         .map((sourceOriginal, bulletIndex) => {
           const optimizationBullet = mappedOptimizationBullets[bulletIndex];
           const rewriteBullet = cleanString(rewriteBullets[bulletIndex]);
+          const optimizationRewrite = cleanBulletText(optimizationBullet?.rewritten);
+          const shouldPreferRewriteBullet =
+            Boolean(rewriteBullet) &&
+            bulletTextsEquivalent(optimizationRewrite, cleanString(sourceOriginal)) &&
+            !bulletTextsEquivalent(rewriteBullet, cleanString(sourceOriginal));
           const rewritten =
-            cleanBulletText(optimizationBullet?.rewritten) ||
+            (shouldPreferRewriteBullet ? rewriteBullet : optimizationRewrite) ||
             rewriteBullet ||
             cleanString(sourceOriginal);
 
@@ -390,11 +399,11 @@ export function normalizeModelOutput(params: {
         ? finalizedDerivedSourceExperienceSections
         : deriveSourceExperienceSectionsFromExperienceRewrites(experienceRewrites);
   const optimizationSections = extractResumeOptimizationPresentationSections({
-    source_experience_sections: sourceExperienceSections,
-    optimizations: normalizedOptimizations,
+    source_experience_sections: finalizedSourceExperienceSections,
+    optimizations,
     project_optimizations: projectOptimizations,
     tailored_resume_input: {
-      experience_rewrites: modelExperienceRewrites,
+      experience_rewrites: experienceRewrites,
       projects_rewrites: modelProjectsRewrites,
     },
   });
