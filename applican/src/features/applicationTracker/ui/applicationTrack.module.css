@@ -1324,6 +1324,13 @@
   padding: 8px 0 0 0;
 }
 
+.optimizationBulletCopiedRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .optimizationAccordionBodyText {
   margin: 0;
   color: #ffffff;
@@ -1331,12 +1338,46 @@
 }
 
 .optimizationAccordionBodyTextOptimized {
+  flex: 1 1 auto;
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: 18px;
   font-weight: 700;
   line-height: 28px;
   letter-spacing: 0.01em;
   color: #ffffff;
+}
+
+.optimizationCopyButton {
+  flex: 0 0 auto;
+  min-width: 72px;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 6%);
+  color: #ffffff;
+  padding: 8px 12px;
+  font-family: "Neue Haas Grotesk Display Pro", Inter, Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.optimizationCopyButton:hover {
+  background: rgb(255 255 255 / 12%);
+  border-color: rgb(255 255 255 / 22%);
+  transform: translateY(-1px);
+}
+
+.optimizationCopyButton:focus,
+.optimizationCopyButton:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
 }
 
 .placeholderPanel {

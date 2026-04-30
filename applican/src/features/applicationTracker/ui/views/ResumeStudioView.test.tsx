@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 
@@ -63,6 +63,7 @@ vi.mock("../../../../effects/ScrollSections", () => ({
 
 const storage = new Map<string, string>();
 const indexedDbFiles = new Map<string, File>();
+const writeTextMock = vi.fn(async () => undefined);
 const localStorageMock = {
   getItem: (key: string) => storage.get(key) ?? null,
   setItem: (key: string, value: string) => {
@@ -193,8 +194,15 @@ beforeEach(() => {
     value: createIndexedDbMock(),
     configurable: true,
   });
+  Object.defineProperty(navigator, "clipboard", {
+    value: {
+      writeText: writeTextMock,
+    },
+    configurable: true,
+  });
   localStorageMock.clear();
   indexedDbFiles.clear();
+  writeTextMock.mockReset();
   useCreateResumeRunMock.mockReturnValue({
     submitResumeRun: vi.fn(),
     retryResumeRun: vi.fn(),
@@ -269,8 +277,10 @@ describe("ResumeStudioView", () => {
       run_id: "run-1",
       request_id: "request-1",
       company: "Wavform",
+      job_title: "Product Support Engineer",
       title: "Product Support Engineer",
       match_score: 87,
+      source: "resume_studio",
       strengths_count: 1,
       gaps_count: 1,
     });
@@ -280,10 +290,12 @@ describe("ResumeStudioView", () => {
     expect(captureEventMock).toHaveBeenCalledWith("optimization_section_expanded", {
       run_id: "run-1",
       request_id: "request-1",
+      company: "Wavform",
       section_id: "exp:0",
       section_kind: "experience",
       job_title: "Product Support Engineer",
       match_score: 87,
+      source: "resume_studio",
       action: "expand",
     });
 
@@ -294,10 +306,136 @@ describe("ResumeStudioView", () => {
       expect.objectContaining({
         run_id: "run-1",
         request_id: "request-1",
+        company: "Wavform",
+        job_title: "Product Support Engineer",
+        match_score: 87,
+        source: "resume_studio",
+      }),
+    );
+  });
+
+  it("copies an optimized bullet and tracks optimized_bullet_copied", async () => {
+    window.localStorage.setItem("applican:resume-studio:show-results", JSON.stringify(true));
+    window.localStorage.setItem(
+      "applican:resume-studio:last-run-output",
+      JSON.stringify({
+        job: {
+          company: "Wavform",
+          title: "Product Support Engineer",
+        },
+        match: {
+          score: 87,
+          label: "87% Match",
+          summary: "Strong support alignment.",
+        },
+        analysis: {
+          strengths: ["Strong troubleshooting background"],
+          gaps: ["Needs more direct SaaS metrics"],
+        },
+        optimization_sections: [
+          {
+            id: "exp:0",
+            kind: "experience",
+            source_index: 0,
+            display_title: "Product Support Engineer",
+            bullets: [
+              {
+                id: "exp:0:0",
+                source_index: 0,
+                original: "Original bullet",
+                optimized: "Optimized bullet",
+                action: "replace",
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    window.localStorage.setItem(
+      "applican:resume-studio:last-run-context",
+      JSON.stringify({
+        run_id: "run-1",
+        request_id: "request-1",
         job_title: "Product Support Engineer",
         match_score: 87,
       }),
     );
+
+    render(<ResumeStudioView />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Product Support Engineer/i }));
+    fireEvent.click(screen.getByRole("button", { name: /copy optimized bullet from product support engineer/i }));
+
+    expect(writeTextMock).toHaveBeenCalledWith("Optimized bullet");
+    await waitFor(() => {
+      expect(captureEventMock).toHaveBeenCalledWith("optimized_bullet_copied", {
+        run_id: "run-1",
+        request_id: "request-1",
+        company: "Wavform",
+        section_id: "exp:0",
+        section_kind: "experience",
+        bullet_id: "exp:0:0",
+        job_title: "Product Support Engineer",
+        match_score: 87,
+        source: "resume_studio",
+        action: "copy",
+      });
+    });
+  });
+
+  it("tracks optimization_section_expanded even when older restored results do not have run context", () => {
+    window.localStorage.setItem("applican:resume-studio:show-results", JSON.stringify(true));
+    window.localStorage.setItem(
+      "applican:resume-studio:last-run-output",
+      JSON.stringify({
+        job: {
+          company: "Wavform",
+          title: "Product Support Engineer",
+        },
+        match: {
+          score: 87,
+          label: "87% Match",
+          summary: "Strong support alignment.",
+        },
+        analysis: {
+          strengths: ["Strong troubleshooting background"],
+          gaps: ["Needs more direct SaaS metrics"],
+        },
+        optimization_sections: [
+          {
+            id: "exp:0",
+            kind: "experience",
+            source_index: 0,
+            display_title: "Product Support Engineer",
+            bullets: [
+              {
+                id: "exp:0:0",
+                source_index: 0,
+                original: "Original bullet",
+                optimized: "Optimized bullet",
+                action: "replace",
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    render(<ResumeStudioView />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Product Support Engineer/i }));
+
+    expect(captureEventMock).toHaveBeenCalledWith("optimization_section_expanded", {
+      run_id: undefined,
+      request_id: undefined,
+      company: "Wavform",
+      section_id: "exp:0",
+      section_kind: "experience",
+      job_title: "Product Support Engineer",
+      match_score: 87,
+      source: "resume_studio",
+      action: "expand",
+    });
   });
 
   it("renders optimization accordions from backend optimization_sections and reveals optimized bullets on expand", async () => {

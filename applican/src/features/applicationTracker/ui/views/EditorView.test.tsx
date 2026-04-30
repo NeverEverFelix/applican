@@ -82,6 +82,10 @@ describe("EditorView", () => {
         run_id: "run-1",
         request_id: "request-1",
         filename: "tailored-resume.tex",
+        source: "editor",
+        file_type: "tex",
+        resume_origin: "history",
+        template: "jakes",
       });
     });
 
@@ -89,13 +93,26 @@ describe("EditorView", () => {
       target: { value: "\\\\documentclass{report}" },
     });
 
-    expect(captureEventMock).toHaveBeenCalledWith("resume_edited", {
-      resume_id: "resume-1",
-      run_id: "run-1",
-      request_id: "request-1",
-      filename: "tailored-resume.tex",
-      action: "edit",
-    });
+    expect(captureEventMock).toHaveBeenCalledWith(
+      "resume_edited",
+      expect.objectContaining({
+        resume_id: "resume-1",
+        run_id: "run-1",
+        request_id: "request-1",
+        filename: "tailored-resume.tex",
+        action: "edit",
+        source: "editor",
+        edit_mode: "latex_monaco",
+        is_editor_mode: false,
+        resume_origin: "history",
+        template: "jakes",
+        file_type: "tex",
+        initial_character_count: 24,
+        current_character_count: 23,
+        seconds_since_editor_opened: expect.any(Number),
+        character_delta_bucket: "1_20",
+      }),
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /download .tex file/i }));
 
@@ -105,6 +122,9 @@ describe("EditorView", () => {
       request_id: "request-1",
       filename: "tailored-resume.tex",
       file_type: "tex",
+      resume_origin: "history",
+      template: "jakes",
+      source: "editor",
     });
   });
 });

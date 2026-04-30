@@ -24,8 +24,15 @@ import type { HistoryCardData } from "../../../components/history/history";
 import { listHistoryCards } from "../../../features/history/api/listHistoryCards";
 import FadeSwipePanels from "../../../effects/FadeSwipePanels";
 import Profile from "../../../components/profile/Profile";
+import { captureEvent } from "../../../posthog";
 
 export type ApplicationTrackerStatus = ApplicationFilter;
+
+function inferFileType(filename: string): string {
+  const trimmed = filename.trim().toLowerCase();
+  const extension = trimmed.includes(".") ? trimmed.slice(trimmed.lastIndexOf(".") + 1) : "";
+  return extension || "unknown";
+}
 
 function PlaceholderView({ title }: { title: string }) {
   return (
@@ -259,6 +266,12 @@ function ApplicationTrackerView({
       link.click();
       link.remove();
       URL.revokeObjectURL(objectUrl);
+      captureEvent("resume_downloaded", {
+        application_id: applicationId,
+        filename: data.filename || fallbackFilename,
+        file_type: inferFileType(data.filename || fallbackFilename),
+        source: "application_tracker",
+      });
     } catch (error) {
       Sentry.captureException(error, {
         tags: { feature: "application_tracker", action: "download_resume" },

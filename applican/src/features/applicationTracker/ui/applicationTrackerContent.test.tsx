@@ -4,11 +4,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { APPLICATION_STATUS, type ApplicationRow } from "../data/model";
 import { ApplicationTrackerContent } from "./applicationTrackerContent";
 
-const mockUseApplications = vi.fn();
+const { mockUseApplications, captureEventMock, getResumeDownloadUrlMock } = vi.hoisted(() => ({
+  mockUseApplications: vi.fn(),
+  captureEventMock: vi.fn(),
+  getResumeDownloadUrlMock: vi.fn(),
+}));
 
 afterEach(() => {
   cleanup();
   mockUseApplications.mockReset();
+  captureEventMock.mockReset();
+  getResumeDownloadUrlMock.mockReset();
+  vi.unstubAllGlobals();
 });
 
 vi.mock("../data/useApplications", () => ({
@@ -16,7 +23,11 @@ vi.mock("../data/useApplications", () => ({
 }));
 
 vi.mock("../api/getResumeDownloadUrl", () => ({
-  getResumeDownloadUrl: vi.fn(),
+  getResumeDownloadUrl: getResumeDownloadUrlMock,
+}));
+
+vi.mock("../../../posthog", () => ({
+  captureEvent: captureEventMock,
 }));
 
 vi.mock("./views/ResumeStudioView", () => ({
@@ -233,5 +244,62 @@ describe("ApplicationTrackerContent", () => {
     expect(betaCheckbox.checked).toBe(true);
     expect(headerCheckbox.checked).toBe(true);
     expect(headerCheckbox.indeterminate).toBe(false);
+  });
+
+  it("tracks resume_downloaded from the application tracker export path", async () => {
+    mockUseApplications.mockReturnValue({
+      applications: [buildApplication({ id: "application-1", company: "Acme", resume_filename: "resume.pdf" })],
+      counts: { all: 1, applied: 1, interview: 0, rejected: 0 },
+      isLoading: false,
+      isFetchingMore: false,
+      hasMore: false,
+      errorMessage: null,
+      retryLoad: vi.fn(),
+      loadMore: vi.fn(),
+      updateApplicationStatus: vi.fn(),
+      deleteApplications: vi.fn(async () => true),
+      isUpdating: vi.fn(() => false),
+      isDeleting: false,
+    });
+
+    getResumeDownloadUrlMock.mockResolvedValue({
+      signed_url: "https://example.com/resume.pdf",
+      filename: "resume.pdf",
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        blob: async () => new Blob(["pdf"], { type: "application/pdf" }),
+      })),
+    );
+    vi.stubGlobal(
+      "URL",
+      Object.assign(URL, {
+        createObjectURL: vi.fn(() => "blob:test"),
+        revokeObjectURL: vi.fn(),
+      }),
+    );
+
+    render(
+      <ApplicationTrackerContent
+        selectedView="Application Tracker"
+        selectedStatus="all"
+        onSelectStatus={vi.fn()}
+        onSelectView={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /download resume.pdf/i }));
+
+    await waitFor(() => {
+      expect(captureEventMock).toHaveBeenCalledWith("resume_downloaded", {
+        application_id: "application-1",
+        filename: "resume.pdf",
+        file_type: "pdf",
+        source: "application_tracker",
+      });
+    });
   });
 });

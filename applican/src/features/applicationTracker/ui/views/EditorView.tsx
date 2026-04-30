@@ -54,6 +54,7 @@ type TailoredResumeOutput = {
   id?: string;
   filename?: string;
   latex?: string;
+  template?: string;
 };
 
 type EditorResumeContext = {
@@ -61,7 +62,26 @@ type EditorResumeContext = {
   run_id: string;
   request_id: string | null;
   filename: string;
+  template: string | null;
+  source: "history" | "generated_for_run" | "latest_run_output";
 };
+
+function inferFileType(filename: string): string {
+  const trimmed = filename.trim().toLowerCase();
+  const extension = trimmed.includes(".") ? trimmed.slice(trimmed.lastIndexOf(".") + 1) : "";
+  return extension || "unknown";
+}
+
+function toCharacterDeltaBucket(delta: number): string {
+  const absoluteDelta = Math.abs(delta);
+  if (absoluteDelta <= 20) {
+    return "1_20";
+  }
+  if (absoluteDelta <= 100) {
+    return "21_100";
+  }
+  return "101_plus";
+}
 
 function extractTailoredResumeFromOutput(output: unknown): TailoredResumeOutput | null {
   if (!output || typeof output !== "object") {
@@ -77,12 +97,14 @@ function extractTailoredResumeFromOutput(output: unknown): TailoredResumeOutput 
     id?: unknown;
     filename?: unknown;
     latex?: unknown;
+    template?: unknown;
   };
 
   return {
     id: typeof tailored.id === "string" ? tailored.id : undefined,
     filename: typeof tailored.filename === "string" ? tailored.filename : undefined,
     latex: typeof tailored.latex === "string" ? tailored.latex : undefined,
+    template: typeof tailored.template === "string" ? tailored.template : undefined,
   };
 }
 
@@ -102,6 +124,7 @@ export function EditorView() {
   const lastTrackedOpenKeyRef = useRef("");
   const editTrackedKeysRef = useRef<Set<string>>(new Set());
   const initialLatexByKeyRef = useRef<Record<string, string>>({});
+  const editorOpenedAtByKeyRef = useRef<Record<string, number>>({});
 
   const activeResumeKey =
     activeResumeContext?.resume_id || activeResumeContext?.run_id
@@ -117,6 +140,8 @@ export function EditorView() {
       run_id: row.run_id,
       request_id: row.request_id,
       filename: row.filename,
+      template: row.template,
+      source: "history",
     });
     initialLatexByKeyRef.current[`${row.id}|${row.run_id}`] = row.latex;
     setErrorMessage("");
@@ -163,6 +188,8 @@ export function EditorView() {
         run_id: targetRunId,
         request_id: targetRequestId ?? null,
         filename: nextFilename,
+        template: response.tailored_resume.template,
+        source: "generated_for_run",
       });
       initialLatexByKeyRef.current[`${nextResumeId}|${targetRunId}`] = response.tailored_resume.latex;
       await loadHistory(false);
@@ -197,6 +224,8 @@ export function EditorView() {
             run_id: latestRun.id,
             request_id: latestRun.request_id,
             filename: nextFilename,
+            template: existingTailored.template ?? null,
+            source: "latest_run_output",
           });
           initialLatexByKeyRef.current[`${nextResumeId}|${latestRun.id}`] = existingTailored.latex;
           return;
@@ -230,11 +259,16 @@ export function EditorView() {
     }
 
     lastTrackedOpenKeyRef.current = trackingKey;
+    editorOpenedAtByKeyRef.current[trackingKey] = Date.now();
     captureEvent("latex_editor_opened", {
       resume_id: activeResumeContext.resume_id,
       run_id: activeResumeContext.run_id,
       request_id: activeResumeContext.request_id,
       filename: activeResumeContext.filename,
+      source: "editor",
+      file_type: inferFileType(activeResumeContext.filename),
+      resume_origin: activeResumeContext.source,
+      template: activeResumeContext.template,
     });
   }, [activeResumeContext]);
 
@@ -245,7 +279,10 @@ export function EditorView() {
         run_id: activeResumeContext.run_id,
         request_id: activeResumeContext.request_id,
         filename: activeResumeContext.filename,
-        file_type: "tex",
+        file_type: inferFileType(activeResumeContext.filename),
+        resume_origin: activeResumeContext.source,
+        template: activeResumeContext.template,
+        source: "editor",
       });
     }
 
@@ -288,12 +325,26 @@ export function EditorView() {
     }
 
     editTrackedKeysRef.current.add(activeResumeKey);
+    const secondsSinceEditorOpened = editorOpenedAtByKeyRef.current[activeResumeKey]
+      ? Math.round((Date.now() - editorOpenedAtByKeyRef.current[activeResumeKey]) / 1000)
+      : null;
+    const characterDelta = nextLatex.length - initialLatex.length;
     captureEvent("resume_edited", {
       resume_id: activeResumeContext.resume_id,
       run_id: activeResumeContext.run_id,
       request_id: activeResumeContext.request_id,
       filename: activeResumeContext.filename,
       action: "edit",
+      source: "editor",
+      edit_mode: "latex_monaco",
+      is_editor_mode: isEditorMode,
+      resume_origin: activeResumeContext.source,
+      template: activeResumeContext.template,
+      file_type: inferFileType(activeResumeContext.filename),
+      initial_character_count: initialLatex.length,
+      current_character_count: nextLatex.length,
+      seconds_since_editor_opened: secondsSinceEditorOpened,
+      character_delta_bucket: toCharacterDeltaBucket(characterDelta),
     });
   };
 

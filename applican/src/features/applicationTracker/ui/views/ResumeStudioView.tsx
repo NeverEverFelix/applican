@@ -44,6 +44,15 @@ type ResumeStudioRunContext = {
   match_score: number;
 };
 
+type ResumeStudioAnalyticsContext = {
+  run_id: string | undefined;
+  request_id: string | undefined;
+  company: string;
+  job_title: string;
+  match_score: number;
+  source: "resume_studio";
+};
+
 const RESUME_FILE_DB_NAME = "applican_resume_file_db";
 const RESUME_FILE_STORE_NAME = "resume_files";
 const RESUME_FILE_KEY = "latest_resume";
@@ -94,11 +103,17 @@ function validateResumeFile(file: File | null): string {
 function OptimizationSectionAccordion({
   section,
   onExpand,
+  onCopyOptimizedBullet,
 }: {
   section: ResumeOptimizationPresentationSection;
   onExpand?: (section: ResumeOptimizationPresentationSection) => void;
+  onCopyOptimizedBullet?: (
+    section: ResumeOptimizationPresentationSection,
+    bullet: ResumeOptimizationPresentationSection["bullets"][number],
+  ) => Promise<void> | void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [copiedBulletId, setCopiedBulletId] = useState<string | null>(null);
 
   return (
     <section className={styles.optimizationGroup}>
@@ -138,14 +153,31 @@ function OptimizationSectionAccordion({
                 <p className={styles.optimizationAccordionBodyText}>{bullet.original ?? bullet.optimized ?? ""}</p>
                 {isOpen && bullet.optimized && bullet.optimized !== bullet.original ? (
                   <div className={styles.optimizationBulletBodyInner}>
-                    <p
-                      className={[
-                        styles.optimizationAccordionBodyText,
-                        styles.optimizationAccordionBodyTextOptimized,
-                      ].join(" ")}
-                    >
-                      {bullet.optimized}
-                    </p>
+                    <div className={styles.optimizationBulletCopiedRow}>
+                      <p
+                        className={[
+                          styles.optimizationAccordionBodyText,
+                          styles.optimizationAccordionBodyTextOptimized,
+                        ].join(" ")}
+                      >
+                        {bullet.optimized}
+                      </p>
+                      <button
+                        type="button"
+                        className={styles.optimizationCopyButton}
+                        onClick={() => {
+                          void Promise.resolve(onCopyOptimizedBullet?.(section, bullet)).then(() => {
+                            setCopiedBulletId(bullet.id);
+                            window.setTimeout(() => {
+                              setCopiedBulletId((current) => (current === bullet.id ? null : current));
+                            }, 1500);
+                          });
+                        }}
+                        aria-label={`Copy optimized bullet from ${section.display_title}`}
+                      >
+                        {copiedBulletId === bullet.id ? "Copied" : "Copy"}
+                      </button>
+                    </div>
                   </div>
                 ) : null}
               </article>
@@ -159,9 +191,14 @@ function OptimizationSectionAccordion({
 function ResumeOptimizationsPanel({
   sections,
   onExpandSection,
+  onCopyOptimizedBullet,
 }: {
   sections: ResumeOptimizationPresentationSection[];
   onExpandSection?: (section: ResumeOptimizationPresentationSection) => void;
+  onCopyOptimizedBullet?: (
+    section: ResumeOptimizationPresentationSection,
+    bullet: ResumeOptimizationPresentationSection["bullets"][number],
+  ) => Promise<void> | void;
 }) {
   return (
     <div
@@ -177,6 +214,7 @@ function ResumeOptimizationsPanel({
           key={`${section.id}-${index}`}
           section={section}
           onExpand={onExpandSection}
+          onCopyOptimizedBullet={onCopyOptimizedBullet}
         />
       ))}
     </div>
@@ -191,6 +229,20 @@ function buildRunContext(runId: string, requestId: string, output: unknown): Res
     request_id: requestId,
     job_title: cleanString(root?.job?.title),
     match_score: typeof root?.match?.score === "number" ? root.match.score : 0,
+  };
+}
+
+function buildResumeStudioAnalyticsContext(
+  parsedOutput: ResumeStudioOutput,
+  runContext: ResumeStudioRunContext | null,
+): ResumeStudioAnalyticsContext {
+  return {
+    run_id: runContext?.run_id,
+    request_id: runContext?.request_id,
+    company: parsedOutput.job.company,
+    job_title: parsedOutput.job.title,
+    match_score: parsedOutput.match.score,
+    source: "resume_studio",
   };
 }
 
@@ -701,12 +753,10 @@ export function ResumeStudioView() {
 
     lastTrackedResultKeyRef.current = resultKey;
     resultsViewedAtRef.current = Date.now();
+    const analyticsContext = buildResumeStudioAnalyticsContext(parsedOutput, currentRunContext);
     captureEvent("results_viewed", {
-      run_id: currentRunContext?.run_id,
-      request_id: currentRunContext?.request_id,
-      company: parsedOutput.job.company,
+      ...analyticsContext,
       title: parsedOutput.job.title,
-      match_score: parsedOutput.match.score,
       strengths_count: parsedOutput.analysis.strengths.length,
       gaps_count: parsedOutput.analysis.gaps.length,
     });
@@ -812,11 +862,18 @@ export function ResumeStudioView() {
 
   const onStartNewAnalysis = () => {
     if (shouldShowResults && currentRunContext) {
+      const analyticsContext = parsedOutput
+        ? buildResumeStudioAnalyticsContext(parsedOutput, currentRunContext)
+        : {
+            run_id: currentRunContext.run_id,
+            request_id: currentRunContext.request_id,
+            company: "",
+            job_title: currentRunContext.job_title,
+            match_score: currentRunContext.match_score,
+            source: "resume_studio" as const,
+          };
       captureEvent("new_run_started", {
-        run_id: currentRunContext.run_id,
-        request_id: currentRunContext.request_id,
-        job_title: parsedOutput?.job.title ?? currentRunContext.job_title,
-        match_score: parsedOutput?.match.score ?? currentRunContext.match_score,
+        ...analyticsContext,
         seconds_since_results_viewed:
           resultsViewedAtRef.current === null ? null : Math.round((Date.now() - resultsViewedAtRef.current) / 1000),
       });
@@ -874,18 +931,38 @@ export function ResumeStudioView() {
 
   const onExpandOptimizationSection = useCallback(
     (section: ResumeOptimizationPresentationSection) => {
-      if (!currentRunContext || !parsedOutput) {
+      if (!parsedOutput) {
         return;
       }
 
+      const analyticsContext = buildResumeStudioAnalyticsContext(parsedOutput, currentRunContext);
       captureEvent("optimization_section_expanded", {
-        run_id: currentRunContext.run_id,
-        request_id: currentRunContext.request_id,
+        ...analyticsContext,
         section_id: section.id,
         section_kind: section.kind,
-        job_title: parsedOutput.job.title,
-        match_score: parsedOutput.match.score,
         action: "expand",
+      });
+    },
+    [currentRunContext, parsedOutput],
+  );
+
+  const onCopyOptimizedBullet = useCallback(
+    async (
+      section: ResumeOptimizationPresentationSection,
+      bullet: ResumeOptimizationPresentationSection["bullets"][number],
+    ) => {
+      if (!parsedOutput || !bullet.optimized) {
+        return;
+      }
+
+      await navigator.clipboard.writeText(bullet.optimized);
+      const analyticsContext = buildResumeStudioAnalyticsContext(parsedOutput, currentRunContext);
+      captureEvent("optimized_bullet_copied", {
+        ...analyticsContext,
+        section_id: section.id,
+        section_kind: section.kind,
+        bullet_id: bullet.id,
+        action: "copy",
       });
     },
     [currentRunContext, parsedOutput],
@@ -1179,6 +1256,7 @@ export function ResumeStudioView() {
                     <ResumeOptimizationsPanel
                       sections={optimizationSections}
                       onExpandSection={onExpandOptimizationSection}
+                      onCopyOptimizedBullet={onCopyOptimizedBullet}
                     />
                   </div>
                 ),

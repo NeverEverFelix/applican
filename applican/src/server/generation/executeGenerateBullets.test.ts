@@ -2,7 +2,6 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 import {
   executeGenerateBullets,
-  GenerateBulletsExecutionError,
 } from "./executeGenerateBullets.ts";
 
 const SOURCE_EXPERIENCE_SECTIONS = [
@@ -13,9 +12,16 @@ const SOURCE_EXPERIENCE_SECTIONS = [
 ];
 
 const PARSER_DEBUG = {
-  experience_sections_found: 1,
-  section_titles: ["Software Engineer"],
-  ignored_headings: [],
+  experience_header_found: true,
+  section_count: 1,
+  experience_slice_preview: ["Software Engineer", "Built backend APIs for internal tools."],
+  source_experience_sections: [
+    {
+      title: "Software Engineer",
+      bullets: ["Built backend APIs for internal tools."],
+      header_lines: ["Software Engineer"],
+    },
+  ],
 };
 
 describe("executeGenerateBullets retries", () => {
@@ -71,7 +77,7 @@ describe("executeGenerateBullets retries", () => {
         parserDebug: PARSER_DEBUG,
         fetchImpl,
       })
-    ).rejects.toMatchObject<Partial<GenerateBulletsExecutionError>>({
+    ).rejects.toMatchObject({
       code: "OPENAI_HTTP_ERROR",
       stage: "openai_request",
     });
@@ -95,7 +101,7 @@ describe("executeGenerateBullets retries", () => {
         parserDebug: PARSER_DEBUG,
         fetchImpl,
       })
-    ).rejects.toMatchObject<Partial<GenerateBulletsExecutionError>>({
+    ).rejects.toMatchObject({
       code: "OPENAI_NETWORK_ERROR",
       stage: "openai_request",
     });
