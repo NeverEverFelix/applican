@@ -438,6 +438,44 @@ describe("ResumeStudioView", () => {
     });
   });
 
+  it("tracks new_run_started even when older restored results do not have run context", () => {
+    window.localStorage.setItem("applican:resume-studio:show-results", JSON.stringify(true));
+    window.localStorage.setItem(
+      "applican:resume-studio:last-run-output",
+      JSON.stringify({
+        job: {
+          company: "Wavform",
+          title: "Product Support Engineer",
+        },
+        match: {
+          score: 87,
+          label: "87% Match",
+          summary: "Strong support alignment.",
+        },
+        analysis: {
+          strengths: ["Strong troubleshooting background"],
+          gaps: ["Needs more direct SaaS metrics"],
+        },
+      }),
+    );
+
+    render(<ResumeStudioView />);
+
+    fireEvent.click(screen.getByRole("button", { name: /new analysis/i }));
+
+    expect(captureEventMock).toHaveBeenCalledWith(
+      "new_run_started",
+      expect.objectContaining({
+        run_id: undefined,
+        request_id: undefined,
+        company: "Wavform",
+        job_title: "Product Support Engineer",
+        match_score: 87,
+        source: "resume_studio",
+      }),
+    );
+  });
+
   it("renders optimization accordions from backend optimization_sections and reveals optimized bullets on expand", async () => {
     window.localStorage.setItem("applican:resume-studio:show-results", JSON.stringify(true));
     window.localStorage.setItem(

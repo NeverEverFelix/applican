@@ -861,15 +861,15 @@ export function ResumeStudioView() {
   };
 
   const onStartNewAnalysis = () => {
-    if (shouldShowResults && currentRunContext) {
+    if (shouldShowResults && (parsedOutput || currentRunContext)) {
       const analyticsContext = parsedOutput
         ? buildResumeStudioAnalyticsContext(parsedOutput, currentRunContext)
         : {
-            run_id: currentRunContext.run_id,
-            request_id: currentRunContext.request_id,
+            run_id: currentRunContext?.run_id,
+            request_id: currentRunContext?.request_id,
             company: "",
-            job_title: currentRunContext.job_title,
-            match_score: currentRunContext.match_score,
+            job_title: currentRunContext?.job_title ?? "",
+            match_score: currentRunContext?.match_score ?? 0,
             source: "resume_studio" as const,
           };
       captureEvent("new_run_started", {
