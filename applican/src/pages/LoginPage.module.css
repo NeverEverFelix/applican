@@ -90,6 +90,7 @@
 }
 
 .subText a {
+  margin-left: 4px;
   color: #0068f4;
   text-decoration: underline;
 }
