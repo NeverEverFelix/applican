@@ -312,6 +312,10 @@
     --header-offset: 0px;
     --content-offset: 0px;
     --section-gap: 20px;
+    min-height: 100dvh;
+    height: 100dvh;
+    align-items: center;
+    align-content: center;
   }
 
   .assetContainer {
@@ -319,10 +323,16 @@
   }
 
   .form {
-    min-height: calc(100svh - (var(--page-padding) * 2));
+    height: auto;
+    min-height: 0;
+    justify-content: center;
   }
 
   .mainText {
     font-size: clamp(40px, 12vw, 52px);
+  }
+
+  .passwordStepActions {
+    margin-top: 20px;
   }
 }
