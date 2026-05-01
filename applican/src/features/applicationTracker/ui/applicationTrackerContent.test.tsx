@@ -4,17 +4,36 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { APPLICATION_STATUS, type ApplicationRow } from "../data/model";
 import { ApplicationTrackerContent } from "./applicationTrackerContent";
 
-const { mockUseApplications, captureEventMock, getResumeDownloadUrlMock } = vi.hoisted(() => ({
+const { mockUseApplications, captureEventMock, getResumeDownloadUrlMock, mockUseViewport } = vi.hoisted(() => ({
   mockUseApplications: vi.fn(),
   captureEventMock: vi.fn(),
   getResumeDownloadUrlMock: vi.fn(),
+  mockUseViewport: vi.fn(),
 }));
+
+mockUseViewport.mockReturnValue({
+  width: 1440,
+  bucket: "desktop",
+  isMobile: false,
+  isTablet: false,
+  isTabletOrBelow: false,
+  isDesktop: true,
+});
 
 afterEach(() => {
   cleanup();
   mockUseApplications.mockReset();
   captureEventMock.mockReset();
   getResumeDownloadUrlMock.mockReset();
+  mockUseViewport.mockReset();
+  mockUseViewport.mockReturnValue({
+    width: 1440,
+    bucket: "desktop",
+    isMobile: false,
+    isTablet: false,
+    isTabletOrBelow: false,
+    isDesktop: true,
+  });
   vi.unstubAllGlobals();
 });
 
@@ -28,6 +47,10 @@ vi.mock("../api/getResumeDownloadUrl", () => ({
 
 vi.mock("../../../posthog", () => ({
   captureEvent: captureEventMock,
+}));
+
+vi.mock("../../../hooks/useViewport", () => ({
+  useViewport: () => mockUseViewport(),
 }));
 
 vi.mock("./views/ResumeStudioView", () => ({
@@ -74,6 +97,48 @@ const buildApplication = (overrides: Partial<ApplicationRow>): ApplicationRow =>
 });
 
 describe("ApplicationTrackerContent", () => {
+  it("renders the editor on desktop viewports", () => {
+    render(
+      <ApplicationTrackerContent
+        selectedView="Editor"
+        selectedStatus="all"
+        onSelectStatus={vi.fn()}
+        onSelectView={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Editor")).toBeTruthy();
+  });
+
+  it("replaces the editor with a fallback panel on tablet and mobile", () => {
+    const onSelectView = vi.fn();
+    mockUseViewport.mockReturnValue({
+      width: 1024,
+      bucket: "tablet",
+      isMobile: false,
+      isTablet: true,
+      isTabletOrBelow: true,
+      isDesktop: false,
+    });
+
+    render(
+      <ApplicationTrackerContent
+        selectedView="Editor"
+        selectedStatus="all"
+        onSelectStatus={vi.fn()}
+        onSelectView={onSelectView}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Editor unavailable on this device" })).toBeTruthy();
+    expect(screen.getByText(/The Editor is desktop-only for now\./)).toBeTruthy();
+    expect(screen.queryByText("Editor")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Return to Resume Studio" }));
+
+    expect(onSelectView).toHaveBeenCalledWith("Resume Studio");
+  });
+
   it("supports selecting rows individually and via the header checkbox", async () => {
     const deleteApplicationsMock = vi.fn(async () => true);
     const updateApplicationStatusMock = vi.fn(async () => {});

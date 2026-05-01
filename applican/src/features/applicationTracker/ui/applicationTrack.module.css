@@ -101,7 +101,7 @@
 }
 
 .editorToolbar {
-  width: 955px;
+  width: min(100%, 955px);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -265,7 +265,7 @@
 }
 
 .editorWorkspace {
-  width: 955px;
+  width: min(100%, 955px);
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
@@ -273,7 +273,7 @@
 }
 
 .editorHistoryPanel {
-  width: 280px;
+  width: min(100%, 280px);
   border: 1px solid #242424;
   border-radius: 12px;
   background: #111111;
@@ -315,14 +315,15 @@
 }
 
 .editorPreviewPanelOpen {
-  flex-basis: 420px;
+  flex: 1 1 420px;
+  min-width: 0;
   opacity: 1;
   pointer-events: auto;
 }
 
 .editorPreviewPanelHistoryMode {
   flex: 1 1 auto;
-  min-width: 560px;
+  min-width: 0;
 }
 
 .editorPreviewPanelSplit {
@@ -546,7 +547,9 @@
   flex-direction: column;
   align-items: center;
   gap: 24px;
-  margin-top: 224px;
+  margin-top: clamp(96px, 18vh, 224px);
+  padding-bottom: 24px;
+  box-sizing: border-box;
 }
 
 .resultsContent {
@@ -599,7 +602,7 @@
 }
 
 .progressBarContainer {
-  width: 850px;
+  width: min(100%, 850px);
   height: 15px;
   border-radius: 100px;
   background: #151515;
@@ -617,7 +620,7 @@
 }
 
 .progressStatusContainer {
-  width: 439px;
+  width: min(100%, 439px);
   height: 40px;
   display: flex;
   align-items: center;
@@ -716,7 +719,7 @@
 }
 
 .generationErrorSubtextContainer {
-  width: 827.75px;
+  width: min(100%, 827.75px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -768,7 +771,7 @@
 }
 
 .jobInputWrapper {
-  width: 638px;
+  width: min(100%, 638px);
   height: 48px;
   position: relative;
 }
@@ -831,7 +834,7 @@
 }
 
 .generateResultButton {
-  width: 638px;
+  width: min(100%, 638px);
   height: 48px;
   background-color: #0068f4;
   color: #ffffff;
@@ -865,7 +868,7 @@
 }
 
 .uploadBox {
-  width: 638px;
+  width: min(100%, 638px);
   height: 192px;
   border: 0;
   border-radius: 12px;
@@ -906,7 +909,7 @@
 }
 
 .statusNotice {
-  width: 638px;
+  width: min(100%, 638px);
 }
 
 .arrowIcon {
@@ -924,7 +927,7 @@
 }
 
 .outputPanel {
-  width: 638px;
+  width: min(100%, 638px);
   margin: 0;
   padding: 14px;
   border-radius: 12px;
@@ -939,10 +942,10 @@
 }
 
 .resumeAnalysisContainer {
-  width: 995px;
+  width: min(100%, 995px);
   height: 100%;
   flex: 1 1 auto;
-  margin-top: var(--resume-analysis-top-gap, 2px);
+  margin-top: var(--resume-analysis-top-gap, clamp(2px, 1.2vh, 16px));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -954,7 +957,7 @@
 }
 
 .resumeAnalysisActions {
-  width: 955px;
+  width: min(100%, 955px);
   display: flex;
   justify-content: flex-end;
   margin-bottom: 14px;
@@ -984,14 +987,14 @@
 }
 
 .resumeAnalysisBottomSeparator {
-  width: 955px;
+  width: min(100%, 955px);
   border-top: 1px dashed #151515;
   align-self: center;
   box-sizing: border-box;
 }
 
 .resumeAnalysisSeparatorWrap {
-  width: 995px;
+  width: min(100%, 995px);
   margin-top: 16px;
   position: relative;
   display: flex;
@@ -1026,7 +1029,7 @@
 
 .resumeOptimizationsContainer,
 .resumeAnalysisScrollContainer {
-  width: 955px;
+  width: min(100%, 955px);
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
@@ -1413,6 +1416,26 @@
   margin: 0;
   color: #9a9a9a;
   font-size: 14px;
+  line-height: 1.5;
+  text-align: center;
+  max-width: 44ch;
+}
+
+.placeholderActionButton {
+  min-height: 40px;
+  border: 1px solid #222222;
+  border-radius: 999px;
+  background: #141414;
+  color: #f3f3f3;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.placeholderActionButton:focus-visible {
+  outline: 2px solid #3f86ff;
+  outline-offset: 2px;
 }
 
 .careerPathView {
@@ -1486,12 +1509,14 @@
   align-items: center;
   box-sizing: border-box;
   padding-top: 98px;
+  min-width: 0;
 }
 
 .trackerHeader {
   width: 100%;
   display: flex;
   justify-content: center;
+  min-width: 0;
 }
 
 .statusPillGroup {
@@ -1619,8 +1644,9 @@
 
 /* Application Tracker Columns */
 .trackerColumns {
-  width: 976px;
+  width: min(100%, 976px);
   margin-top: 0;
+  min-width: 0;
 }
 
 .trackerColumnHeader {
@@ -1663,6 +1689,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 6px;
+  scrollbar-gutter: stable both-edges;
 }
 
 .trackerRow {
@@ -1936,6 +1963,19 @@
 }
 
 @media (max-width: 1279px) {
+  .trackerView {
+    padding-top: 72px;
+    align-items: stretch;
+  }
+
+  .trackerHeader {
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 0 12px;
+    scrollbar-gutter: stable;
+  }
+
   .studioContainer {
     height: auto;
     max-height: none;
@@ -1973,9 +2013,24 @@
     min-width: 976px;
   }
 
+  .statusPillGroup {
+    padding-inline: 4px;
+  }
+
+  .trackerTopDivider,
+  .trackerHeaderDivider,
+  .trackerColumns {
+    align-self: stretch;
+  }
+
   .trackerColumns,
   .trackerGridBody {
     overflow-x: auto;
+    scrollbar-gutter: stable;
+  }
+
+  .trackerColumns {
+    padding-bottom: 8px;
   }
 
   .trackerGridBody {
@@ -1983,7 +2038,7 @@
   }
 
   .content {
-    margin-top: 168px;
+    margin-top: clamp(80px, 14vh, 168px);
   }
 
   .progressBarContainer {
@@ -2016,6 +2071,25 @@
 }
 
 @media (max-width: 767px) {
+  .trackerView {
+    padding-top: 56px;
+  }
+
+  .trackerHeader {
+    padding-bottom: 10px;
+  }
+
+  .statusPillGroup {
+    gap: 10px;
+    padding-inline: 0;
+  }
+
+  .statusPill {
+    font-size: 15px;
+    padding: 0 12px;
+    gap: 10px;
+  }
+
   .studioContainer {
     height: auto;
     max-height: none;
@@ -2045,8 +2119,14 @@
   }
 
   .content {
-    margin-top: 132px;
+    margin-top: clamp(56px, 10vh, 132px);
     gap: 16px;
+    padding-bottom: 16px;
+  }
+
+  .trackerColumns,
+  .trackerGridBody {
+    padding-bottom: 6px;
   }
 
   .progressScreenContainer,

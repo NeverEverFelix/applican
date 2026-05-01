@@ -60,10 +60,19 @@
   outline: none;
 }
 
+.stateControlItem:disabled {
+  cursor: not-allowed;
+}
+
 .stateControlItemActive {
   height: 42px;
   border-radius: 8px;
   background: linear-gradient(90deg, #292929 0%, #1f1f1f 100%);
+}
+
+.stateControlItemUnavailable {
+  background: transparent;
+  box-shadow: none;
 }
 
 .stateControlIcon {
@@ -71,6 +80,10 @@
   height: 14px;
   flex: 0 0 14px;
   opacity: 0.95;
+}
+
+.stateControlIconUnavailable {
+  opacity: 0.35;
 }
 
 .stateControlIconPurple {
@@ -84,6 +97,10 @@
   line-height: 1;
   letter-spacing: -0.01em;
   color: #ffffff;
+}
+
+.stateControlLabelUnavailable {
+  color: rgb(255 255 255 / 58%);
 }
 
 .stateControlLabelRow {
@@ -101,6 +118,10 @@
   color: rgb(255 255 255 / 40%);
   text-transform: lowercase;
   white-space: nowrap;
+}
+
+.stateControlAvailabilityUnavailable {
+  color: rgb(255 255 255 / 28%);
 }
 
 .logoutButton {

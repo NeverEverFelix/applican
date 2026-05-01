@@ -25,6 +25,8 @@ import { listHistoryCards } from "../../../features/history/api/listHistoryCards
 import FadeSwipePanels from "../../../effects/FadeSwipePanels";
 import Profile from "../../../components/profile/Profile";
 import { captureEvent } from "../../../posthog";
+import { useViewport } from "../../../hooks/useViewport";
+import { resolveStudioViewAccess } from "./studioViewPolicy";
 
 export type ApplicationTrackerStatus = ApplicationFilter;
 
@@ -34,11 +36,26 @@ function inferFileType(filename: string): string {
   return extension || "unknown";
 }
 
-function PlaceholderView({ title }: { title: string }) {
+function PlaceholderView({
+  title,
+  copy = "This view will be built inside the studio container.",
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  copy?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
   return (
     <section className={styles.placeholderPanel}>
       <h2 className={styles.placeholderTitle}>{title}</h2>
-      <p className={styles.placeholderCopy}>This view will be built inside the studio container.</p>
+      <p className={styles.placeholderCopy}>{copy}</p>
+      {actionLabel && onAction ? (
+        <button type="button" className={styles.placeholderActionButton} onClick={onAction}>
+          {actionLabel}
+        </button>
+      ) : null}
     </section>
   );
 }
@@ -650,12 +667,29 @@ export function ApplicationTrackerContent({
   onSelectStatus,
   onSelectView,
 }: ApplicationTrackerContentProps) {
+  const { bucket } = useViewport();
+
   if (selectedView === "Application Tracker") {
     return <ApplicationTrackerView selectedStatus={selectedStatus} onSelectStatus={onSelectStatus} />;
   }
 
   if (selectedView === "Profile") {
     return <Profile onClose={() => onSelectView("Resume Studio")} />;
+  }
+
+  const access = resolveStudioViewAccess(selectedView, bucket);
+
+  if (!access.isSupported) {
+    return (
+      <PlaceholderView
+        title={access.policy.unavailableTitle ?? `${selectedView} unavailable on this device`}
+        copy={access.policy.unavailableCopy ?? "This view is not available on the current device."}
+        actionLabel={
+          access.policy.fallbackView ? (access.policy.fallbackActionLabel ?? `Return to ${access.policy.fallbackView}`) : undefined
+        }
+        onAction={access.policy.fallbackView ? () => onSelectView(access.policy.fallbackView!) : undefined}
+      />
+    );
   }
 
   const SelectedView = STUDIO_CONTENT_BY_VIEW[selectedView];

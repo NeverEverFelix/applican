@@ -1,1 +1,2 @@
 # applican
+I built a product around a real user workflow, handled technical implementation, thought through onboarding and failure cases, used analytics to improve the experience, and translated user pain into product decisions.

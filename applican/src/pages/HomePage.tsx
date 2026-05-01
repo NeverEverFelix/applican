@@ -19,6 +19,13 @@ import { useLocalStorageState } from "../hooks/useLocalStorageState";
 import { useUpgradeGate } from "../hooks/useUpgradeGate";
 import { createCheckoutSession } from "../features/billing/api/createCheckoutSession";
 import { createPortalSession } from "../features/billing/api/createPortalSession";
+import { useViewport } from "../hooks/useViewport";
+import {
+  getStudioViewAvailabilityLabel,
+  getStudioViewPolicy,
+  isStudioViewSupportedOn,
+  resolveSupportedStudioView,
+} from "../features/applicationTracker/ui/studioViewPolicy";
 
 function isPickerView(value: unknown): value is PickerView {
   return (
@@ -44,6 +51,7 @@ export default function HomePage() {
   const showLoading = useMinimumLoading(isLoggingOut);
   const navigate = useNavigate();
   const location = useLocation();
+  const { bucket } = useViewport();
   const currentUserName = useCurrentUserName();
   const currentUserPlan = useCurrentUserPlan();
   const pickerItems: Array<{ label: PickerView; iconSrc: string }> = [
@@ -59,6 +67,10 @@ export default function HomePage() {
     view !== "Resume Studio" && view !== "Application Tracker" && view !== "Profile" && view !== "History";
 
   const onSelectView = (view: PickerView) => {
+    if (!isStudioViewSupportedOn(view, bucket)) {
+      return;
+    }
+
     if (!isProUser && isViewRestricted(view)) {
       openUpgradeModal();
       return;
@@ -66,6 +78,13 @@ export default function HomePage() {
 
     setSelectedView(view);
   };
+
+  useEffect(() => {
+    const resolvedView = resolveSupportedStudioView(selectedView, bucket);
+    if (resolvedView !== selectedView) {
+      setSelectedView(resolvedView);
+    }
+  }, [bucket, selectedView, setSelectedView]);
 
   const handleLogout = async () => {
     if (isLoggingOut) {
@@ -144,17 +163,26 @@ export default function HomePage() {
           onOpenChange={setIsUserMenuOpen}
         />
         <div className={userStyles.stateControlStack}>
-          {pickerItems.map((item) => (
+          {pickerItems.map((item) => {
+            const isSupportedOnCurrentViewport = isStudioViewSupportedOn(item.label, bucket);
+            const policy = getStudioViewPolicy(item.label);
+            const availabilityLabel = getStudioViewAvailabilityLabel(item.label, bucket);
+
+            return (
             <button
               type="button"
               key={item.label}
               className={[
                 userStyles.stateControlItem,
+                !isSupportedOnCurrentViewport ? userStyles.stateControlItemUnavailable : "",
                 selectedView === item.label ? userStyles.stateControlItemActive : "",
               ]
                 .filter(Boolean)
                 .join(" ")}
               onClick={() => onSelectView(item.label)}
+              disabled={!isSupportedOnCurrentViewport}
+              aria-disabled={!isSupportedOnCurrentViewport}
+              title={!isSupportedOnCurrentViewport ? policy.unavailableTitle : undefined}
               aria-pressed={selectedView === item.label}
             >
               <img
@@ -163,19 +191,39 @@ export default function HomePage() {
                 aria-hidden="true"
                 className={[
                   userStyles.stateControlIcon,
+                  !isSupportedOnCurrentViewport ? userStyles.stateControlIconUnavailable : "",
                   item.label === "Editor" ? userStyles.stateControlIconPurple : "",
                 ]
                   .filter(Boolean)
                   .join(" ")}
               />
               <div className={userStyles.stateControlLabelRow}>
-                <p className={userStyles.stateControlLabel}>{item.label}</p>
-                {item.label === "Career Path" || item.label === "Resources" ? (
-                  <span className={userStyles.stateControlSoonLabel}>Coming soon</span>
+                <p
+                  className={[
+                    userStyles.stateControlLabel,
+                    !isSupportedOnCurrentViewport ? userStyles.stateControlLabelUnavailable : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  {item.label}
+                </p>
+                {availabilityLabel ? (
+                  <span
+                    className={[
+                      userStyles.stateControlSoonLabel,
+                      !isSupportedOnCurrentViewport ? userStyles.stateControlAvailabilityUnavailable : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    {availabilityLabel}
+                  </span>
                 ) : null}
               </div>
             </button>
-          ))}
+            );
+          })}
         </div>
       </div>
       <div className={styles.studioArea}>
