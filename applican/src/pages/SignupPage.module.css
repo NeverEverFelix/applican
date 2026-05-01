@@ -342,6 +342,7 @@
     height: 100dvh;
     align-items: center;
     align-content: center;
+    justify-items: center;
   }
 
   .assetContainer {
@@ -352,6 +353,7 @@
     height: auto;
     min-height: 0;
     justify-content: center;
+    margin: 0 auto;
   }
 
   .mainText {
