@@ -300,3 +300,29 @@
     min-height: 320px;
   }
 }
+
+@media (max-width: 767px) {
+  .container {
+    --page-padding: 16px;
+    --panel-height: auto;
+    --panel-radius: 20px;
+    --panel-padding-inline: 20px;
+    --panel-padding-top: 40px;
+    --panel-padding-bottom: 24px;
+    --header-offset: 0px;
+    --content-offset: 0px;
+    --section-gap: 20px;
+  }
+
+  .assetContainer {
+    display: none;
+  }
+
+  .form {
+    min-height: calc(100svh - (var(--page-padding) * 2));
+  }
+
+  .mainText {
+    font-size: clamp(40px, 12vw, 52px);
+  }
+}

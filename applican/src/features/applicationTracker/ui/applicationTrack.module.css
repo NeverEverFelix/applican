@@ -2077,11 +2077,21 @@
 
   .trackerHeader {
     padding-bottom: 10px;
+    overflow: visible;
   }
 
   .statusPillGroup {
+    width: 100%;
+    height: auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto auto auto;
     gap: 10px;
     padding-inline: 0;
+  }
+
+  .statusPillActionSlot {
+    grid-column: 1 / -1;
+    grid-row: 3;
   }
 
   .statusPill {
@@ -2124,9 +2134,174 @@
     padding-bottom: 16px;
   }
 
+  .trackerTopDivider,
+  .trackerHeaderDivider,
+  .trackerColumns,
+  .trackerColumnHeader,
+  .trackerRow,
+  .trackerRowDivider {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .trackerColumns,
+  .trackerGridBody {
+    overflow-x: hidden;
+  }
+
+  .trackerColumnHeader {
+    display: none;
+  }
+
+  .trackerGridBody {
+    min-height: 0;
+    max-height: none;
+    overflow-y: visible;
+    padding-right: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .trackerRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "checkbox checkbox"
+      "company company"
+      "date status"
+      "position position"
+      "location location"
+      "resume resume";
+    align-items: start;
+    gap: 10px 12px;
+    min-height: 0;
+    padding: 12px;
+    border: 1px solid #222222;
+    border-radius: 12px;
+    background: #111111;
+  }
+
+  .trackerColumnCheckbox {
+    grid-area: checkbox;
+    justify-content: flex-start;
+  }
+
+  .trackerRowText,
+  .trackerStatusCell,
+  .trackerResumeCell {
+    min-width: 0;
+  }
+
+  .trackerRow > :nth-child(2) {
+    grid-area: company;
+  }
+
+  .trackerRow > :nth-child(3) {
+    grid-area: date;
+  }
+
+  .trackerRow > :nth-child(4) {
+    grid-area: status;
+    justify-content: flex-end;
+  }
+
+  .trackerRow > :nth-child(5) {
+    grid-area: position;
+  }
+
+  .trackerRow > :nth-child(6) {
+    grid-area: location;
+  }
+
+  .trackerRow > :nth-child(7) {
+    grid-area: resume;
+  }
+
+  .trackerRowDivider {
+    display: none;
+  }
+
+  .trackerRowText {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    padding-right: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .trackerRow > :nth-child(2)::before {
+    content: "Company";
+  }
+
+  .trackerRow > :nth-child(3)::before {
+    content: "Date Applied";
+  }
+
+  .trackerRow > :nth-child(5)::before {
+    content: "Position";
+  }
+
+  .trackerRow > :nth-child(6)::before {
+    content: "Location";
+  }
+
+  .trackerRow > :nth-child(2)::before,
+  .trackerRow > :nth-child(3)::before,
+  .trackerRow > :nth-child(5)::before,
+  .trackerRow > :nth-child(6)::before {
+    color: #9a9a9a;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+  }
+
+  .trackerStatusCell::before {
+    content: "Status";
+    color: #9a9a9a;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+    margin-right: 8px;
+  }
+
+  .trackerStatusCell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  .trackerResumeCell {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+
+  .trackerResumeCell::before {
+    content: "Resume";
+    color: #9a9a9a;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+  }
+
+  .trackerResumeChip {
+    width: 100%;
+    max-width: 100%;
+  }
+
   .trackerColumns,
   .trackerGridBody {
     padding-bottom: 6px;
+  }
+
+  .trackerColumns,
+  .trackerGridBody {
+    scrollbar-gutter: auto;
   }
 
   .progressScreenContainer,
