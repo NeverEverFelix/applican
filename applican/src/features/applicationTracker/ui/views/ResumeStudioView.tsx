@@ -554,7 +554,6 @@ export function ResumeStudioView() {
       setLoadingAnimationOriginMs(null);
       setRevealedAnalysisCount(0);
       setShowComputedResults(true);
-      setIsTransitioningToSuccessfulResult(false);
     },
     [setLoadingAnimationOriginMs, setPersistedRunContext, setPersistedRunOutput, setShowComputedResults],
   );

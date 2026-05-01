@@ -2,6 +2,21 @@ import { describe, expect, it } from "vitest";
 
 import { normalizeModelOutput } from "./normalizeModelOutput.ts";
 
+const PARSER_DEBUG = {
+  experience_header_found: true,
+  section_count: 1,
+  experience_slice_preview: ["Product Support Engineer"],
+  source_experience_sections: [
+    {
+      title: "Product Support Engineer",
+      bullets: [
+        "Diagnosed and resolved production issues across APIs and PostgreSQL database queries, improving query performance and ensuring reliable functionality for end users",
+      ],
+      header_lines: ["Product Support Engineer"],
+    },
+  ],
+};
+
 describe("normalizeModelOutput", () => {
   it("builds optimization_sections from reconciled experience optimizations instead of raw model order", () => {
     const output = normalizeModelOutput({
@@ -59,6 +74,8 @@ describe("normalizeModelOutput", () => {
         projects_rewrites: [],
         project_optimizations: [],
       },
+      model: "gpt-4.1",
+      requestId: "request-1",
       parsedSourceExperienceSections: [
         {
           title: "Product Support Engineer",
@@ -74,7 +91,7 @@ describe("normalizeModelOutput", () => {
           ],
         },
       ],
-      parserDebug: null,
+      parserDebug: PARSER_DEBUG,
     });
 
     expect(output.optimization_sections).toEqual([
@@ -160,6 +177,8 @@ describe("normalizeModelOutput", () => {
         projects_rewrites: [],
         project_optimizations: [],
       },
+      model: "gpt-4.1",
+      requestId: "request-2",
       parsedSourceExperienceSections: [
         {
           title: "Technical Support Specialist",
@@ -168,7 +187,7 @@ describe("normalizeModelOutput", () => {
           ],
         },
       ],
-      parserDebug: null,
+      parserDebug: PARSER_DEBUG,
     });
 
     expect(output.optimizations[0]?.bullets[0]?.rewritten).toBe(

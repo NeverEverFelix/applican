@@ -75,10 +75,10 @@ describe("EditorView", () => {
         revokeObjectURL: vi.fn(),
       }),
     );
-    vi.stubGlobal("fetch", vi.fn(async () => ({
-      ok: true,
-      blob: async () => new Blob(["pdf"], { type: "application/pdf" }),
-    })) as typeof fetch);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(new Blob(["pdf"], { type: "application/pdf" }))) as typeof fetch,
+    );
   });
 
   afterEach(() => {
