@@ -1,16 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import * as Sentry from "npm:@sentry/deno";
-import {
-  type ResumeOptimizationPresentationSection,
-} from "../../../src/lib/resumeOptimizations.ts";
-import {
-  cleanString,
-  type ResumeStudioOutput,
-} from "../../../src/server/generation/bulletOutput.ts";
+import { type ResumeStudioOutput } from "../../../src/server/generation/bulletOutput.ts";
 import { executeGenerateBullets } from "../../../src/server/generation/executeGenerateBullets.ts";
-import { normalizeModelOutput } from "../../../src/server/generation/normalizeModelOutput.ts";
-import { buildGenerateBulletsOpenAiRequest } from "../../../src/server/generation/openAiRequest.ts";
 import { buildParserDebug, parseExperienceSections } from "./parser.ts";
 
 const RUNS_TABLE = "resume_runs";
@@ -260,7 +252,6 @@ async function callOpenAI(
   requestId: string,
 ): Promise<ResumeStudioOutput> {
   const model = Deno.env.get("OPENAI_MODEL") ?? "gpt-4.1-mini";
-  const sourceExperienceSections = parseExperienceSections(resumeText);
   const parsedSourceExperienceSections = parseExperienceSections(resumeText);
   const parserDebug = buildParserDebug(resumeText, parsedSourceExperienceSections);
 

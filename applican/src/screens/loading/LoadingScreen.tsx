@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import applicanLogo from "../../assets/applican.svg";
 import LoadingMorph from "../../components/LoadingBar/LoadingMorph.tsx";
 import { animateWords } from "../../effects/splittext";
@@ -29,13 +29,13 @@ type ActiveResumeProjectile = ResumeProjectile & {
 };
 
 export default function LoadingScreen({ backendProgress = 0, animationOriginMs, onCancel }: LoadingScreenProps) {
-  const getElapsedMs = () => {
+  const getElapsedMs = useCallback(() => {
     if (!animationOriginMs) {
       return 0;
     }
 
     return Math.max(0, Date.now() - animationOriginMs);
-  };
+  }, [animationOriginMs]);
   const [projectiles, setProjectiles] = useState<ActiveResumeProjectile[]>(() => {
     const elapsedMs = getElapsedMs();
     if (elapsedMs <= 0) {
@@ -95,7 +95,7 @@ export default function LoadingScreen({ backendProgress = 0, animationOriginMs, 
     }, remainingIntroMs);
 
     return () => window.clearTimeout(timeoutId);
-  }, [showIntroMessage]);
+  }, [getElapsedMs, showIntroMessage]);
 
   useEffect(() => {
     if (showIntroMessage || JOB_MARKET_QUOTES.length <= 1) {
@@ -120,7 +120,7 @@ export default function LoadingScreen({ backendProgress = 0, animationOriginMs, 
         window.clearInterval(intervalId);
       }
     };
-  }, [showIntroMessage]);
+  }, [getElapsedMs, showIntroMessage]);
 
   useEffect(() => {
     if (showIntroMessage) {
@@ -145,7 +145,7 @@ export default function LoadingScreen({ backendProgress = 0, animationOriginMs, 
     }, remainingRevealDelayMs);
 
     return () => window.clearTimeout(timeoutId);
-  }, [showIntroMessage]);
+  }, [getElapsedMs, showIntroMessage]);
 
   const showMorph = !showIntroMessage && shouldRevealMorph;
 

@@ -203,7 +203,7 @@ export function EditorView() {
     });
     initialLatexByKeyRef.current[`${row.id}|${row.run_id}`] = row.latex;
     setErrorMessage("");
-  }, []);
+  }, [previewUrl]);
 
   const loadHistory = useCallback(async (autoSelectFirst = false, showRefreshAnimation = false) => {
     setIsHistoryLoading(true);

@@ -457,7 +457,6 @@ export function ResumeStudioView() {
   const [isShowingGenerationErrorScreen, setIsShowingGenerationErrorScreen] = useState(
     shouldStartOnPersistedErrorScreen,
   );
-  const [isTransitioningToSuccessfulResult, setIsTransitioningToSuccessfulResult] = useState(false);
   const [jobDescriptionValidationError, setJobDescriptionValidationError] = useState("");
   const [resumeValidationError, setResumeValidationError] = useState("");
   const [revealedAnalysisCount, setRevealedAnalysisCount] = useState(0);
@@ -561,35 +560,6 @@ export function ResumeStudioView() {
   );
 
   useEffect(() => {
-    if (isTransitioningToSuccessfulResult) {
-      return;
-    }
-
-    if (shouldShowResults) {
-      setIsShowingProgressScreen(false);
-      setIsShowingGenerationErrorScreen(false);
-      return;
-    }
-
-    if (isSubmitting) {
-      setIsShowingProgressScreen(true);
-      setIsShowingGenerationErrorScreen(false);
-      return;
-    }
-
-    if (errorMessage && failedRun) {
-      setIsShowingProgressScreen(false);
-      setIsShowingGenerationErrorScreen(true);
-      return;
-    }
-
-    if (!hasPersistedRunState) {
-      setIsShowingProgressScreen(false);
-      setIsShowingGenerationErrorScreen(false);
-    }
-  }, [errorMessage, failedRun, hasPersistedRunState, isSubmitting, isTransitioningToSuccessfulResult, shouldShowResults]);
-
-  useEffect(() => {
     if (
       !shouldAttemptInitialPersistedRunResumeRef.current ||
       shouldShowResults ||
@@ -605,19 +575,15 @@ export function ResumeStudioView() {
     if (loadingAnimationOriginMs === null) {
       setLoadingAnimationOriginMs(Date.now());
     }
-    setIsShowingProgressScreen(!errorMessage);
-    setIsShowingGenerationErrorScreen(Boolean(errorMessage));
 
     void (async () => {
       const result = await resumeStoredRun();
       if (!result || result.cancelled) {
-        setIsTransitioningToSuccessfulResult(false);
         hasAttemptedPersistedRunResumeRef.current = false;
         return;
       }
 
       if (result.ok) {
-        setIsTransitioningToSuccessfulResult(true);
         setIsShowingProgressScreen(false);
         await completeSuccessfulRun(
           result.createdRun.row.output,
@@ -626,19 +592,16 @@ export function ResumeStudioView() {
         return;
       }
 
-      setIsTransitioningToSuccessfulResult(false);
       setIsShowingProgressScreen(false);
       setIsShowingGenerationErrorScreen(true);
     })();
   }, [
     completeSuccessfulRun,
-    errorMessage,
     hasPersistedRunState,
     loadingAnimationOriginMs,
     resumeStoredRun,
     setLoadingAnimationOriginMs,
     isSubmitting,
-    setIsTransitioningToSuccessfulResult,
     shouldShowResults,
   ]);
 
@@ -844,14 +807,10 @@ export function ResumeStudioView() {
     setIsShowingProgressScreen(true);
 
     const result = await submitResumeRun({ file: selectedFile, jobDescription });
-    if (result.ok) {
-      setIsTransitioningToSuccessfulResult(true);
-    }
     await wait(220);
     setIsShowingProgressScreen(false);
 
     if (result.cancelled) {
-      setIsTransitioningToSuccessfulResult(false);
       return;
     }
 
@@ -863,7 +822,6 @@ export function ResumeStudioView() {
       return;
     }
 
-    setIsTransitioningToSuccessfulResult(false);
     setIsShowingGenerationErrorScreen(true);
   };
 
@@ -877,14 +835,10 @@ export function ResumeStudioView() {
     setIsShowingProgressScreen(true);
 
     const result = await retryResumeRun();
-    if (result.ok) {
-      setIsTransitioningToSuccessfulResult(true);
-    }
     await wait(220);
     setIsShowingProgressScreen(false);
 
     if (result.cancelled) {
-      setIsTransitioningToSuccessfulResult(false);
       return;
     }
 
@@ -896,7 +850,6 @@ export function ResumeStudioView() {
       return;
     }
 
-    setIsTransitioningToSuccessfulResult(false);
     setIsShowingGenerationErrorScreen(true);
   };
 
@@ -932,7 +885,6 @@ export function ResumeStudioView() {
     setIsShowingAnalysisCompleteScreen(false);
     setShouldRenderAnalysisCompleteScreen(false);
     setIsShowingGenerationErrorScreen(false);
-    setIsTransitioningToSuccessfulResult(false);
     setJobDescriptionValidationError("");
     setResumeValidationError("");
     setSelectedFile(null);
@@ -954,7 +906,6 @@ export function ResumeStudioView() {
     setIsShowingAnalysisCompleteScreen(false);
     setShouldRenderAnalysisCompleteScreen(false);
     setIsShowingGenerationErrorScreen(false);
-    setIsTransitioningToSuccessfulResult(false);
     setJobDescriptionValidationError("");
     setResumeValidationError("");
     resultsViewedAtRef.current = null;
