@@ -9,8 +9,8 @@ import IlluminateText from "../../effects/illuminate-text";
 type UserMenuProps = {
   user: UserInfo;
   onSignOut: () => void;
-  onUpgrade: () => Promise<void>;
-  onBilling: () => Promise<void>;
+  onUpgrade: (source: string) => Promise<void>;
+  onBilling: (source: string) => Promise<void>;
   onProfileSelect?: () => void;
   onHistorySelect?: () => void;
   isSigningOut?: boolean;
@@ -69,8 +69,9 @@ export default function UserMenu({
 
     setIsBillingActionPending(true);
     if (shouldShowUpgrade) {
-      posthog?.capture("checkout_clicked", { source: "user_menu_upgrade" });
-      void onUpgrade()
+      const source = "user_menu_upgrade";
+      posthog?.capture("checkout_clicked", { source });
+      void onUpgrade(source)
         .catch((error) => {
           const message = error instanceof Error ? error.message : "Failed to open checkout.";
           posthog?.capture("checkout_open_failed", { message });
@@ -82,8 +83,9 @@ export default function UserMenu({
       return;
     }
 
-    posthog?.capture("billing_portal_clicked", { source: "user_menu_billing" });
-    void onBilling()
+    const source = "user_menu_billing";
+    posthog?.capture("billing_portal_clicked", { source });
+    void onBilling(source)
       .catch((error) => {
         const message = error instanceof Error ? error.message : "Failed to open billing portal.";
         posthog?.capture("billing_portal_open_failed", { message });

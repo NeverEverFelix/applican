@@ -2,9 +2,28 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import HomePage from "./HomePage";
+import { captureEvent } from "../posthog";
+import { createCheckoutSession } from "../features/billing/api/createCheckoutSession";
+import { createPortalSession } from "../features/billing/api/createPortalSession";
+import { supabase } from "../lib/supabaseClient";
+
+const refreshSessionResponse = {
+  data: {
+    session: null,
+    user: null,
+  },
+  error: null,
+} as const;
 
 const { mockUseViewport } = vi.hoisted(() => ({
   mockUseViewport: vi.fn(),
+}));
+
+const { mockOpenUpgradeModal, mockSetIsUserMenuOpen, mockCloseUpgradeModalAndOpenMenu, mockCurrentUserPlan } = vi.hoisted(() => ({
+  mockOpenUpgradeModal: vi.fn(),
+  mockSetIsUserMenuOpen: vi.fn(),
+  mockCloseUpgradeModalAndOpenMenu: vi.fn(),
+  mockCurrentUserPlan: vi.fn(),
 }));
 
 const localStorageStore = new Map<string, string>();
@@ -29,12 +48,14 @@ mockUseViewport.mockReturnValue({
   isTabletOrBelow: false,
   isDesktop: true,
 });
+mockCurrentUserPlan.mockReturnValue("pro");
 
 beforeEach(() => {
   Object.defineProperty(window, "localStorage", {
     value: localStorageMock,
     configurable: true,
   });
+  vi.mocked(supabase.auth.refreshSession).mockResolvedValue(refreshSessionResponse);
 });
 
 vi.mock("../hooks/useViewport", () => ({
@@ -43,7 +64,7 @@ vi.mock("../hooks/useViewport", () => ({
 
 vi.mock("../features/auth/useCurrentUser", () => ({
   useCurrentUserName: () => "Test User",
-  useCurrentUserPlan: () => "pro",
+  useCurrentUserPlan: () => mockCurrentUserPlan(),
 }));
 
 vi.mock("../features/auth/useMinimumLoading", () => ({
@@ -51,7 +72,22 @@ vi.mock("../features/auth/useMinimumLoading", () => ({
 }));
 
 vi.mock("../components/UserMenu/UserMenu", () => ({
-  default: () => <div>User Menu</div>,
+  default: ({
+    onUpgrade,
+    onBilling,
+  }: {
+    onUpgrade: (source: string) => Promise<void>;
+    onBilling: (source: string) => Promise<void>;
+  }) => (
+    <div>
+      <button type="button" onClick={() => void onUpgrade("test_upgrade_source")}>
+        Trigger upgrade
+      </button>
+      <button type="button" onClick={() => void onBilling("test_billing_source")}>
+        Trigger billing
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock("../components/UserInfoCard", () => ({
@@ -70,9 +106,9 @@ vi.mock("../hooks/useUpgradeGate", () => ({
   useUpgradeGate: () => ({
     isUpgradeModalOpen: false,
     isUserMenuOpen: false,
-    setIsUserMenuOpen: vi.fn(),
-    openUpgradeModal: vi.fn(),
-    closeUpgradeModalAndOpenMenu: vi.fn(),
+    setIsUserMenuOpen: mockSetIsUserMenuOpen,
+    openUpgradeModal: mockOpenUpgradeModal,
+    closeUpgradeModalAndOpenMenu: mockCloseUpgradeModalAndOpenMenu,
   }),
 }));
 
@@ -93,6 +129,10 @@ vi.mock("../lib/supabaseClient", () => ({
   },
 }));
 
+vi.mock("../posthog", () => ({
+  captureEvent: vi.fn(),
+}));
+
 afterEach(() => {
   cleanup();
   localStorageMock.clear();
@@ -109,6 +149,16 @@ afterEach(() => {
     isTabletOrBelow: false,
     isDesktop: true,
   });
+  mockOpenUpgradeModal.mockReset();
+  mockSetIsUserMenuOpen.mockReset();
+  mockCloseUpgradeModalAndOpenMenu.mockReset();
+  mockCurrentUserPlan.mockReset();
+  mockCurrentUserPlan.mockReturnValue("pro");
+  vi.mocked(captureEvent).mockReset();
+  vi.mocked(createCheckoutSession).mockReset();
+  vi.mocked(createPortalSession).mockReset();
+  vi.mocked(supabase.auth.refreshSession).mockReset();
+  vi.mocked(supabase.auth.refreshSession).mockResolvedValue(refreshSessionResponse);
 });
 
 function renderHomePage() {
@@ -192,6 +242,103 @@ describe("HomePage", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Selected view: Resume Studio")).toBeTruthy();
+    });
+  });
+
+  it("captures upgrade prompt openings for restricted views", async () => {
+    mockCurrentUserPlan.mockReturnValue("free");
+
+    renderHomePage();
+
+    fireEvent.click(screen.getByRole("button", { name: /Editor/i }));
+
+    expect(captureEvent).toHaveBeenCalledWith("upgrade_prompt_opened", {
+      source: "restricted_view",
+      target_view: "Editor",
+      viewport_bucket: "desktop",
+    });
+    expect(mockOpenUpgradeModal).toHaveBeenCalledTimes(1);
+  });
+
+  it("captures checkout session lifecycle events", async () => {
+    vi.mocked(createCheckoutSession).mockResolvedValue("https://billing.example/checkout");
+    const assignMock = vi.fn();
+    Object.defineProperty(window, "location", {
+      value: { assign: assignMock },
+      configurable: true,
+    });
+
+    renderHomePage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Trigger upgrade" }));
+
+    await waitFor(() => {
+      expect(createCheckoutSession).toHaveBeenCalledTimes(1);
+    });
+
+    expect(captureEvent).toHaveBeenNthCalledWith(1, "checkout_session_requested", {
+      source: "test_upgrade_source",
+    });
+    expect(captureEvent).toHaveBeenNthCalledWith(2, "checkout_session_created", {
+      source: "test_upgrade_source",
+    });
+    expect(assignMock).toHaveBeenCalledWith("https://billing.example/checkout");
+  });
+
+  it("captures billing portal lifecycle events", async () => {
+    vi.mocked(createPortalSession).mockResolvedValue("https://billing.example/portal");
+    const assignMock = vi.fn();
+    Object.defineProperty(window, "location", {
+      value: { assign: assignMock },
+      configurable: true,
+    });
+
+    renderHomePage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Trigger billing" }));
+
+    await waitFor(() => {
+      expect(createPortalSession).toHaveBeenCalledTimes(1);
+    });
+
+    expect(captureEvent).toHaveBeenNthCalledWith(1, "billing_portal_session_requested", {
+      source: "test_billing_source",
+    });
+    expect(captureEvent).toHaveBeenNthCalledWith(2, "billing_portal_session_created", {
+      source: "test_billing_source",
+    });
+    expect(assignMock).toHaveBeenCalledWith("https://billing.example/portal");
+  });
+
+  it("captures checkout completion on successful Stripe return", async () => {
+    render(
+      <MemoryRouter initialEntries={["/app?checkout=success&session_id=cs_test_123"]}>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(supabase.auth.refreshSession).toHaveBeenCalledTimes(1);
+    });
+
+    expect(captureEvent).toHaveBeenCalledWith("checkout_completed", {
+      source: "stripe_checkout_return",
+      has_session_id: true,
+    });
+  });
+
+  it("captures checkout cancellation on canceled Stripe return", async () => {
+    render(
+      <MemoryRouter initialEntries={["/app?checkout=cancel"]}>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(captureEvent).toHaveBeenCalledWith("checkout_canceled", {
+        source: "stripe_checkout_return",
+        has_session_id: false,
+      });
     });
   });
 });

@@ -21,6 +21,7 @@ import { useUpgradeGate } from "../hooks/useUpgradeGate";
 import { createCheckoutSession } from "../features/billing/api/createCheckoutSession";
 import { createPortalSession } from "../features/billing/api/createPortalSession";
 import { useViewport } from "../hooks/useViewport";
+import { captureEvent } from "../posthog";
 import {
   getStudioViewAvailabilityLabel,
   getStudioViewPolicy,
@@ -73,6 +74,11 @@ export default function HomePage() {
     }
 
     if (!isProUser && isViewRestricted(view)) {
+      captureEvent("upgrade_prompt_opened", {
+        source: "restricted_view",
+        target_view: view,
+        viewport_bucket: bucket,
+      });
       openUpgradeModal();
       return;
     }
@@ -101,14 +107,32 @@ export default function HomePage() {
     }
   };
 
-  const handleUpgrade = async () => {
-    const checkoutUrl = await createCheckoutSession();
-    window.location.assign(checkoutUrl);
+  const handleUpgrade = async (source = "unknown") => {
+    captureEvent("checkout_session_requested", { source });
+
+    try {
+      const checkoutUrl = await createCheckoutSession();
+      captureEvent("checkout_session_created", { source });
+      window.location.assign(checkoutUrl);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to create checkout session.";
+      captureEvent("checkout_session_failed", { source, message });
+      throw error;
+    }
   };
 
-  const handleBilling = async () => {
-    const portalUrl = await createPortalSession();
-    window.location.assign(portalUrl);
+  const handleBilling = async (source = "unknown") => {
+    captureEvent("billing_portal_session_requested", { source });
+
+    try {
+      const portalUrl = await createPortalSession();
+      captureEvent("billing_portal_session_created", { source });
+      window.location.assign(portalUrl);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to create billing portal session.";
+      captureEvent("billing_portal_session_failed", { source, message });
+      throw error;
+    }
   };
 
   useEffect(() => {
@@ -122,8 +146,13 @@ export default function HomePage() {
     nextSearchParams.delete("checkout");
     nextSearchParams.delete("session_id");
     const nextSearch = nextSearchParams.toString();
+    const hasSessionId = Boolean(searchParams.get("session_id"));
 
     if (checkoutState === "success") {
+      captureEvent("checkout_completed", {
+        source: "stripe_checkout_return",
+        has_session_id: hasSessionId,
+      });
       void supabase.auth.refreshSession().finally(() => {
         navigate(
           {
@@ -135,6 +164,11 @@ export default function HomePage() {
       });
       return;
     }
+
+    captureEvent("checkout_canceled", {
+      source: "stripe_checkout_return",
+      has_session_id: hasSessionId,
+    });
 
     navigate(
       {
