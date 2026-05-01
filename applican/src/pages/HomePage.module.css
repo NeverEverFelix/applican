@@ -12,13 +12,25 @@
 .userInfoContainer {
   width: 100%;
   max-width: 216px;
-  height: auto;
+  min-height: calc(100dvh - 48px);
   grid-column: 1;
   justify-self: start;
   align-self: start;
   display: flex;
   flex-direction: column;
   gap: 84px;
+}
+
+.sidebarControls {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.supportLink {
+  margin-top: auto;
+  margin-bottom: 70px;
 }
 
 .studioArea {
@@ -48,7 +60,17 @@
   .userInfoContainer {
     max-width: none;
     width: 100%;
+    min-height: auto;
     gap: 24px;
+  }
+
+  .sidebarControls {
+    flex: none;
+  }
+
+  .supportLink {
+    margin-top: 16px;
+    margin-bottom: 0;
   }
 
   .studioArea {

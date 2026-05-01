@@ -14,6 +14,7 @@ test("authenticated user visiting root is redirected into the app shell", async 
   await expect(page.getByText("Playwright User")).toBeVisible();
   await expect(page.getByRole("button", { name: "Resume Studio" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Application Tracker" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Support" })).toHaveAttribute("href", "https://tally.so/r/441r7b");
 });
 
 test("authenticated user can open profile from the user menu and return to the studio", async ({ page }) => {

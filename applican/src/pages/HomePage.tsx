@@ -5,6 +5,7 @@ import starIcon from "../assets/Star.png";
 import hamburgerIcon from "../assets/Hamburger.png";
 import careerPathIcon from "../assets/Vector (1).png";
 import resourcesIcon from "../assets/oblong.png";
+import helpIcon from "../assets/Help.svg";
 import UserMenu from "../components/UserMenu/UserMenu";
 import { useCurrentUserName, useCurrentUserPlan } from "../features/auth/useCurrentUser";
 import AuthLoadingScreen from "../features/auth/AuthLoadingScreen";
@@ -162,68 +163,84 @@ export default function HomePage() {
           open={isUserMenuOpen}
           onOpenChange={setIsUserMenuOpen}
         />
-        <div className={userStyles.stateControlStack}>
-          {pickerItems.map((item) => {
-            const isSupportedOnCurrentViewport = isStudioViewSupportedOn(item.label, bucket);
-            const policy = getStudioViewPolicy(item.label);
-            const availabilityLabel = getStudioViewAvailabilityLabel(item.label, bucket);
+        <div className={styles.sidebarControls}>
+          <div className={userStyles.stateControlStack}>
+            {pickerItems.map((item) => {
+              const isSupportedOnCurrentViewport = isStudioViewSupportedOn(item.label, bucket);
+              const policy = getStudioViewPolicy(item.label);
+              const availabilityLabel = getStudioViewAvailabilityLabel(item.label, bucket);
 
-            return (
-            <button
-              type="button"
-              key={item.label}
-              className={[
-                userStyles.stateControlItem,
-                !isSupportedOnCurrentViewport ? userStyles.stateControlItemUnavailable : "",
-                selectedView === item.label ? userStyles.stateControlItemActive : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              onClick={() => onSelectView(item.label)}
-              disabled={!isSupportedOnCurrentViewport}
-              aria-disabled={!isSupportedOnCurrentViewport}
-              title={!isSupportedOnCurrentViewport ? policy.unavailableTitle : undefined}
-              aria-pressed={selectedView === item.label}
-            >
-              <img
-                src={item.iconSrc}
-                alt=""
-                aria-hidden="true"
-                className={[
-                  userStyles.stateControlIcon,
-                  !isSupportedOnCurrentViewport ? userStyles.stateControlIconUnavailable : "",
-                  item.label === "Editor" ? userStyles.stateControlIconPurple : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-              />
-              <div className={userStyles.stateControlLabelRow}>
-                <p
+              return (
+                <button
+                  type="button"
+                  key={item.label}
                   className={[
-                    userStyles.stateControlLabel,
-                    !isSupportedOnCurrentViewport ? userStyles.stateControlLabelUnavailable : "",
+                    userStyles.stateControlItem,
+                    !isSupportedOnCurrentViewport ? userStyles.stateControlItemUnavailable : "",
+                    selectedView === item.label ? userStyles.stateControlItemActive : "",
                   ]
                     .filter(Boolean)
                     .join(" ")}
+                  onClick={() => onSelectView(item.label)}
+                  disabled={!isSupportedOnCurrentViewport}
+                  aria-disabled={!isSupportedOnCurrentViewport}
+                  title={!isSupportedOnCurrentViewport ? policy.unavailableTitle : undefined}
+                  aria-pressed={selectedView === item.label}
                 >
-                  {item.label}
-                </p>
-                {availabilityLabel ? (
-                  <span
+                  <img
+                    src={item.iconSrc}
+                    alt=""
+                    aria-hidden="true"
                     className={[
-                      userStyles.stateControlSoonLabel,
-                      !isSupportedOnCurrentViewport ? userStyles.stateControlAvailabilityUnavailable : "",
+                      userStyles.stateControlIcon,
+                      !isSupportedOnCurrentViewport ? userStyles.stateControlIconUnavailable : "",
+                      item.label === "Editor" ? userStyles.stateControlIconPurple : "",
                     ]
                       .filter(Boolean)
                       .join(" ")}
-                  >
-                    {availabilityLabel}
-                  </span>
-                ) : null}
-              </div>
-            </button>
-            );
-          })}
+                  />
+                  <div className={userStyles.stateControlLabelRow}>
+                    <p
+                      className={[
+                        userStyles.stateControlLabel,
+                        !isSupportedOnCurrentViewport ? userStyles.stateControlLabelUnavailable : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      {item.label}
+                    </p>
+                    {availabilityLabel ? (
+                      <span
+                        className={[
+                          userStyles.stateControlSoonLabel,
+                          !isSupportedOnCurrentViewport ? userStyles.stateControlAvailabilityUnavailable : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                      >
+                        {availabilityLabel}
+                      </span>
+                    ) : null}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <a
+            href="https://tally.so/r/441r7b"
+            target="_blank"
+            rel="noreferrer"
+            className={[userStyles.stateControlItem, styles.supportLink].join(" ")}
+          >
+            <img
+              src={helpIcon}
+              alt=""
+              aria-hidden="true"
+              className={userStyles.stateControlIcon}
+            />
+            <span className={userStyles.stateControlLabel}>Support</span>
+          </a>
         </div>
       </div>
       <div className={styles.studioArea}>
