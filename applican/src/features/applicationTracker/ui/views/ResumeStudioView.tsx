@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type TouchEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import gsap from "gsap";
 import styles from "../applicationTrack.module.css";
 import starIcon from "../../../../assets/Star.png";
@@ -469,6 +469,8 @@ export function ResumeStudioView() {
   const [resumeValidationError, setResumeValidationError] = useState("");
   const [revealedAnalysisCount, setRevealedAnalysisCount] = useState(0);
   const [isCancellingRun, setIsCancellingRun] = useState(false);
+  const [mobileResultsPanel, setMobileResultsPanel] = useState<"analysis" | "optimizations">("analysis");
+  const mobileTouchStartXRef = useRef<number | null>(null);
   const initialRestoreSnapshotRef = useRef({
     jobDescription,
     uploadedFileName,
@@ -1011,6 +1013,36 @@ export function ResumeStudioView() {
       : styles.content;
   const useScrollSectionsFlow = !isMobile;
 
+  useEffect(() => {
+    if (!shouldShowResults) {
+      setMobileResultsPanel("analysis");
+    }
+  }, [shouldShowResults]);
+
+  const onMobileResultsTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    mobileTouchStartXRef.current = event.touches[0]?.clientX ?? null;
+  };
+
+  const onMobileResultsTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
+    const startX = mobileTouchStartXRef.current;
+    const endX = event.changedTouches[0]?.clientX;
+    mobileTouchStartXRef.current = null;
+    if (startX === null || typeof endX !== "number") {
+      return;
+    }
+
+    const deltaX = endX - startX;
+    if (Math.abs(deltaX) < 36) {
+      return;
+    }
+
+    if (deltaX < 0) {
+      setMobileResultsPanel("optimizations");
+      return;
+    }
+    setMobileResultsPanel("analysis");
+  };
+
   return (
     <div className={rootClassName}>
       {isShowingProgressScreen ? (
@@ -1173,6 +1205,142 @@ export function ResumeStudioView() {
             <StatusNotice tone="error" message={outputShapeError} className={styles.statusNotice} />
           ) : null}
         </>
+      ) : isMobile ? (
+        <section className={styles.resumeAnalysisContainer}>
+          <div className={styles.resumeAnalysisActions}>
+            <button type="button" className={styles.newAnalysisButton} onClick={onStartNewAnalysis}>
+              New analysis
+            </button>
+          </div>
+
+          <div
+            className={styles.mobileResultsViewport}
+            onTouchStart={onMobileResultsTouchStart}
+            onTouchEnd={onMobileResultsTouchEnd}
+          >
+            <div
+              className={[
+                styles.mobileResultsTrack,
+                mobileResultsPanel === "optimizations" ? styles.mobileResultsTrackOptimizations : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              <div className={styles.mobileResultsPanel}>
+                <div className={styles.mobileResultsPanelBody}>
+                  <div className={styles.resumeAnalysisScrollContainer}>
+                    <div className={styles.resumeRoleContainer}>
+                      <h2 className={styles.resumeRoleText}>
+                        <WritingText
+                          key={`company-${parsedOutput?.job.company ?? ""}`}
+                          text={parsedOutput?.job.company ?? ""}
+                          transition={{ type: "spring", bounce: 0, duration: 4.25, delay: 0.175 }}
+                          spacing="0.3ch"
+                        />
+                        {" - "}
+                        <WritingText
+                          key={`title-${parsedOutput?.job.title ?? ""}`}
+                          text={parsedOutput?.job.title ?? ""}
+                          transition={{ type: "spring", bounce: 0, duration: 4.25, delay: 0.175 }}
+                          spacing="0.3ch"
+                        />
+                      </h2>
+                    </div>
+
+                    <div className={styles.resumeScorePill}>
+                      <img src={blackStarIcon} alt="" aria-hidden="true" className={styles.resumeScoreIcon} />
+                      <p className={styles.resumeScoreValue}>{parsedOutput?.match.label}</p>
+                    </div>
+
+                    <div className={styles.resumeVirtuesContainer} style={{ minHeight: virtuesContainerMinHeight }}>
+                      {parsedOutput?.analysis.strengths.slice(0, revealedVirtuesCount).map((virtue, index) => (
+                        <span key={virtue} className={styles.resumeVirtuePill}>
+                          <img src={checkIcon} alt="" aria-hidden="true" className={styles.resumeVirtueIcon} />
+                          <TypingText
+                            key={`virtue-${index}-${virtue}`}
+                            as="span"
+                            className={styles.resumeVirtueText}
+                            text={virtue}
+                            showCursor
+                            showCursorWhileTypingOnly
+                            cursorCharacter="│"
+                            cursorClassName={styles.resumeTypingCursor}
+                            loop={false}
+                            typingSpeed={ANALYSIS_TYPING_SPEED}
+                            initialDelay={0}
+                            pauseDuration={0}
+                          />
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className={styles.resumeNegativesContainer} style={{ minHeight: negativesContainerMinHeight }}>
+                      {parsedOutput?.analysis.gaps.slice(0, revealedNegativesCount).map((negative, index) => (
+                        <span key={negative} className={styles.resumeNegativePill}>
+                          <span className={styles.resumeNegativeIcon} aria-hidden="true">
+                            ×
+                          </span>
+                          <TypingText
+                            key={`negative-${index}-${negative}`}
+                            as="span"
+                            className={styles.resumeNegativeText}
+                            text={negative}
+                            showCursor
+                            showCursorWhileTypingOnly
+                            cursorCharacter="│"
+                            cursorClassName={styles.resumeTypingCursor}
+                            loop={false}
+                            typingSpeed={ANALYSIS_TYPING_SPEED}
+                            initialDelay={0}
+                            pauseDuration={0}
+                          />
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.mobileResultsPanel}>
+                <div className={styles.mobileResultsPanelBody}>
+                  <div className={styles.resumeOptimizationsContainer}>
+                    <h3 className={styles.resumeOptimizationsTitle}>Resume Optimizations</h3>
+                    <ResumeOptimizationsPanel
+                      sections={optimizationSections}
+                      onExpandSection={onExpandOptimizationSection}
+                      onCopyOptimizedBullet={onCopyOptimizedBullet}
+                      isMobile
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className={styles.mobileResultsPager} aria-label="Resume result panel selector">
+            <button
+              type="button"
+              className={[
+                styles.mobileResultsDot,
+                mobileResultsPanel === "analysis" ? styles.mobileResultsDotActive : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              onClick={() => setMobileResultsPanel("analysis")}
+              aria-label="Show resume analysis panel"
+            />
+            <button
+              type="button"
+              className={[
+                styles.mobileResultsDot,
+                mobileResultsPanel === "optimizations" ? styles.mobileResultsDotActive : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              onClick={() => setMobileResultsPanel("optimizations")}
+              aria-label="Show resume optimizations panel"
+            />
+          </div>
+        </section>
       ) : useScrollSectionsFlow ? (
         <section className={styles.resumeAnalysisContainer}>
           <div className={styles.resumeAnalysisActions}>
