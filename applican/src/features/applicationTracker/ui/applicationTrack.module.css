@@ -2162,6 +2162,14 @@
     margin-top: 18px;
   }
 
+  .resumeOptimizationsCanvas {
+    position: static;
+    left: auto;
+    top: auto;
+    width: 100% !important;
+    max-width: 100%;
+  }
+
   .trackerTopDivider,
   .trackerHeaderDivider,
   .trackerColumns,

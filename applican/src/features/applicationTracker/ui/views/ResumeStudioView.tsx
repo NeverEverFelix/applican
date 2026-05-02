@@ -233,6 +233,7 @@ function ResumeOptimizationsPanel({
   sections,
   onExpandSection,
   onCopyOptimizedBullet,
+  isMobile = false,
 }: {
   sections: ResumeOptimizationPresentationSection[];
   onExpandSection?: (section: ResumeOptimizationPresentationSection) => void;
@@ -240,15 +241,20 @@ function ResumeOptimizationsPanel({
     section: ResumeOptimizationPresentationSection,
     bullet: ResumeOptimizationPresentationSection["bullets"][number],
   ) => Promise<void> | void;
+  isMobile?: boolean;
 }) {
   return (
     <div
       className={styles.resumeOptimizationsCanvas}
-      style={{
-        top: `${OPTIMIZATIONS_TOP}px`,
-        left: `${OPTIMIZATIONS_LEFT}px`,
-        width: `${OPTIMIZATIONS_WIDTH}px`,
-      }}
+      style={
+        isMobile
+          ? { width: "100%" }
+          : {
+              top: `${OPTIMIZATIONS_TOP}px`,
+              left: `${OPTIMIZATIONS_LEFT}px`,
+              width: `${OPTIMIZATIONS_WIDTH}px`,
+            }
+      }
     >
       {sections.map((section, index) => (
         <OptimizationSectionAccordion
@@ -977,6 +983,9 @@ export function ResumeStudioView() {
   }, [cancelActiveRun, isCancellingRun, resetToDraftInputs]);
 
   const onToggleAnalysisCollapse = () => {
+    if (isMobile) {
+      return;
+    }
     setIsAnalysisCollapsed((previous) => {
       if (previous) {
         setRevealedAnalysisCount(0);
@@ -1272,27 +1281,29 @@ export function ResumeStudioView() {
             </button>
           </div>
 
-          <button
-            type="button"
-            className={styles.analysisCollapseButton}
-            onClick={onToggleAnalysisCollapse}
-            aria-label={isAnalysisCollapsed ? "Expand resume analysis" : "Collapse resume analysis"}
-            aria-expanded={!isAnalysisCollapsed}
-          >
-            <img
-              src={arrowIcon}
-              alt=""
-              aria-hidden="true"
-              className={[
-                styles.analysisCollapseIcon,
-                isAnalysisCollapsed ? styles.analysisCollapseIconFlipped : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-            />
-          </button>
+          {!isMobile ? (
+            <button
+              type="button"
+              className={styles.analysisCollapseButton}
+              onClick={onToggleAnalysisCollapse}
+              aria-label={isAnalysisCollapsed ? "Expand resume analysis" : "Collapse resume analysis"}
+              aria-expanded={!isAnalysisCollapsed}
+            >
+              <img
+                src={arrowIcon}
+                alt=""
+                aria-hidden="true"
+                className={[
+                  styles.analysisCollapseIcon,
+                  isAnalysisCollapsed ? styles.analysisCollapseIconFlipped : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              />
+            </button>
+          ) : null}
 
-          {!isAnalysisCollapsed ? (
+          {!isAnalysisCollapsed || isMobile ? (
             <>
               <div className={styles.resumeRoleContainer}>
                 <h2 className={styles.resumeRoleText}>
@@ -1362,6 +1373,18 @@ export function ResumeStudioView() {
                   </span>
                 ))}
               </div>
+
+              {isMobile ? (
+                <div className={styles.resumeOptimizationsContainer}>
+                  <h3 className={styles.resumeOptimizationsTitle}>Resume Optimizations</h3>
+                  <ResumeOptimizationsPanel
+                    sections={optimizationSections}
+                    onExpandSection={onExpandOptimizationSection}
+                    onCopyOptimizedBullet={onCopyOptimizedBullet}
+                    isMobile
+                  />
+                </div>
+              ) : null}
             </>
           ) : null}
 
