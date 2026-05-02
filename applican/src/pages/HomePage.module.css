@@ -89,6 +89,13 @@
     row-gap: 16px;
   }
 
+  .studioArea {
+    width: 100%;
+    max-width: none;
+    justify-self: stretch;
+    margin-top: 8px;
+  }
+
   .studioUserCard {
     position: static;
     margin-bottom: 12px;

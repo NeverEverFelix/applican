@@ -2103,10 +2103,12 @@
   .studioContainer {
     height: auto;
     max-height: none;
-    min-height: calc(100dvh - 152px);
+    width: 100%;
+    min-height: calc(100dvh - 128px);
     border-radius: 20px;
-    padding: 72px 16px 16px;
+    padding: 84px 16px 20px;
     gap: 16px;
+    margin: 0 auto;
   }
 
   .editorToolbar,
