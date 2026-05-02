@@ -2101,10 +2101,10 @@
   }
 
   .studioContainer {
-    height: 100%;
+    height: auto;
     max-height: none;
     width: 100%;
-    min-height: min(860px, calc(100dvh - 124px));
+    min-height: clamp(620px, calc(100dvh - 220px), 760px);
     border-radius: 20px;
     padding: 78px 16px 20px;
     gap: 16px;
