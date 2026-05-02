@@ -11,6 +11,8 @@ type UserMenuProps = {
   onSignOut: () => void;
   onUpgrade: (source: string) => Promise<void>;
   onBilling: (source: string) => Promise<void>;
+  onResumeStudioSelect?: () => void;
+  onApplicationTrackerSelect?: () => void;
   onProfileSelect?: () => void;
   onHistorySelect?: () => void;
   isSigningOut?: boolean;
@@ -23,6 +25,8 @@ export default function UserMenu({
   onSignOut,
   onUpgrade,
   onBilling,
+  onResumeStudioSelect,
+  onApplicationTrackerSelect,
   onProfileSelect,
   onHistorySelect,
   isSigningOut = false,
@@ -39,8 +43,8 @@ export default function UserMenu({
   const isMenuOpen = open ?? internalOpen;
   const shouldShowUpgrade = userPlan !== "pro";
   const menuItems = shouldShowUpgrade
-    ? (["Profile", "Upgrade", "History", "Sign out"] as const)
-    : (["Profile", "Billing", "History", "Sign out"] as const);
+    ? (["Resume Studio", "Application Tracker", "Profile", "Upgrade", "History", "Sign out"] as const)
+    : (["Resume Studio", "Application Tracker", "Profile", "Billing", "History", "Sign out"] as const);
   const handleOpenChange = (nextOpen: boolean) => {
     setInternalOpen(nextOpen);
     if (nextOpen) {
@@ -55,6 +59,18 @@ export default function UserMenu({
       source: "user_menu_item",
     });
     onProfileSelect?.();
+  };
+  const handleResumeStudioSelect = () => {
+    posthog?.capture("resume_studio_menu_clicked", {
+      source: "user_menu_item",
+    });
+    onResumeStudioSelect?.();
+  };
+  const handleApplicationTrackerSelect = () => {
+    posthog?.capture("application_tracker_menu_clicked", {
+      source: "user_menu_item",
+    });
+    onApplicationTrackerSelect?.();
   };
   const handleHistorySelect = () => {
     posthog?.capture("history_menu_clicked", {
@@ -166,6 +182,10 @@ export default function UserMenu({
                 onSelect={
                   item === "Sign out"
                     ? onSignOut
+                    : item === "Resume Studio"
+                      ? handleResumeStudioSelect
+                      : item === "Application Tracker"
+                        ? handleApplicationTrackerSelect
                     : item === "Profile"
                       ? handleProfileSelect
                       : item === "History"

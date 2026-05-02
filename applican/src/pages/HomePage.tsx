@@ -191,6 +191,8 @@ export default function HomePage() {
           onSignOut={() => void handleLogout()}
           onUpgrade={handleUpgrade}
           onBilling={handleBilling}
+          onResumeStudioSelect={() => onSelectView("Resume Studio")}
+          onApplicationTrackerSelect={() => onSelectView("Application Tracker")}
           onProfileSelect={() => onSelectView("Profile")}
           onHistorySelect={() => onSelectView("History")}
           isSigningOut={isLoggingOut}

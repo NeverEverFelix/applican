@@ -362,6 +362,13 @@
     white-space: normal;
   }
 
+  .email,
+  .name,
+  .jobrole,
+  .password {
+    font-size: 16px;
+  }
+
   .passwordStepActions {
     margin-top: 20px;
   }

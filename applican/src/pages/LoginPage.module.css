@@ -332,6 +332,11 @@
     font-size: clamp(40px, 12vw, 52px);
   }
 
+  .email,
+  .password {
+    font-size: 16px;
+  }
+
   .passwordStepActions {
     margin-top: 20px;
   }
