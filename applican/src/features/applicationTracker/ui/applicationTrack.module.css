@@ -2136,6 +2136,32 @@
     padding-bottom: 0;
   }
 
+  .resultsContent {
+    height: auto;
+    min-height: 0;
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  .resumeAnalysisContainer {
+    height: auto;
+    min-height: 0;
+    flex: 0 0 auto;
+    margin-top: 0;
+  }
+
+  .resumeAnalysisActions {
+    margin-bottom: 10px;
+  }
+
+  .resumeOptimizationsContainer,
+  .resumeAnalysisScrollContainer {
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow: visible;
+    margin-top: 18px;
+  }
+
   .trackerTopDivider,
   .trackerHeaderDivider,
   .trackerColumns,
