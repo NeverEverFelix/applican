@@ -2104,9 +2104,9 @@
     height: auto;
     max-height: none;
     width: 100%;
-    min-height: clamp(620px, calc(100dvh - 220px), 760px);
+    min-height: 0;
     border-radius: 20px;
-    padding: 78px 16px 20px;
+    padding: 40px 16px 24px;
     gap: 16px;
     margin: 0 auto;
   }
@@ -2131,9 +2131,9 @@
   }
 
   .content {
-    margin-top: clamp(56px, 10vh, 132px);
+    margin-top: 0;
     gap: 16px;
-    padding-bottom: 16px;
+    padding-bottom: 0;
   }
 
   .trackerTopDivider,

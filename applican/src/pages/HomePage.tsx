@@ -54,6 +54,7 @@ export default function HomePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { bucket, isMobile } = useViewport();
+  const shellClassName = [styles.container, isMobile ? styles.mobileShell : ""].filter(Boolean).join(" ");
   const currentUserName = useCurrentUserName();
   const currentUserPlan = useCurrentUserPlan();
   const pickerItems: Array<{ label: PickerView; iconSrc: string }> = [
@@ -184,7 +185,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className={styles.container}>
+    <div className={shellClassName}>
       <div className={styles.userInfoContainer}>
         <UserMenu
           user={{ name: currentUserName, plan: currentUserPlan }}
