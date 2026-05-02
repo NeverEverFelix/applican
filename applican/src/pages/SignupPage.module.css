@@ -354,6 +354,7 @@
     min-height: 0;
     justify-content: center;
     margin: 0 auto;
+    transform: translateY(14px);
   }
 
   .mainText {
