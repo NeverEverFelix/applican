@@ -15,6 +15,7 @@ import WritingText from "../../../../effects/writing-text";
 import TypingText from "../../../../effects/typing-text";
 import ScrollSections from "../../../../effects/ScrollSections";
 import StatusNotice from "../../../../components/feedback/StatusNotice";
+import { useViewport } from "../../../../hooks/useViewport";
 import {
   extractResumeOptimizationPresentationSections,
   type ResumeOptimizationPresentationSection,
@@ -399,6 +400,7 @@ function toResumeStudioOutput(value: unknown): ResumeStudioOutput | null {
 }
 
 export function ResumeStudioView() {
+  const { isMobile } = useViewport();
   const ANALYSIS_TYPING_SPEED = 28;
   const ANALYSIS_REVEAL_GAP_MS = 420;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -998,7 +1000,7 @@ export function ResumeStudioView() {
           .filter(Boolean)
           .join(" ")
       : styles.content;
-  const useScrollSectionsFlow = true;
+  const useScrollSectionsFlow = !isMobile;
 
   return (
     <div className={rootClassName}>
