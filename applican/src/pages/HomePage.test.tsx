@@ -75,9 +75,17 @@ vi.mock("../components/UserMenu/UserMenu", () => ({
   default: ({
     onUpgrade,
     onBilling,
+    onResumeStudioSelect,
+    onApplicationTrackerSelect,
+    onProfileSelect,
+    onHistorySelect,
   }: {
     onUpgrade: (source: string) => Promise<void>;
     onBilling: (source: string) => Promise<void>;
+    onResumeStudioSelect?: () => void;
+    onApplicationTrackerSelect?: () => void;
+    onProfileSelect?: () => void;
+    onHistorySelect?: () => void;
   }) => (
     <div>
       <button type="button" onClick={() => void onUpgrade("test_upgrade_source")}>
@@ -85,6 +93,18 @@ vi.mock("../components/UserMenu/UserMenu", () => ({
       </button>
       <button type="button" onClick={() => void onBilling("test_billing_source")}>
         Trigger billing
+      </button>
+      <button type="button" onClick={() => onResumeStudioSelect?.()}>
+        Go Resume Studio
+      </button>
+      <button type="button" onClick={() => onApplicationTrackerSelect?.()}>
+        Go Application Tracker
+      </button>
+      <button type="button" onClick={() => onProfileSelect?.()}>
+        Go Profile
+      </button>
+      <button type="button" onClick={() => onHistorySelect?.()}>
+        Go History
       </button>
     </div>
   ),
@@ -186,78 +206,37 @@ describe("HomePage", () => {
     await waitFor(() => {
       expect(screen.getByText("Selected view: Resume Studio")).toBeTruthy();
     });
-
-    const editorButton = screen.getByRole("button", { name: /Editor/i }) as HTMLButtonElement;
-    expect(editorButton.disabled).toBe(true);
-    expect(screen.getAllByText("Desktop only").length).toBeGreaterThan(0);
   });
 
-  it("keeps desktop-only nav items disabled on tablet when clicked", async () => {
-    mockUseViewport.mockReturnValue({
-      width: 1024,
-      bucket: "tablet",
-      isMobile: false,
-      isTablet: true,
-      isTabletOrBelow: true,
-      isDesktop: false,
-    });
-
+  it("switches views via user menu callbacks", async () => {
     renderHomePage();
 
-    const editorButton = screen.getByRole("button", { name: /Editor/i }) as HTMLButtonElement;
-    expect(editorButton.disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Go Application Tracker" }));
+    await waitFor(() => {
+      expect(screen.getByText("Selected view: Application Tracker")).toBeTruthy();
+    });
 
-    fireEvent.click(editorButton);
+    fireEvent.click(screen.getByRole("button", { name: "Go Profile" }));
+    await waitFor(() => {
+      expect(screen.getByText("Selected view: Profile")).toBeTruthy();
+    });
 
+    fireEvent.click(screen.getByRole("button", { name: "Go History" }));
+    await waitFor(() => {
+      expect(screen.getByText("Selected view: History")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Go Resume Studio" }));
     await waitFor(() => {
       expect(screen.getByText("Selected view: Resume Studio")).toBeTruthy();
     });
   });
 
-  it("allows desktop users to activate Editor from the nav", async () => {
+  it("does not open upgrade modal when selecting menu-supported views", async () => {
     renderHomePage();
-
-    const editorButton = screen.getByRole("button", { name: /Editor/i }) as HTMLButtonElement;
-    expect(editorButton.disabled).toBe(false);
-
-    fireEvent.click(editorButton);
-
-    await waitFor(() => {
-      expect(screen.getByText("Selected view: Editor")).toBeTruthy();
-    });
-  });
-
-  it("keeps coming-soon views disabled even on desktop", async () => {
-    renderHomePage();
-
-    const careerPathButton = screen.getByRole("button", { name: /Career Path/i }) as HTMLButtonElement;
-    const resourcesButton = screen.getByRole("button", { name: /Resources/i }) as HTMLButtonElement;
-
-    expect(careerPathButton.disabled).toBe(true);
-    expect(resourcesButton.disabled).toBe(true);
-    expect(screen.getAllByText("Coming soon").length).toBeGreaterThan(0);
-
-    fireEvent.click(careerPathButton);
-    fireEvent.click(resourcesButton);
-
-    await waitFor(() => {
-      expect(screen.getByText("Selected view: Resume Studio")).toBeTruthy();
-    });
-  });
-
-  it("captures upgrade prompt openings for restricted views", async () => {
-    mockCurrentUserPlan.mockReturnValue("free");
-
-    renderHomePage();
-
-    fireEvent.click(screen.getByRole("button", { name: /Editor/i }));
-
-    expect(captureEvent).toHaveBeenCalledWith("upgrade_prompt_opened", {
-      source: "restricted_view",
-      target_view: "Editor",
-      viewport_bucket: "desktop",
-    });
-    expect(mockOpenUpgradeModal).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Go Application Tracker" }));
+    fireEvent.click(screen.getByRole("button", { name: "Go Resume Studio" }));
+    expect(mockOpenUpgradeModal).not.toHaveBeenCalled();
   });
 
   it("captures checkout session lifecycle events", async () => {

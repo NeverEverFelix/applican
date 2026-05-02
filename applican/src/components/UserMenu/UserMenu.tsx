@@ -11,6 +11,7 @@ type UserMenuProps = {
   onSignOut: () => void;
   onUpgrade: (source: string) => Promise<void>;
   onBilling: (source: string) => Promise<void>;
+  showMobileNavigationItems?: boolean;
   onResumeStudioSelect?: () => void;
   onApplicationTrackerSelect?: () => void;
   onProfileSelect?: () => void;
@@ -25,6 +26,7 @@ export default function UserMenu({
   onSignOut,
   onUpgrade,
   onBilling,
+  showMobileNavigationItems = false,
   onResumeStudioSelect,
   onApplicationTrackerSelect,
   onProfileSelect,
@@ -42,9 +44,13 @@ export default function UserMenu({
   const userPlan = typeof user.plan === "string" ? user.plan.trim().toLowerCase() : "";
   const isMenuOpen = open ?? internalOpen;
   const shouldShowUpgrade = userPlan !== "pro";
-  const menuItems = shouldShowUpgrade
-    ? (["Resume Studio", "Application Tracker", "Profile", "Upgrade", "History", "Sign out"] as const)
-    : (["Resume Studio", "Application Tracker", "Profile", "Billing", "History", "Sign out"] as const);
+  const baseMenuItems = shouldShowUpgrade
+    ? (["Profile", "Upgrade", "History", "Sign out"] as const)
+    : (["Profile", "Billing", "History", "Sign out"] as const);
+  const mobileNavigationItems = ["Resume Studio", "Application Tracker"] as const;
+  const menuItems = showMobileNavigationItems
+    ? ([...mobileNavigationItems, ...baseMenuItems] as const)
+    : baseMenuItems;
   const handleOpenChange = (nextOpen: boolean) => {
     setInternalOpen(nextOpen);
     if (nextOpen) {

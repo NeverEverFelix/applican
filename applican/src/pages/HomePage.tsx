@@ -53,7 +53,7 @@ export default function HomePage() {
   const showLoading = useMinimumLoading(isLoggingOut);
   const navigate = useNavigate();
   const location = useLocation();
-  const { bucket } = useViewport();
+  const { bucket, isMobile } = useViewport();
   const currentUserName = useCurrentUserName();
   const currentUserPlan = useCurrentUserPlan();
   const pickerItems: Array<{ label: PickerView; iconSrc: string }> = [
@@ -191,6 +191,7 @@ export default function HomePage() {
           onSignOut={() => void handleLogout()}
           onUpgrade={handleUpgrade}
           onBilling={handleBilling}
+          showMobileNavigationItems={isMobile}
           onResumeStudioSelect={() => onSelectView("Resume Studio")}
           onApplicationTrackerSelect={() => onSelectView("Application Tracker")}
           onProfileSelect={() => onSelectView("Profile")}
@@ -199,85 +200,87 @@ export default function HomePage() {
           open={isUserMenuOpen}
           onOpenChange={setIsUserMenuOpen}
         />
-        <div className={styles.sidebarControls}>
-          <div className={userStyles.stateControlStack}>
-            {pickerItems.map((item) => {
-              const isSupportedOnCurrentViewport = isStudioViewSupportedOn(item.label, bucket);
-              const policy = getStudioViewPolicy(item.label);
-              const availabilityLabel = getStudioViewAvailabilityLabel(item.label, bucket);
+        {!isMobile ? (
+          <div className={styles.sidebarControls}>
+            <div className={userStyles.stateControlStack}>
+              {pickerItems.map((item) => {
+                const isSupportedOnCurrentViewport = isStudioViewSupportedOn(item.label, bucket);
+                const policy = getStudioViewPolicy(item.label);
+                const availabilityLabel = getStudioViewAvailabilityLabel(item.label, bucket);
 
-              return (
-                <button
-                  type="button"
-                  key={item.label}
-                  className={[
-                    userStyles.stateControlItem,
-                    !isSupportedOnCurrentViewport ? userStyles.stateControlItemUnavailable : "",
-                    selectedView === item.label ? userStyles.stateControlItemActive : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  onClick={() => onSelectView(item.label)}
-                  disabled={!isSupportedOnCurrentViewport}
-                  aria-disabled={!isSupportedOnCurrentViewport}
-                  title={!isSupportedOnCurrentViewport ? policy.unavailableTitle : undefined}
-                  aria-pressed={selectedView === item.label}
-                >
-                  <img
-                    src={item.iconSrc}
-                    alt=""
-                    aria-hidden="true"
+                return (
+                  <button
+                    type="button"
+                    key={item.label}
                     className={[
-                      userStyles.stateControlIcon,
-                      !isSupportedOnCurrentViewport ? userStyles.stateControlIconUnavailable : "",
-                      item.label === "Editor" ? userStyles.stateControlIconPurple : "",
+                      userStyles.stateControlItem,
+                      !isSupportedOnCurrentViewport ? userStyles.stateControlItemUnavailable : "",
+                      selectedView === item.label ? userStyles.stateControlItemActive : "",
                     ]
                       .filter(Boolean)
                       .join(" ")}
-                  />
-                  <div className={userStyles.stateControlLabelRow}>
-                    <p
+                    onClick={() => onSelectView(item.label)}
+                    disabled={!isSupportedOnCurrentViewport}
+                    aria-disabled={!isSupportedOnCurrentViewport}
+                    title={!isSupportedOnCurrentViewport ? policy.unavailableTitle : undefined}
+                    aria-pressed={selectedView === item.label}
+                  >
+                    <img
+                      src={item.iconSrc}
+                      alt=""
+                      aria-hidden="true"
                       className={[
-                        userStyles.stateControlLabel,
-                        !isSupportedOnCurrentViewport ? userStyles.stateControlLabelUnavailable : "",
+                        userStyles.stateControlIcon,
+                        !isSupportedOnCurrentViewport ? userStyles.stateControlIconUnavailable : "",
+                        item.label === "Editor" ? userStyles.stateControlIconPurple : "",
                       ]
                         .filter(Boolean)
                         .join(" ")}
-                    >
-                      {item.label}
-                    </p>
-                    {availabilityLabel ? (
-                      <span
+                    />
+                    <div className={userStyles.stateControlLabelRow}>
+                      <p
                         className={[
-                          userStyles.stateControlSoonLabel,
-                          !isSupportedOnCurrentViewport ? userStyles.stateControlAvailabilityUnavailable : "",
+                          userStyles.stateControlLabel,
+                          !isSupportedOnCurrentViewport ? userStyles.stateControlLabelUnavailable : "",
                         ]
                           .filter(Boolean)
                           .join(" ")}
                       >
-                        {availabilityLabel}
-                      </span>
-                    ) : null}
-                  </div>
-                </button>
-              );
-            })}
+                        {item.label}
+                      </p>
+                      {availabilityLabel ? (
+                        <span
+                          className={[
+                            userStyles.stateControlSoonLabel,
+                            !isSupportedOnCurrentViewport ? userStyles.stateControlAvailabilityUnavailable : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
+                          {availabilityLabel}
+                        </span>
+                      ) : null}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <a
+              href="https://tally.so/r/441r7b"
+              target="_blank"
+              rel="noreferrer"
+              className={[userStyles.stateControlItem, styles.supportLink].join(" ")}
+            >
+              <img
+                src={helpIcon}
+                alt=""
+                aria-hidden="true"
+                className={userStyles.stateControlIcon}
+              />
+              <span className={userStyles.stateControlLabel}>Support</span>
+            </a>
           </div>
-          <a
-            href="https://tally.so/r/441r7b"
-            target="_blank"
-            rel="noreferrer"
-            className={[userStyles.stateControlItem, styles.supportLink].join(" ")}
-          >
-            <img
-              src={helpIcon}
-              alt=""
-              aria-hidden="true"
-              className={userStyles.stateControlIcon}
-            />
-            <span className={userStyles.stateControlLabel}>Support</span>
-          </a>
-        </div>
+        ) : null}
       </div>
       <div className={styles.studioArea}>
         {selectedView === "Profile" ? (
