@@ -1834,6 +1834,30 @@
   height: 12px;
 }
 
+.trackerResumeIconOnlyButton {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: #222222;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.trackerResumeIconOnlyButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.trackerResumeIconOnlyImage {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
 .trackerNotice {
   width: 100%;
   margin: 12px 0;
@@ -2408,6 +2432,11 @@
     min-width: 860px;
   }
 
+  .trackerColumnHeaderMobileCompact {
+    grid-template-columns: 28px minmax(150px, 1.9fr) minmax(108px, 1fr) minmax(98px, 0.95fr) minmax(150px, 1.6fr) 44px;
+    min-width: 760px;
+  }
+
   .trackerRow {
     grid-template-columns: 28px minmax(150px, 1.8fr) minmax(108px, 1fr) minmax(98px, 0.9fr) minmax(150px, 1.5fr) minmax(120px, 1.1fr) minmax(150px, 1.2fr);
     min-width: 860px;
@@ -2417,6 +2446,11 @@
     border: 0;
     border-radius: 0;
     background: transparent;
+  }
+
+  .trackerRowMobileCompact {
+    grid-template-columns: 28px minmax(150px, 1.9fr) minmax(108px, 1fr) minmax(98px, 0.95fr) minmax(150px, 1.6fr) 44px;
+    min-width: 760px;
   }
 
   .trackerTopDivider,
@@ -2460,6 +2494,17 @@
   .trackerResumeChip {
     width: 100%;
     max-width: 180px;
+  }
+
+  .trackerResumeIconOnlyButton {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+  }
+
+  .trackerResumeIconOnlyImage {
+    width: 12px;
+    height: 12px;
   }
 
   .progressScreenContainer,

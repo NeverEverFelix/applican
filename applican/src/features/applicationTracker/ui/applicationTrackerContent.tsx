@@ -16,6 +16,7 @@ import type { PickerView } from "./studioContainerView";
 import { ResumeStudioView } from "./views/ResumeStudioView";
 import { EditorView } from "./views/EditorView";
 import downloadIcon from "../../../assets/Download Icon.png";
+import resumeIcon from "../../../assets/resume-icons/resume-icon.svg";
 import trashIcon from "../../../assets/trash.svg";
 import StatusNotice from "../../../components/feedback/StatusNotice";
 import HistoryCard from "../../../components/history/HistoryCard";
@@ -214,6 +215,7 @@ function ApplicationTrackerView({
   selectedStatus: ApplicationTrackerStatus;
   onSelectStatus: (status: ApplicationTrackerStatus) => void;
 }) {
+  const { isMobile } = useViewport();
   const {
     applications,
     counts,
@@ -537,7 +539,7 @@ function ApplicationTrackerView({
       <div className={styles.trackerTopDivider} aria-hidden="true" />
 
       <section className={styles.trackerColumns} aria-label="Applications grid">
-        <div className={styles.trackerColumnHeader}>
+        <div className={[styles.trackerColumnHeader, isMobile ? styles.trackerColumnHeaderMobileCompact : ""].join(" ").trim()}>
           <span className={styles.trackerColumnCheckbox}>
             <input
               ref={headerCheckboxRef}
@@ -553,7 +555,7 @@ function ApplicationTrackerView({
           <span className={styles.trackerColumnLabel}>Date Applied</span>
           <span className={styles.trackerColumnLabel}>Status</span>
           <span className={styles.trackerColumnLabel}>Position</span>
-          <span className={styles.trackerColumnLabel}>Location</span>
+          {!isMobile ? <span className={styles.trackerColumnLabel}>Location</span> : null}
           <span className={styles.trackerColumnLabel}>Resume</span>
         </div>
         <div className={styles.trackerHeaderDivider} aria-hidden="true" />
@@ -573,7 +575,7 @@ function ApplicationTrackerView({
           {isLoading
             ? Array.from({ length: skeletonRows }).map((_, index) => (
                 <div key={`skeleton-${index}`}>
-                  <div className={styles.trackerRow}>
+                  <div className={[styles.trackerRow, isMobile ? styles.trackerRowMobileCompact : ""].join(" ").trim()}>
                     <span className={styles.trackerColumnCheckbox}>
                       <span className={[styles.trackerSkeleton, styles.trackerSkeletonCheckbox].join(" ")} />
                     </span>
@@ -581,7 +583,7 @@ function ApplicationTrackerView({
                     <span className={[styles.trackerSkeleton, styles.trackerSkeletonTextMedium].join(" ")} />
                     <span className={[styles.trackerSkeleton, styles.trackerSkeletonStatus].join(" ")} />
                     <span className={[styles.trackerSkeleton, styles.trackerSkeletonTextLong].join(" ")} />
-                    <span className={[styles.trackerSkeleton, styles.trackerSkeletonTextMedium].join(" ")} />
+                    {!isMobile ? <span className={[styles.trackerSkeleton, styles.trackerSkeletonTextMedium].join(" ")} /> : null}
                     <span className={[styles.trackerSkeleton, styles.trackerSkeletonResume].join(" ")} />
                   </div>
                   <div className={styles.trackerRowDivider} aria-hidden="true" />
@@ -594,7 +596,7 @@ function ApplicationTrackerView({
           {!isLoading && !errorMessage
             ? applicationRows.map((row) => (
                 <div key={row.id}>
-                  <div className={styles.trackerRow}>
+                  <div className={[styles.trackerRow, isMobile ? styles.trackerRowMobileCompact : ""].join(" ").trim()}>
                     <span className={styles.trackerColumnCheckbox}>
                       <input
                         type="checkbox"
@@ -617,20 +619,32 @@ function ApplicationTrackerView({
                       </button>
                     </span>
                     <span className={styles.trackerRowText}>{row.position}</span>
-                    <span className={styles.trackerRowText}>{row.location}</span>
+                    {!isMobile ? <span className={styles.trackerRowText}>{row.location}</span> : null}
                     <span className={styles.trackerResumeCell}>
-                      <span className={styles.trackerResumeChip}>
-                        <span className={styles.trackerResumeName}>{row.resume_filename ?? "---"}</span>
+                      {isMobile ? (
                         <button
                           type="button"
-                          className={styles.trackerResumeDownloadButton}
+                          className={styles.trackerResumeIconOnlyButton}
                           onClick={() => void downloadResume(row.id, row.resume_filename ?? "resume")}
                           disabled={!row.resume_path || Boolean(downloadingById[row.id])}
                           aria-label={`Download ${row.resume_filename ?? "resume"}`}
                         >
-                          <img src={downloadIcon} alt="" aria-hidden="true" className={styles.trackerResumeDownloadIcon} />
+                          <img src={resumeIcon} alt="" aria-hidden="true" className={styles.trackerResumeIconOnlyImage} />
                         </button>
-                      </span>
+                      ) : (
+                        <span className={styles.trackerResumeChip}>
+                          <span className={styles.trackerResumeName}>{row.resume_filename ?? "---"}</span>
+                          <button
+                            type="button"
+                            className={styles.trackerResumeDownloadButton}
+                            onClick={() => void downloadResume(row.id, row.resume_filename ?? "resume")}
+                            disabled={!row.resume_path || Boolean(downloadingById[row.id])}
+                            aria-label={`Download ${row.resume_filename ?? "resume"}`}
+                          >
+                            <img src={downloadIcon} alt="" aria-hidden="true" className={styles.trackerResumeDownloadIcon} />
+                          </button>
+                        </span>
+                      )}
                     </span>
                   </div>
                   <div className={styles.trackerRowDivider} aria-hidden="true" />
