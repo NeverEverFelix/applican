@@ -2173,9 +2173,9 @@
   .mobileResultsViewport {
     width: 100%;
     overflow: hidden;
-    touch-action: pan-x;
+    touch-action: pan-x pan-y;
     overscroll-behavior: contain;
-    -webkit-overflow-scrolling: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .mobileResultsTrack {
@@ -2199,7 +2199,10 @@
 
   .mobileResultsPanelBody {
     width: 100%;
-    overflow: hidden;
+    max-height: min(62vh, 560px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
   }
 
   .mobileResultsPager {
