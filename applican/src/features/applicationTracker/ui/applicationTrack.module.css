@@ -2436,8 +2436,8 @@
   }
 
   .trackerColumnHeaderMobileCompact {
-    grid-template-columns: 28px minmax(150px, 1.9fr) minmax(108px, 1fr) minmax(98px, 0.95fr) minmax(150px, 1.6fr) 44px;
-    min-width: 760px;
+    grid-template-columns: 24px minmax(124px, 1.7fr) minmax(92px, 0.95fr) minmax(86px, 0.9fr) minmax(124px, 1.4fr) 32px;
+    min-width: 620px;
   }
 
   .trackerRow {
@@ -2452,8 +2452,8 @@
   }
 
   .trackerRowMobileCompact {
-    grid-template-columns: 28px minmax(150px, 1.9fr) minmax(108px, 1fr) minmax(98px, 0.95fr) minmax(150px, 1.6fr) 44px;
-    min-width: 760px;
+    grid-template-columns: 24px minmax(124px, 1.7fr) minmax(92px, 0.95fr) minmax(86px, 0.9fr) minmax(124px, 1.4fr) 32px;
+    min-width: 620px;
   }
 
   .trackerTopDivider,
