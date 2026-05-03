@@ -2437,13 +2437,13 @@
   }
 
   .trackerColumnHeaderMobileCompact {
-    grid-template-columns: 24px minmax(70px, 1.3fr) minmax(56px, 0.9fr) minmax(66px, 1fr) minmax(74px, 1.1fr) 28px;
+    grid-template-columns: 24px minmax(92px, 1.45fr) minmax(62px, 0.9fr) minmax(72px, 1fr) minmax(86px, 1.15fr) 36px;
     min-width: 0;
-    column-gap: 8px;
+    column-gap: 6px;
     min-height: 36px;
     align-items: center;
-    padding-left: 8px;
-    padding-right: 4px;
+    padding-left: 10px;
+    padding-right: 6px;
   }
 
   .trackerRow {
@@ -2458,11 +2458,11 @@
   }
 
   .trackerRowMobileCompact {
-    grid-template-columns: 24px minmax(70px, 1.3fr) minmax(56px, 0.9fr) minmax(66px, 1fr) minmax(74px, 1.1fr) 28px;
+    grid-template-columns: 24px minmax(92px, 1.45fr) minmax(62px, 0.9fr) minmax(72px, 1fr) minmax(86px, 1.15fr) 36px;
     min-width: 0;
-    column-gap: 8px;
-    padding-left: 8px;
-    padding-right: 4px;
+    column-gap: 6px;
+    padding-left: 10px;
+    padding-right: 6px;
   }
 
   .trackerTopDivider,
@@ -2501,6 +2501,26 @@
     width: 100%;
   }
 
+  .trackerColumnHeaderMobileCompact > .trackerColumnCheckbox,
+  .trackerRowMobileCompact > .trackerColumnCheckbox {
+    justify-self: center;
+  }
+
+  .trackerRowMobileCompact > :nth-child(2),
+  .trackerRowMobileCompact > :nth-child(3),
+  .trackerRowMobileCompact > :nth-child(4),
+  .trackerRowMobileCompact > :nth-child(5),
+  .trackerRowMobileCompact > :nth-child(6) {
+    justify-self: center;
+    width: 100%;
+    text-align: center;
+  }
+
+  .trackerRowMobileCompact > :nth-child(2),
+  .trackerRowMobileCompact > :nth-child(5) {
+    text-align: left;
+  }
+
   .trackerStatusCell::before,
   .trackerResumeCell::before,
   .trackerRow > :nth-child(2)::before,
@@ -2523,17 +2543,18 @@
   }
 
   .trackerResumeIconOnlyButton {
-    width: 20px;
-    height: 20px;
+    width: 28px;
+    height: 28px;
     border-radius: 0;
     background: transparent;
     border: 0;
     padding: 0;
+    justify-self: center;
   }
 
   .trackerResumeIconOnlyImage {
-    width: 11px;
-    height: 11px;
+    width: 16px;
+    height: 16px;
   }
 
   .progressScreenContainer,
