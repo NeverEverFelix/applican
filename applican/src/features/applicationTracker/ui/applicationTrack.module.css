@@ -2442,6 +2442,8 @@
     column-gap: 8px;
     min-height: 36px;
     align-items: center;
+    padding-left: 8px;
+    padding-right: 4px;
   }
 
   .trackerRow {
@@ -2459,6 +2461,8 @@
     grid-template-columns: 24px minmax(70px, 1.3fr) minmax(56px, 0.9fr) minmax(66px, 1fr) minmax(74px, 1.1fr) 28px;
     min-width: 0;
     column-gap: 8px;
+    padding-left: 8px;
+    padding-right: 4px;
   }
 
   .trackerTopDivider,
@@ -2492,6 +2496,9 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    text-align: center;
+    justify-self: center;
+    width: 100%;
   }
 
   .trackerStatusCell::before,
