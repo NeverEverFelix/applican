@@ -1699,6 +1699,78 @@
   min-height: 52px;
 }
 
+/* Class-driven compact table layout (used on phone tracker) */
+.trackerColumnHeaderMobileCompact {
+  grid-template-columns: 24px minmax(92px, 1.45fr) minmax(62px, 0.9fr) minmax(72px, 1fr) minmax(86px, 1.15fr) 36px;
+  min-width: 0;
+  column-gap: 6px;
+  min-height: 36px;
+  align-items: center;
+  padding-left: 10px;
+  padding-right: 6px;
+}
+
+.trackerRowMobileCompact {
+  grid-template-columns: 24px minmax(92px, 1.45fr) minmax(62px, 0.9fr) minmax(72px, 1fr) minmax(86px, 1.15fr) 36px;
+  min-width: 0;
+  column-gap: 6px;
+  padding-left: 10px;
+  padding-right: 6px;
+}
+
+.trackerColumnLabelMobileCompact {
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  justify-self: center;
+  width: 100%;
+}
+
+.trackerColumnHeaderMobileCompact > .trackerColumnCheckbox,
+.trackerRowMobileCompact > .trackerColumnCheckbox {
+  justify-self: center;
+}
+
+.trackerRowMobileCompact > :nth-child(2),
+.trackerRowMobileCompact > :nth-child(3),
+.trackerRowMobileCompact > :nth-child(4),
+.trackerRowMobileCompact > :nth-child(5),
+.trackerRowMobileCompact > :nth-child(6) {
+  justify-self: center;
+  width: 100%;
+  text-align: center;
+}
+
+.trackerRowMobileCompact > :nth-child(2),
+.trackerRowMobileCompact > :nth-child(5) {
+  text-align: left;
+}
+
+.trackerResumeHeaderMobileCompact {
+  text-align: center !important;
+  justify-self: center !important;
+}
+
+.trackerResumeCellMobileCompact {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  justify-self: center !important;
+  width: 100% !important;
+}
+
+.trackerRowMobileCompact .trackerResumeCell {
+  justify-content: center;
+}
+
+.trackerRowMobileCompact .trackerResumeIconOnlyButton {
+  margin-inline: auto;
+}
+
 .trackerRowDivider {
   width: 976px;
   height: 1px;
@@ -1835,8 +1907,8 @@
 }
 
 .trackerResumeIconOnlyButton {
-  width: 28px;
-  height: 28px;
+  width: 52px;
+  height: 52px;
   border: 0;
   border-radius: 8px;
   background: #222222;
@@ -1853,14 +1925,73 @@
 }
 
 .trackerResumeIconOnlyImage {
-  width: 14px;
-  height: 14px;
+  width: 30px;
+  height: 30px;
   display: block;
 }
 
 .trackerNotice {
   width: 100%;
   margin: 12px 0;
+}
+
+.mobileTrackerList {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: min(56vh, 520px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
+  scrollbar-gutter: stable;
+}
+
+.mobileTrackerCard {
+  width: 100%;
+  border: 1px solid #222222;
+  border-radius: 12px;
+  background: #111111;
+  padding: 10px 12px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobileTrackerCardTop {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mobileTrackerRow {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.mobileTrackerLabel {
+  margin: 0;
+  color: #9a9a9a;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+
+.mobileTrackerValue {
+  margin: 0;
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 1.2;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .trackerSkeleton {
@@ -2096,7 +2227,7 @@
 
 @media (max-width: 767px) {
   .trackerView {
-    padding-top: 56px;
+    padding-top: 28px;
   }
 
   .trackerHeader {
@@ -2106,12 +2237,34 @@
 
   .statusPillGroup {
     width: 100%;
+    min-width: 0;
     height: auto;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, max-content));
     grid-template-rows: auto auto auto;
     gap: 10px;
     padding-inline: 0;
-    justify-items: start;
+    justify-content: center;
+    justify-items: center;
+  }
+
+  .statusPillGroup > :nth-child(1) {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .statusPillGroup > :nth-child(2) {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .statusPillGroup > :nth-child(3) {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .statusPillGroup > :nth-child(4) {
+    grid-column: 3;
+    grid-row: 1;
   }
 
   .statusPillActionSlot {
@@ -2605,5 +2758,96 @@
   .resumeNegativePill {
     border-radius: 24px;
     padding: 12px 14px;
+  }
+
+  /* Final mobile compact override: keep Resume icon centered under Resume header */
+  .trackerRowMobileCompact .trackerResumeCell {
+    justify-content: center !important;
+    text-align: center !important;
+  }
+
+  .trackerRowMobileCompact .trackerResumeIconOnlyButton {
+    margin-inline: auto !important;
+    justify-self: center !important;
+  }
+
+  /* Final compact tracker spacing model for phone widths */
+  .trackerColumnHeaderMobileCompact,
+  .trackerRowMobileCompact {
+    grid-template-columns: 24px minmax(72px, 1.25fr) minmax(52px, 0.8fr) minmax(76px, 1fr) minmax(72px, 1.05fr) 30px;
+    column-gap: 6px;
+    padding-left: 2px;
+    padding-right: 2px;
+    align-items: center;
+  }
+
+  .trackerColumnHeaderMobileCompact > *,
+  .trackerRowMobileCompact > * {
+    min-width: 0;
+  }
+
+  .trackerColumnHeaderMobileCompact .trackerColumnLabelMobileCompact {
+    font-size: 10px;
+    letter-spacing: 0;
+    line-height: 1;
+  }
+
+  .trackerColumnHeaderMobileCompact > :nth-child(2),
+  .trackerColumnHeaderMobileCompact > :nth-child(5),
+  .trackerRowMobileCompact > :nth-child(2),
+  .trackerRowMobileCompact > :nth-child(5) {
+    justify-self: start;
+    text-align: left;
+  }
+
+  .trackerColumnHeaderMobileCompact > :nth-child(3),
+  .trackerColumnHeaderMobileCompact > :nth-child(4),
+  .trackerColumnHeaderMobileCompact > :nth-child(6),
+  .trackerRowMobileCompact > :nth-child(3),
+  .trackerRowMobileCompact > :nth-child(4),
+  .trackerRowMobileCompact > :nth-child(6) {
+    justify-self: center;
+    text-align: center;
+  }
+
+  .trackerRowMobileCompact .trackerColumnCheckbox,
+  .trackerColumnHeaderMobileCompact .trackerColumnCheckbox {
+    justify-self: center;
+  }
+
+  .trackerRowMobileCompact .trackerRowText {
+    font-size: 11px;
+    line-height: 1.15;
+    padding-right: 0;
+  }
+
+  .trackerRowMobileCompact .trackerStatusCell {
+    justify-content: center;
+  }
+
+  .trackerRowMobileCompact .trackerStatusButton {
+    min-width: 0;
+    width: auto;
+    max-width: 100%;
+    height: 22px;
+    font-size: 10px;
+    padding: 0 7px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .trackerRowMobileCompact .trackerResumeCellMobileCompact {
+    justify-content: center !important;
+  }
+
+  .trackerRowMobileCompact .trackerResumeIconOnlyButton {
+    width: 24px !important;
+    height: 24px !important;
+  }
+
+  .trackerRowMobileCompact .trackerResumeIconOnlyImage {
+    width: 14px !important;
+    height: 14px !important;
   }
 }

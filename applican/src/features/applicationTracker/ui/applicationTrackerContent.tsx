@@ -538,38 +538,8 @@ function ApplicationTrackerView({
       </header>
       <div className={styles.trackerTopDivider} aria-hidden="true" />
 
-      <section className={styles.trackerColumns} aria-label="Applications grid">
-        <div className={[styles.trackerColumnHeader, isMobile ? styles.trackerColumnHeaderMobileCompact : ""].join(" ").trim()}>
-          <span className={styles.trackerColumnCheckbox}>
-            <input
-              ref={headerCheckboxRef}
-              type="checkbox"
-              className={styles.trackerHeaderCheckbox}
-              aria-label="Select all applications"
-              checked={areAllVisibleRowsSelected}
-              disabled={!hasVisibleRows}
-              onChange={toggleVisibleApplicationSelection}
-            />
-          </span>
-          <span className={[styles.trackerColumnLabel, isMobile ? styles.trackerColumnLabelMobileCompact : ""].join(" ").trim()}>
-            Company
-          </span>
-          <span className={[styles.trackerColumnLabel, isMobile ? styles.trackerColumnLabelMobileCompact : ""].join(" ").trim()}>
-            {isMobile ? "Date" : "Date Applied"}
-          </span>
-          <span className={[styles.trackerColumnLabel, isMobile ? styles.trackerColumnLabelMobileCompact : ""].join(" ").trim()}>
-            Status
-          </span>
-          <span className={[styles.trackerColumnLabel, isMobile ? styles.trackerColumnLabelMobileCompact : ""].join(" ").trim()}>
-            Position
-          </span>
-          {!isMobile ? <span className={styles.trackerColumnLabel}>Location</span> : null}
-          <span className={[styles.trackerColumnLabel, isMobile ? styles.trackerColumnLabelMobileCompact : ""].join(" ").trim()}>
-            Resume
-          </span>
-        </div>
-        <div className={styles.trackerHeaderDivider} aria-hidden="true" />
-        <div className={styles.trackerGridBody} onScroll={onGridScroll}>
+      {isMobile ? (
+        <section className={styles.mobileTrackerList} aria-label="Applications list">
           {errorMessage ? (
             <StatusNotice
               tone="error"
@@ -579,25 +549,18 @@ function ApplicationTrackerView({
               onAction={retryLoad}
             />
           ) : null}
-          {downloadError ? (
-            <StatusNotice tone="error" message={downloadError} className={styles.trackerNotice} />
-          ) : null}
+          {downloadError ? <StatusNotice tone="error" message={downloadError} className={styles.trackerNotice} /> : null}
           {isLoading
             ? Array.from({ length: skeletonRows }).map((_, index) => (
-                <div key={`skeleton-${index}`}>
-                  <div className={[styles.trackerRow, isMobile ? styles.trackerRowMobileCompact : ""].join(" ").trim()}>
-                    <span className={styles.trackerColumnCheckbox}>
-                      <span className={[styles.trackerSkeleton, styles.trackerSkeletonCheckbox].join(" ")} />
-                    </span>
-                    <span className={[styles.trackerSkeleton, styles.trackerSkeletonTextLong].join(" ")} />
-                    <span className={[styles.trackerSkeleton, styles.trackerSkeletonTextMedium].join(" ")} />
+                <article key={`mobile-skeleton-${index}`} className={styles.mobileTrackerCard}>
+                  <div className={styles.mobileTrackerCardTop}>
+                    <span className={[styles.trackerSkeleton, styles.trackerSkeletonCheckbox].join(" ")} />
                     <span className={[styles.trackerSkeleton, styles.trackerSkeletonStatus].join(" ")} />
-                    <span className={[styles.trackerSkeleton, styles.trackerSkeletonTextLong].join(" ")} />
-                    {!isMobile ? <span className={[styles.trackerSkeleton, styles.trackerSkeletonTextMedium].join(" ")} /> : null}
-                    <span className={[styles.trackerSkeleton, styles.trackerSkeletonResume].join(" ")} />
                   </div>
-                  <div className={styles.trackerRowDivider} aria-hidden="true" />
-                </div>
+                  <span className={[styles.trackerSkeleton, styles.trackerSkeletonTextLong].join(" ")} />
+                  <span className={[styles.trackerSkeleton, styles.trackerSkeletonTextMedium].join(" ")} />
+                  <span className={[styles.trackerSkeleton, styles.trackerSkeletonTextLong].join(" ")} />
+                </article>
               ))
             : null}
           {!isLoading && !errorMessage && applicationRows.length === 0 ? (
@@ -605,43 +568,137 @@ function ApplicationTrackerView({
           ) : null}
           {!isLoading && !errorMessage
             ? applicationRows.map((row) => (
-                <div key={row.id}>
-                  <div className={[styles.trackerRow, isMobile ? styles.trackerRowMobileCompact : ""].join(" ").trim()}>
-                    <span className={styles.trackerColumnCheckbox}>
-                      <input
-                        type="checkbox"
-                        className={styles.trackerRowCheckbox}
-                        aria-label={`Select ${row.company}`}
-                        checked={selectedApplicationIds.includes(row.id)}
-                        onChange={() => toggleApplicationSelection(row.id)}
-                      />
-                    </span>
-                    <span className={styles.trackerRowText}>{row.company}</span>
-                    <span className={styles.trackerRowText}>{formatAppliedDate(row.date_applied)}</span>
-                    <span className={styles.trackerStatusCell}>
-                      <button
-                        type="button"
-                        className={[styles.trackerStatusButton, getStatusButtonClassName(row.status)].join(" ")}
-                        disabled={isUpdating(row.id)}
-                        onClick={() => void updateApplicationStatus(row.id, getNextApplicationStatus(row.status))}
-                      >
-                        {row.status}
-                      </button>
-                    </span>
-                    <span className={styles.trackerRowText}>{row.position}</span>
-                    {!isMobile ? <span className={styles.trackerRowText}>{row.location}</span> : null}
-                    <span className={styles.trackerResumeCell}>
-                      {isMobile ? (
+                <article key={row.id} className={styles.mobileTrackerCard}>
+                  <div className={styles.mobileTrackerCardTop}>
+                    <input
+                      type="checkbox"
+                      className={styles.trackerRowCheckbox}
+                      aria-label={`Select ${row.company}`}
+                      checked={selectedApplicationIds.includes(row.id)}
+                      onChange={() => toggleApplicationSelection(row.id)}
+                    />
+                    <button
+                      type="button"
+                      className={styles.trackerResumeIconOnlyButton}
+                      onClick={() => void downloadResume(row.id, row.resume_filename ?? "resume")}
+                      disabled={!row.resume_path || Boolean(downloadingById[row.id])}
+                      aria-label={`Download ${row.resume_filename ?? "resume"}`}
+                    >
+                      <img src={resumeIcon} alt="" aria-hidden="true" className={styles.trackerResumeIconOnlyImage} />
+                    </button>
+                  </div>
+                  <div className={styles.mobileTrackerRow}>
+                    <span className={styles.mobileTrackerLabel}>Company</span>
+                    <span className={styles.mobileTrackerValue}>{row.company}</span>
+                  </div>
+                  <div className={styles.mobileTrackerRow}>
+                    <span className={styles.mobileTrackerLabel}>Date</span>
+                    <span className={styles.mobileTrackerValue}>{formatAppliedDate(row.date_applied)}</span>
+                  </div>
+                  <div className={styles.mobileTrackerRow}>
+                    <span className={styles.mobileTrackerLabel}>Status</span>
+                    <button
+                      type="button"
+                      className={[styles.trackerStatusButton, getStatusButtonClassName(row.status)].join(" ")}
+                      disabled={isUpdating(row.id)}
+                      onClick={() => void updateApplicationStatus(row.id, getNextApplicationStatus(row.status))}
+                    >
+                      {row.status}
+                    </button>
+                  </div>
+                  <div className={styles.mobileTrackerRow}>
+                    <span className={styles.mobileTrackerLabel}>Position</span>
+                    <span className={styles.mobileTrackerValue}>{row.position}</span>
+                  </div>
+                </article>
+              ))
+            : null}
+          {!isLoading && (isFetchingMore || showTrailingLoadState) ? (
+            <StatusNotice tone="info" message="Loading more applications..." className={styles.trackerNotice} />
+          ) : null}
+        </section>
+      ) : (
+        <section className={styles.trackerColumns} aria-label="Applications grid">
+          <div className={styles.trackerColumnHeader}>
+            <span className={styles.trackerColumnCheckbox}>
+              <input
+                ref={headerCheckboxRef}
+                type="checkbox"
+                className={styles.trackerHeaderCheckbox}
+                aria-label="Select all applications"
+                checked={areAllVisibleRowsSelected}
+                disabled={!hasVisibleRows}
+                onChange={toggleVisibleApplicationSelection}
+              />
+            </span>
+            <span className={styles.trackerColumnLabel}>Company</span>
+            <span className={styles.trackerColumnLabel}>Date Applied</span>
+            <span className={styles.trackerColumnLabel}>Status</span>
+            <span className={styles.trackerColumnLabel}>Position</span>
+            <span className={styles.trackerColumnLabel}>Location</span>
+            <span className={styles.trackerColumnLabel}>Resume</span>
+          </div>
+          <div className={styles.trackerHeaderDivider} aria-hidden="true" />
+          <div className={styles.trackerGridBody} onScroll={onGridScroll}>
+            {errorMessage ? (
+              <StatusNotice
+                tone="error"
+                message={errorMessage}
+                className={styles.trackerNotice}
+                actionLabel="Retry"
+                onAction={retryLoad}
+              />
+            ) : null}
+            {downloadError ? <StatusNotice tone="error" message={downloadError} className={styles.trackerNotice} /> : null}
+            {isLoading
+              ? Array.from({ length: skeletonRows }).map((_, index) => (
+                  <div key={`skeleton-${index}`}>
+                    <div className={styles.trackerRow}>
+                      <span className={styles.trackerColumnCheckbox}>
+                        <span className={[styles.trackerSkeleton, styles.trackerSkeletonCheckbox].join(" ")} />
+                      </span>
+                      <span className={[styles.trackerSkeleton, styles.trackerSkeletonTextLong].join(" ")} />
+                      <span className={[styles.trackerSkeleton, styles.trackerSkeletonTextMedium].join(" ")} />
+                      <span className={[styles.trackerSkeleton, styles.trackerSkeletonStatus].join(" ")} />
+                      <span className={[styles.trackerSkeleton, styles.trackerSkeletonTextLong].join(" ")} />
+                      <span className={[styles.trackerSkeleton, styles.trackerSkeletonTextMedium].join(" ")} />
+                      <span className={[styles.trackerSkeleton, styles.trackerSkeletonResume].join(" ")} />
+                    </div>
+                    <div className={styles.trackerRowDivider} aria-hidden="true" />
+                  </div>
+                ))
+              : null}
+            {!isLoading && !errorMessage && applicationRows.length === 0 ? (
+              <StatusNotice tone="info" message="No applications yet for this filter." className={styles.trackerNotice} />
+            ) : null}
+            {!isLoading && !errorMessage
+              ? applicationRows.map((row) => (
+                  <div key={row.id}>
+                    <div className={styles.trackerRow}>
+                      <span className={styles.trackerColumnCheckbox}>
+                        <input
+                          type="checkbox"
+                          className={styles.trackerRowCheckbox}
+                          aria-label={`Select ${row.company}`}
+                          checked={selectedApplicationIds.includes(row.id)}
+                          onChange={() => toggleApplicationSelection(row.id)}
+                        />
+                      </span>
+                      <span className={styles.trackerRowText}>{row.company}</span>
+                      <span className={styles.trackerRowText}>{formatAppliedDate(row.date_applied)}</span>
+                      <span className={styles.trackerStatusCell}>
                         <button
                           type="button"
-                          className={styles.trackerResumeIconOnlyButton}
-                          onClick={() => void downloadResume(row.id, row.resume_filename ?? "resume")}
-                          disabled={!row.resume_path || Boolean(downloadingById[row.id])}
-                          aria-label={`Download ${row.resume_filename ?? "resume"}`}
+                          className={[styles.trackerStatusButton, getStatusButtonClassName(row.status)].join(" ")}
+                          disabled={isUpdating(row.id)}
+                          onClick={() => void updateApplicationStatus(row.id, getNextApplicationStatus(row.status))}
                         >
-                          <img src={resumeIcon} alt="" aria-hidden="true" className={styles.trackerResumeIconOnlyImage} />
+                          {row.status}
                         </button>
-                      ) : (
+                      </span>
+                      <span className={styles.trackerRowText}>{row.position}</span>
+                      <span className={styles.trackerRowText}>{row.location}</span>
+                      <span className={styles.trackerResumeCell}>
                         <span className={styles.trackerResumeChip}>
                           <span className={styles.trackerResumeName}>{row.resume_filename ?? "---"}</span>
                           <button
@@ -654,18 +711,18 @@ function ApplicationTrackerView({
                             <img src={downloadIcon} alt="" aria-hidden="true" className={styles.trackerResumeDownloadIcon} />
                           </button>
                         </span>
-                      )}
-                    </span>
+                      </span>
+                    </div>
+                    <div className={styles.trackerRowDivider} aria-hidden="true" />
                   </div>
-                  <div className={styles.trackerRowDivider} aria-hidden="true" />
-                </div>
-              ))
-            : null}
-          {!isLoading && (isFetchingMore || showTrailingLoadState) ? (
-            <StatusNotice tone="info" message="Loading more applications..." className={styles.trackerNotice} />
-          ) : null}
-        </div>
-      </section>
+                ))
+              : null}
+            {!isLoading && (isFetchingMore || showTrailingLoadState) ? (
+              <StatusNotice tone="info" message="Loading more applications..." className={styles.trackerNotice} />
+            ) : null}
+          </div>
+        </section>
+      )}
     </section>
   );
 }
