@@ -28,6 +28,7 @@ import Profile from "../../../components/profile/Profile";
 import { captureEvent } from "../../../posthog";
 import { useViewport } from "../../../hooks/useViewport";
 import { resolveStudioViewAccess } from "./studioViewPolicy";
+import { supabase } from "../../../lib/supabaseClient";
 
 export type ApplicationTrackerStatus = ApplicationFilter;
 
@@ -131,23 +132,56 @@ function HistoryView() {
       </section>
     );
   }
-  const openHistoryResume = async (card: HistoryCardData) => {
-    const applicationId = card.sourceApplicationId?.trim() ?? "";
-    if (!applicationId) {
-      setHistoryResumeError("Resume file unavailable for this history item.");
-      return;
+
+  const resolveHistoryApplicationId = async (card: HistoryCardData) => {
+    const directId = card.sourceApplicationId?.trim() ?? "";
+    if (directId) {
+      return directId;
     }
 
+    const runId = card.resumeRunId?.trim() ?? "";
+    if (!runId) {
+      return "";
+    }
+
+    const { data, error } = await supabase
+      .from("applications")
+      .select("id")
+      .eq("source_resume_run_id", runId)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`Failed to resolve resume for this history item: ${error.message}`);
+    }
+
+    return typeof data?.id === "string" ? data.id : "";
+  };
+
+  const openHistoryResume = async (card: HistoryCardData) => {
     setHistoryResumeError(null);
-    setOpeningResumeByApplicationId((prev) => ({ ...prev, [applicationId]: true }));
+    const popup = window.open("", "_blank", "noopener,noreferrer");
+    let applicationId = "";
     try {
+      applicationId = await resolveHistoryApplicationId(card);
+      if (!applicationId) {
+        throw new Error("Resume file unavailable for this history item.");
+      }
+      setOpeningResumeByApplicationId((prev) => ({ ...prev, [applicationId]: true }));
       const data = await getResumeDownloadUrl(applicationId);
-      window.open(data.signed_url, "_blank", "noopener,noreferrer");
+      if (popup) {
+        popup.location.href = data.signed_url;
+      } else {
+        window.location.assign(data.signed_url);
+      }
     } catch (error) {
+      popup?.close();
       const message = error instanceof Error ? error.message : "Failed to open resume.";
       setHistoryResumeError(message);
     } finally {
-      setOpeningResumeByApplicationId((prev) => ({ ...prev, [applicationId]: false }));
+      if (applicationId) {
+        setOpeningResumeByApplicationId((prev) => ({ ...prev, [applicationId]: false }));
+      }
     }
   };
 
@@ -168,7 +202,6 @@ function HistoryView() {
               data={card}
               onResumeIconClick={openHistoryResume}
               isResumeIconDisabled={
-                !card.sourceApplicationId ||
                 Boolean(card.sourceApplicationId && openingResumeByApplicationId[card.sourceApplicationId])
               }
               showSummary={false}

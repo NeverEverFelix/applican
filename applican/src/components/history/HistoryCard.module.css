@@ -291,3 +291,63 @@
     font-size: 24px;
   }
 }
+
+@media (max-width: 767px) {
+  .card {
+    min-height: 0;
+    border-radius: 28px;
+    padding: 16px;
+    gap: 14px;
+  }
+
+  .headerRow {
+    gap: 10px;
+  }
+
+  .iconContainer {
+    width: 36px;
+    height: 48px;
+  }
+
+  .titleLocationContainer {
+    gap: 8px;
+    padding-top: 4px;
+  }
+
+  .titleText,
+  .locationText {
+    font-size: 15px;
+    line-height: 1.2;
+  }
+
+  .contentStack {
+    margin-top: 6px;
+    gap: 12px;
+  }
+
+  .infoPillsContainer {
+    gap: 8px;
+  }
+
+  .pillRowTop,
+  .pillRowBottom {
+    gap: 6px;
+  }
+
+  .infoPill {
+    min-height: 32px;
+    padding: 6px 10px;
+    font-size: 12px;
+    line-height: 1.2;
+  }
+
+  .analysisContainer {
+    min-height: 0;
+    margin-top: 0;
+  }
+
+  .analysisText {
+    font-size: 14px;
+    line-height: 1.35;
+  }
+}

@@ -2226,6 +2226,34 @@
 }
 
 @media (max-width: 767px) {
+  .historyFlow {
+    align-items: flex-start;
+    padding-top: 8px;
+  }
+
+  .historySequence {
+    width: 100%;
+  }
+
+  .historySingleCardWrap {
+    width: 100%;
+    max-width: 100%;
+    padding: 0 8px;
+  }
+
+  .historyFadeLayer {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .historyStatusNotice {
+    width: min(520px, calc(100% - 16px));
+  }
+
+  .historyInlineNotice {
+    width: min(620px, calc(100% - 16px));
+  }
+
   .trackerView {
     padding-top: 28px;
   }

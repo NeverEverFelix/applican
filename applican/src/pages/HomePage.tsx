@@ -54,7 +54,13 @@ export default function HomePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { bucket, isMobile } = useViewport();
-  const shellClassName = [styles.container, isMobile ? styles.mobileShell : ""].filter(Boolean).join(" ");
+  const shellClassName = [
+    styles.container,
+    isMobile ? styles.mobileShell : "",
+    selectedView === "History" ? styles.historyNoPageScroll : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
   const currentUserName = useCurrentUserName();
   const currentUserPlan = useCurrentUserPlan();
   const pickerItems: Array<{ label: PickerView; iconSrc: string }> = [
@@ -93,6 +99,29 @@ export default function HomePage() {
       setSelectedView(resolvedView);
     }
   }, [bucket, selectedView, setSelectedView]);
+
+  useEffect(() => {
+    if (selectedView !== "History") {
+      return;
+    }
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousBodyOverscrollBehavior = document.body.style.overscrollBehavior;
+    const previousHtmlOverscrollBehavior = document.documentElement.style.overscrollBehavior;
+
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overscrollBehavior = "none";
+    document.documentElement.style.overscrollBehavior = "none";
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      document.body.style.overscrollBehavior = previousBodyOverscrollBehavior;
+      document.documentElement.style.overscrollBehavior = previousHtmlOverscrollBehavior;
+    };
+  }, [selectedView]);
 
   const handleLogout = async () => {
     if (isLoggingOut) {
@@ -284,7 +313,7 @@ export default function HomePage() {
         ) : null}
       </div>
       <div className={styles.studioArea}>
-        {selectedView === "Profile" ? (
+        {selectedView === "Profile" && !isMobile ? (
           <div className={styles.studioUserCard}>
             <UserInfoCard user={{ name: currentUserName, plan: currentUserPlan }} />
           </div>

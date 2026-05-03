@@ -93,3 +93,38 @@
     font-size: 22px;
   }
 }
+
+@media (max-width: 767px) {
+  .container {
+    padding: 8px;
+  }
+
+  .summaryPanel {
+    min-height: 0;
+    border-radius: 28px;
+    padding: 18px 16px;
+    gap: 14px;
+  }
+
+  .summaryEyebrow {
+    font-size: 10px;
+  }
+
+  .summaryTitle {
+    font-size: 20px;
+  }
+
+  .summaryMeta {
+    font-size: 13px;
+  }
+
+  .summaryBody {
+    padding: 14px 12px;
+    border-radius: 16px;
+  }
+
+  .summaryText {
+    font-size: 14px;
+    line-height: 1.35;
+  }
+}

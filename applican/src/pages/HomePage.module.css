@@ -18,6 +18,11 @@
   align-items: stretch;
 }
 
+.historyNoPageScroll {
+  height: 100dvh;
+  overflow: hidden;
+}
+
 .mobileShell .userInfoContainer {
   max-width: none;
   width: 100%;

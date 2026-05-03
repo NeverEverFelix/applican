@@ -167,6 +167,7 @@ export default function FadeSwipePanels({
       observer = Observer.create({
         target: container,
         type: "wheel,touch",
+        ignore: "button, a, input, select, textarea, [role='button']",
         wheelSpeed: -1,
         tolerance: 24,
         dragMinimum: 24,
