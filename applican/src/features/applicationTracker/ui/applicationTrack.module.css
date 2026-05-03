@@ -2423,26 +2423,28 @@
     scrollbar-gutter: auto;
   }
 
-  /* Keep tracker desktop-like on mobile (scaled down), with 2x2 filter pills. */
+  /* Phone-width tracker layout (no desktop-width carryover). */
   .trackerColumns,
   .trackerGridBody {
-    overflow-x: auto;
+    overflow-x: hidden;
+    width: 100%;
   }
 
   .trackerColumnHeader {
     display: grid;
-    grid-template-columns: 28px minmax(150px, 1.8fr) minmax(108px, 1fr) minmax(98px, 0.9fr) minmax(150px, 1.5fr) minmax(120px, 1.1fr) minmax(150px, 1.2fr);
-    min-width: 860px;
+    width: 100%;
+    min-width: 0;
   }
 
   .trackerColumnHeaderMobileCompact {
-    grid-template-columns: 24px minmax(124px, 1.7fr) minmax(92px, 0.95fr) minmax(86px, 0.9fr) minmax(124px, 1.4fr) 32px;
-    min-width: 620px;
+    grid-template-columns: 24px minmax(84px, 1.35fr) minmax(72px, 1fr) minmax(78px, 1fr) minmax(86px, 1.15fr) 28px;
+    min-width: 0;
+    column-gap: 6px;
   }
 
   .trackerRow {
-    grid-template-columns: 28px minmax(150px, 1.8fr) minmax(108px, 1fr) minmax(98px, 0.9fr) minmax(150px, 1.5fr) minmax(120px, 1.1fr) minmax(150px, 1.2fr);
-    min-width: 860px;
+    width: 100%;
+    min-width: 0;
     align-items: center;
     gap: 0;
     padding: 0;
@@ -2452,15 +2454,17 @@
   }
 
   .trackerRowMobileCompact {
-    grid-template-columns: 24px minmax(124px, 1.7fr) minmax(92px, 0.95fr) minmax(86px, 0.9fr) minmax(124px, 1.4fr) 32px;
-    min-width: 620px;
+    grid-template-columns: 24px minmax(84px, 1.35fr) minmax(72px, 1fr) minmax(78px, 1fr) minmax(86px, 1.15fr) 28px;
+    min-width: 0;
+    column-gap: 6px;
   }
 
   .trackerTopDivider,
   .trackerHeaderDivider,
   .trackerRowDivider {
-    min-width: 860px;
+    min-width: 0;
     display: block;
+    width: 100%;
   }
 
   .trackerGridBody {
@@ -2475,7 +2479,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
     display: block;
-    padding-right: 8px;
+    padding-right: 4px;
+    font-size: 12px;
   }
 
   .trackerStatusCell::before,
@@ -2500,8 +2505,8 @@
   }
 
   .trackerResumeIconOnlyButton {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
     border-radius: 0;
     background: transparent;
     border: 0;
@@ -2509,8 +2514,8 @@
   }
 
   .trackerResumeIconOnlyImage {
-    width: 12px;
-    height: 12px;
+    width: 11px;
+    height: 11px;
   }
 
   .progressScreenContainer,
