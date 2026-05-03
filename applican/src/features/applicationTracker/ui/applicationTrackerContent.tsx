@@ -551,12 +551,22 @@ function ApplicationTrackerView({
               onChange={toggleVisibleApplicationSelection}
             />
           </span>
-          <span className={styles.trackerColumnLabel}>Company</span>
-          <span className={styles.trackerColumnLabel}>Date Applied</span>
-          <span className={styles.trackerColumnLabel}>Status</span>
-          <span className={styles.trackerColumnLabel}>Position</span>
+          <span className={[styles.trackerColumnLabel, isMobile ? styles.trackerColumnLabelMobileCompact : ""].join(" ").trim()}>
+            Company
+          </span>
+          <span className={[styles.trackerColumnLabel, isMobile ? styles.trackerColumnLabelMobileCompact : ""].join(" ").trim()}>
+            {isMobile ? "Date" : "Date Applied"}
+          </span>
+          <span className={[styles.trackerColumnLabel, isMobile ? styles.trackerColumnLabelMobileCompact : ""].join(" ").trim()}>
+            Status
+          </span>
+          <span className={[styles.trackerColumnLabel, isMobile ? styles.trackerColumnLabelMobileCompact : ""].join(" ").trim()}>
+            Position
+          </span>
           {!isMobile ? <span className={styles.trackerColumnLabel}>Location</span> : null}
-          <span className={styles.trackerColumnLabel}>Resume</span>
+          <span className={[styles.trackerColumnLabel, isMobile ? styles.trackerColumnLabelMobileCompact : ""].join(" ").trim()}>
+            Resume
+          </span>
         </div>
         <div className={styles.trackerHeaderDivider} aria-hidden="true" />
         <div className={styles.trackerGridBody} onScroll={onGridScroll}>

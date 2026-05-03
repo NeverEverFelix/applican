@@ -2437,9 +2437,11 @@
   }
 
   .trackerColumnHeaderMobileCompact {
-    grid-template-columns: 24px minmax(84px, 1.35fr) minmax(72px, 1fr) minmax(78px, 1fr) minmax(86px, 1.15fr) 28px;
+    grid-template-columns: 24px minmax(70px, 1.3fr) minmax(56px, 0.9fr) minmax(66px, 1fr) minmax(74px, 1.1fr) 28px;
     min-width: 0;
-    column-gap: 6px;
+    column-gap: 8px;
+    min-height: 36px;
+    align-items: center;
   }
 
   .trackerRow {
@@ -2454,9 +2456,9 @@
   }
 
   .trackerRowMobileCompact {
-    grid-template-columns: 24px minmax(84px, 1.35fr) minmax(72px, 1fr) minmax(78px, 1fr) minmax(86px, 1.15fr) 28px;
+    grid-template-columns: 24px minmax(70px, 1.3fr) minmax(56px, 0.9fr) minmax(66px, 1fr) minmax(74px, 1.1fr) 28px;
     min-width: 0;
-    column-gap: 6px;
+    column-gap: 8px;
   }
 
   .trackerTopDivider,
@@ -2481,6 +2483,15 @@
     display: block;
     padding-right: 4px;
     font-size: 12px;
+  }
+
+  .trackerColumnLabelMobileCompact {
+    font-size: 11px;
+    line-height: 1;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .trackerStatusCell::before,
