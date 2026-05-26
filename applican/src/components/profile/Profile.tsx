@@ -10,6 +10,7 @@ import { useChangePassword } from "./changePassword";
 import { useProfessionalSummary } from "./professionalSummary";
 import { cancelSubscription } from "../../features/billing/api/cancelSubscription";
 import cancelIcon from "../../assets/cancel.svg";
+import { Button, Input, Textarea } from "../ui";
 
 function getNameParts(user: User | null) {
   const fullName =
@@ -116,17 +117,17 @@ export default function Profile({ onClose }: ProfileProps) {
 
   return (
     <section className={styles.profileView}>
-      <button
+      <Button
         type="button"
         className={styles.dismissButton}
         onClick={onClose}
         aria-label="Close profile and return to Resume Studio"
       >
         <img src={cancelIcon} alt="" className={styles.dismissIcon} />
-      </button>
+      </Button>
       <div className={styles.profileColumn}>
         <div className={styles.nameRow}>
-          <input
+          <Input
             type="text"
             className={styles.firstNameTextbox}
             value={firstNameDraft}
@@ -134,14 +135,14 @@ export default function Profile({ onClose }: ProfileProps) {
             aria-label="First name"
           />
           <div className={styles.nameActionGroup}>
-            <input
+            <Input
               type="text"
               className={styles.lastNameTextbox}
               value={lastNameDraft}
               onChange={(event) => setLastNameDraft(event.target.value)}
               aria-label="Last name"
             />
-            <button
+            <Button
               type="button"
               className={[
                 styles.changeEmailLink,
@@ -153,20 +154,20 @@ export default function Profile({ onClose }: ProfileProps) {
               disabled={!canChangeName}
             >
               {isChangingName ? "saving..." : "save name"}
-            </button>
+            </Button>
           </div>
         </div>
         {nameStatusMessage ? <StatusNotice tone="success" message={nameStatusMessage} className={styles.profileNotice} /> : null}
         {nameErrorMessage ? <StatusNotice tone="error" message={nameErrorMessage} className={styles.profileNotice} /> : null}
         <div className={styles.emailRow}>
-          <input
+          <Input
             type="email"
             className={styles.emailTextbox}
             value={emailDraft}
             onChange={(event) => setEmailDraft(event.target.value)}
             aria-label="Email address"
           />
-          <button
+          <Button
             type="button"
             className={[
               styles.changeEmailLink,
@@ -175,11 +176,11 @@ export default function Profile({ onClose }: ProfileProps) {
             ]
               .join(" ")
               .trim()}
-            onClick={() => void submitChangeEmail()}
-            disabled={!canChangeEmail}
-          >
-            {isChangingEmail ? "sending..." : "change email"}
-          </button>
+              onClick={() => void submitChangeEmail()}
+              disabled={!canChangeEmail}
+            >
+              {isChangingEmail ? "sending..." : "change email"}
+          </Button>
         </div>
         {emailStatusMessage ? <StatusNotice tone="success" message={emailStatusMessage} className={styles.profileNotice} /> : null}
         {emailErrorMessage ? <StatusNotice tone="error" message={emailErrorMessage} className={styles.profileNotice} /> : null}
@@ -194,8 +195,9 @@ export default function Profile({ onClose }: ProfileProps) {
           >
             Enter Professional Summary
           </span>
-          <textarea
+          <Textarea
             className={[styles.professionalSummaryTextbox, isOverLimit ? styles.professionalSummaryTextboxInvalid : ""].join(" ").trim()}
+            invalid={isOverLimit}
             value={summary}
             onChange={(event) => setSummary(event.target.value)}
             onFocus={() => setIsSummaryFocused(true)}
@@ -222,17 +224,17 @@ export default function Profile({ onClose }: ProfileProps) {
         {!isOverLimit && summaryErrorMessage ? (
           <StatusNotice tone="error" message={summaryErrorMessage} className={styles.profileNotice} />
         ) : null}
-        <button
+        <Button
           type="button"
           className={styles.profileActionLink}
           onClick={handleResetPassword}
           disabled={!canChangePassword}
         >
           {isChangingPassword ? "sending..." : "change password"}
-        </button>
+        </Button>
         {passwordStatusMessage ? <StatusNotice tone="success" message={passwordStatusMessage} className={styles.profileNotice} /> : null}
         {passwordErrorMessage ? <StatusNotice tone="error" message={passwordErrorMessage} className={styles.profileNotice} /> : null}
-        <button
+        <Button
           type="button"
           className={styles.cancelSubscriptionLink}
           onClick={() => void handleCancelSubscription()}
@@ -246,7 +248,7 @@ export default function Profile({ onClose }: ProfileProps) {
                 ? "scheduling cancellation..."
                 : "cancel subscription"
             : "no active subscription"}
-        </button>
+        </Button>
         {cancellationState === "scheduled" ? (
           <StatusNotice
             tone="success"

@@ -2,6 +2,7 @@ import styles from "./HistoryCard.module.css";
 import { historyCardSeed, type HistoryCardData } from "./history";
 import applicanCreamIcon from "../../assets/resume-icons/applican-cream-resume-icon.svg";
 import clockIcon from "../../assets/clock.svg";
+import { Button } from "../ui";
 
 type HistoryCardProps = {
   data?: HistoryCardData;
@@ -31,7 +32,7 @@ export default function HistoryCard({
       aria-label={`History card for ${role} at ${company}`}
     >
       <div className={styles.headerRow}>
-        <button
+        <Button
           type="button"
           className={[styles.iconContainer, isIconClickable ? styles.iconButton : ""].join(" ").trim()}
           onClick={() => onResumeIconClick?.(data)}
@@ -39,7 +40,7 @@ export default function HistoryCard({
           aria-label={`Open resume used for ${role} at ${company}`}
         >
           <img src={applicanCreamIcon} alt="" className={styles.icon} />
-        </button>
+        </Button>
 
         <div className={styles.titleLocationContainer}>
           <p className={styles.titleText}>{titleDisplay}</p>

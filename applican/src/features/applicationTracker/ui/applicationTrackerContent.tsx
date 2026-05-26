@@ -29,6 +29,7 @@ import { captureEvent } from "../../../posthog";
 import { useViewport } from "../../../hooks/useViewport";
 import { resolveStudioViewAccess } from "./studioViewPolicy";
 import { supabase } from "../../../lib/supabaseClient";
+import { Button, Input } from "../../../components/ui";
 
 export type ApplicationTrackerStatus = ApplicationFilter;
 
@@ -54,9 +55,9 @@ function PlaceholderView({
       <h2 className={styles.placeholderTitle}>{title}</h2>
       <p className={styles.placeholderCopy}>{copy}</p>
       {actionLabel && onAction ? (
-        <button type="button" className={styles.placeholderActionButton} onClick={onAction}>
+        <Button type="button" className={styles.placeholderActionButton} onClick={onAction}>
           {actionLabel}
-        </button>
+        </Button>
       ) : null}
     </section>
   );
@@ -487,42 +488,42 @@ function ApplicationTrackerView({
     <section className={styles.trackerView}>
       <header className={styles.trackerHeader}>
         <div className={styles.statusPillGroup}>
-          <button
+          <Button
             type="button"
             className={[styles.statusPill, selectedStatus === "all" ? styles.statusPillSelected : ""].join(" ").trim()}
             onClick={() => onSelectStatus("all")}
           >
             All
             <span className={styles.statusCount}>{counts.all}</span>
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             className={[styles.statusPill, selectedStatus === "applied" ? styles.statusPillSelected : ""].join(" ").trim()}
             onClick={() => onSelectStatus("applied")}
           >
             Applied
             <span className={styles.statusCount}>{counts.applied}</span>
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             className={[styles.statusPill, selectedStatus === "interview" ? styles.statusPillSelected : ""].join(" ").trim()}
             onClick={() => onSelectStatus("interview")}
           >
             Interview
             <span className={styles.statusCount}>{counts.interview}</span>
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             className={[styles.statusPill, selectedStatus === "rejected" ? styles.statusPillSelected : ""].join(" ").trim()}
             onClick={() => onSelectStatus("rejected")}
           >
             Rejected
             <span className={styles.statusCount}>{counts.rejected}</span>
-          </button>
+          </Button>
           <div className={styles.statusPillActionSlot} aria-hidden={!showActionPills}>
             {showActionPills ? (
               <>
-                <button
+                <Button
                   type="button"
                   data-testid="tracker-delete-pill"
                   className={[styles.statusPill, styles.statusPillActionPill, styles.statusPillActionPillVisible].join(" ").trim()}
@@ -531,8 +532,8 @@ function ApplicationTrackerView({
                 >
                   {deletePillLabel}
                   <img src={trashIcon} alt="" aria-hidden="true" className={styles.statusPillActionIcon} />
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   data-testid="tracker-offer-pill"
                   className={[
@@ -547,8 +548,8 @@ function ApplicationTrackerView({
                   onClick={() => void offerSelectedApplications()}
                 >
                   Offer
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   data-testid="tracker-progress-pill"
                   className={[
@@ -563,7 +564,7 @@ function ApplicationTrackerView({
                   onClick={() => void progressSelectedApplications()}
                 >
                   Progress
-                </button>
+                </Button>
               </>
             ) : null}
           </div>
@@ -603,14 +604,14 @@ function ApplicationTrackerView({
             ? applicationRows.map((row) => (
                 <article key={row.id} className={styles.mobileTrackerCard}>
                   <div className={styles.mobileTrackerCardTop}>
-                    <input
+                    <Input
                       type="checkbox"
                       className={styles.trackerRowCheckbox}
                       aria-label={`Select ${row.company}`}
                       checked={selectedApplicationIds.includes(row.id)}
                       onChange={() => toggleApplicationSelection(row.id)}
                     />
-                    <button
+                    <Button
                       type="button"
                       className={styles.trackerResumeIconOnlyButton}
                       onClick={() => void downloadResume(row.id, row.resume_filename ?? "resume")}
@@ -618,7 +619,7 @@ function ApplicationTrackerView({
                       aria-label={`Download ${row.resume_filename ?? "resume"}`}
                     >
                       <img src={resumeIcon} alt="" aria-hidden="true" className={styles.trackerResumeIconOnlyImage} />
-                    </button>
+                    </Button>
                   </div>
                   <div className={styles.mobileTrackerRow}>
                     <span className={styles.mobileTrackerLabel}>Company</span>
@@ -630,14 +631,14 @@ function ApplicationTrackerView({
                   </div>
                   <div className={styles.mobileTrackerRow}>
                     <span className={styles.mobileTrackerLabel}>Status</span>
-                    <button
+                    <Button
                       type="button"
                       className={[styles.trackerStatusButton, getStatusButtonClassName(row.status)].join(" ")}
                       disabled={isUpdating(row.id)}
                       onClick={() => void updateApplicationStatus(row.id, getNextApplicationStatus(row.status))}
                     >
                       {row.status}
-                    </button>
+                    </Button>
                   </div>
                   <div className={styles.mobileTrackerRow}>
                     <span className={styles.mobileTrackerLabel}>Position</span>
@@ -654,7 +655,7 @@ function ApplicationTrackerView({
         <section className={styles.trackerColumns} aria-label="Applications grid">
           <div className={styles.trackerColumnHeader}>
             <span className={styles.trackerColumnCheckbox}>
-              <input
+              <Input
                 ref={headerCheckboxRef}
                 type="checkbox"
                 className={styles.trackerHeaderCheckbox}
@@ -709,7 +710,7 @@ function ApplicationTrackerView({
                   <div key={row.id}>
                     <div className={styles.trackerRow}>
                       <span className={styles.trackerColumnCheckbox}>
-                        <input
+                        <Input
                           type="checkbox"
                           className={styles.trackerRowCheckbox}
                           aria-label={`Select ${row.company}`}
@@ -720,21 +721,21 @@ function ApplicationTrackerView({
                       <span className={styles.trackerRowText}>{row.company}</span>
                       <span className={styles.trackerRowText}>{formatAppliedDate(row.date_applied)}</span>
                       <span className={styles.trackerStatusCell}>
-                        <button
+                        <Button
                           type="button"
                           className={[styles.trackerStatusButton, getStatusButtonClassName(row.status)].join(" ")}
                           disabled={isUpdating(row.id)}
                           onClick={() => void updateApplicationStatus(row.id, getNextApplicationStatus(row.status))}
                         >
                           {row.status}
-                        </button>
+                        </Button>
                       </span>
                       <span className={styles.trackerRowText}>{row.position}</span>
                       <span className={styles.trackerRowText}>{row.location}</span>
                       <span className={styles.trackerResumeCell}>
                         <span className={styles.trackerResumeChip}>
                           <span className={styles.trackerResumeName}>{row.resume_filename ?? "---"}</span>
-                          <button
+                          <Button
                             type="button"
                             className={styles.trackerResumeDownloadButton}
                             onClick={() => void downloadResume(row.id, row.resume_filename ?? "resume")}
@@ -742,7 +743,7 @@ function ApplicationTrackerView({
                             aria-label={`Download ${row.resume_filename ?? "resume"}`}
                           >
                             <img src={downloadIcon} alt="" aria-hidden="true" className={styles.trackerResumeDownloadIcon} />
-                          </button>
+                          </Button>
                         </span>
                       </span>
                     </div>

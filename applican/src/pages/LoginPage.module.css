@@ -10,7 +10,7 @@
   --header-offset: clamp(184px, 18vh, 364px);
   --content-offset: -32px;
   --section-gap: clamp(28px, 3vw, 40px);
-  --form-control-width: min(100%, 403px);
+  --form-control-width: var(--auth-control-width);
   min-height: 100svh;
   display: grid;
   grid-template-columns: minmax(0, 588px) minmax(0, 840px);
@@ -18,7 +18,7 @@
   align-items: stretch;
   justify-content: center;
   padding: var(--page-padding);
-  background: #151515;
+  background: var(--bg-canvas);
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -28,7 +28,7 @@
   width: 100%;
   height: var(--panel-height);
   border-radius: var(--panel-radius);
-  background: #000;
+  background: var(--bg-surface);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -73,45 +73,45 @@
 }
 
 .mainText {
-  margin: 24px 0 0;
+  margin: var(--space-6) 0 0;
   text-align: center;
-  color: #fff;
-  font-size: clamp(48px, 4.4vw, 64px);
+  color: var(--text-primary);
+  font-size: var(--text-hero);
   line-height: 1.1;
 }
 
 .subText {
   margin: 16px 0 0;
   max-width: 24ch;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 16px;
+  color: var(--text-muted);
+  font-size: var(--text-base);
   line-height: 1.4;
   text-align: center;
 }
 
 .subText a {
   margin-left: 4px;
-  color: #0068f4;
+  color: var(--text-link);
   text-decoration: underline;
 }
 
 .email {
   width: var(--form-control-width);
-  height: 48px;
-  padding: 0 12px;
-  border-radius: 12px;
-  background-color: #151515;
+  height: var(--auth-control-height);
+  padding: 0 var(--space-3);
+  border-radius: var(--auth-control-radius);
+  background-color: var(--bg-canvas);
   box-sizing: border-box;
 
   border: none;
-  color: rgba(0, 104, 244, 0.5);
-  caret-color: rgba(0, 104, 244, 0.5);
+  color: var(--text-input-email);
+  caret-color: var(--text-input-email);
 }
 
 .email:focus,
 .email:focus-visible,
 .email:active {
-  background-color: #151515;
+  background-color: var(--bg-canvas);
   outline: none;
 }
 
@@ -119,14 +119,14 @@
 .email:-webkit-autofill:hover,
 .email:-webkit-autofill:focus,
 .email:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 1000px #151515 inset;
-  box-shadow: 0 0 0 1000px #151515 inset;
-  -webkit-text-fill-color: rgba(0, 104, 244, 0.5);
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-canvas) inset;
+  box-shadow: 0 0 0 1000px var(--bg-canvas) inset;
+  -webkit-text-fill-color: var(--text-input-email);
   transition: background-color 0.5s ease-out 0s;
 }
 
 .email::placeholder {
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
   opacity: 1;
 }
 
@@ -134,54 +134,54 @@
 .emailValidated:focus,
 .emailValidated:focus-visible,
 .emailValidated:active {
-  background-color: #022d28;
-  color: rgba(49, 197, 108, 0.75);
-  caret-color: rgba(49, 197, 108, 0.75);
+  background-color: var(--state-valid-bg);
+  color: var(--state-valid-text);
+  caret-color: var(--state-valid-text);
 }
 
 .emailValidated:-webkit-autofill,
 .emailValidated:-webkit-autofill:hover,
 .emailValidated:-webkit-autofill:focus,
 .emailValidated:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 1000px #022d28 inset;
-  box-shadow: 0 0 0 1000px #022d28 inset;
-  -webkit-text-fill-color: rgba(49, 197, 108, 0.75);
+  -webkit-box-shadow: 0 0 0 1000px var(--state-valid-bg) inset;
+  box-shadow: 0 0 0 1000px var(--state-valid-bg) inset;
+  -webkit-text-fill-color: var(--state-valid-text);
 }
 
 .emailInvalid,
 .emailInvalid:focus,
 .emailInvalid:focus-visible,
 .emailInvalid:active {
-  background-color: #4a0719;
-  color: #ec2542;
-  caret-color: #ec2542;
+  background-color: var(--state-invalid-bg);
+  color: var(--feedback-danger);
+  caret-color: var(--feedback-danger);
 }
 
 .emailInvalid:-webkit-autofill,
 .emailInvalid:-webkit-autofill:hover,
 .emailInvalid:-webkit-autofill:focus,
 .emailInvalid:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 1000px #4a0719 inset;
-  box-shadow: 0 0 0 1000px #4a0719 inset;
-  -webkit-text-fill-color: #ec2542;
+  -webkit-box-shadow: 0 0 0 1000px var(--state-invalid-bg) inset;
+  box-shadow: 0 0 0 1000px var(--state-invalid-bg) inset;
+  -webkit-text-fill-color: var(--feedback-danger);
 }
 .password{
   width: var(--form-control-width);
-  height: 48px;
-  padding: 0 12px;
-  border-radius: 12px;
-  background-color: #151515;
+  height: var(--auth-control-height);
+  padding: 0 var(--space-3);
+  border-radius: var(--auth-control-radius);
+  background-color: var(--bg-canvas);
   box-sizing: border-box;
 
   border: none;
-  color: rgba(255, 255, 255, 0.5);
-  caret-color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
+  caret-color: var(--text-muted);
 }
 
 .password:focus,
 .password:focus-visible,
 .password:active {
-  background-color: #151515;
+  background-color: var(--bg-canvas);
   border: none;
   outline: none;
   box-shadow: none;
@@ -191,18 +191,18 @@
 .password:-webkit-autofill:hover,
 .password:-webkit-autofill:focus,
 .password:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 1000px #151515 inset;
-  box-shadow: 0 0 0 1000px #151515 inset;
-  -webkit-text-fill-color: rgba(255, 255, 255, 0.5);
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-canvas) inset;
+  box-shadow: 0 0 0 1000px var(--bg-canvas) inset;
+  -webkit-text-fill-color: var(--text-muted);
 }
 .continue {
-  margin-top: 24px;
+  margin-top: var(--space-6);
   width: var(--form-control-width);
-  height: 48px;
-  background: #0068f4;
-  color: #0d0d0d; /* if you want it dark like your screenshot; use #fff if you want white */
+  height: var(--auth-control-height);
+  background: var(--action-primary);
+  color: var(--text-on-action);
   border: none;
-  border-radius: 12px;
+  border-radius: var(--auth-control-radius);
 }
 
 .continue:disabled {
@@ -212,36 +212,36 @@
 
 .formMessageError {
   width: var(--form-control-width);
-  margin: 12px 0 0;
-  color: #ec2542;
-  font-size: 13px;
+  margin: var(--space-3) 0 0;
+  color: var(--feedback-danger);
+  font-size: var(--text-sm);
   line-height: 1.4;
   text-align: left;
 }
 
 .orText {
-  margin: 24px 0 0;
-  color: #8c8c8c;
-  font-size: 14px;
+  margin: var(--space-6) 0 0;
+  color: var(--text-neutral);
+  font-size: var(--text-md);
   line-height: 14px;
   text-align: center;
 }
 
 .AltLogin {
   width: var(--form-control-width);
-  height: 48px;
-  background-color: #151515;
-  border-radius: 12px;
+  height: var(--auth-control-height);
+  background-color: var(--bg-canvas);
+  border-radius: var(--auth-control-radius);
   box-sizing: border-box;
 
-  margin-top: 24px; /* replaces the 117px hack */
+  margin-top: var(--space-6); /* replaces the 117px hack */
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
 
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
 }
 
 .AltLogin img {
@@ -253,9 +253,9 @@
 }
 
 .forgotPassword {
-  margin-top: 24px;
-  color: rgba(255, 255, 255, 0.42);
-  font-size: 14px;
+  margin-top: var(--space-6);
+  color: var(--text-subtle);
+  font-size: var(--text-md);
   text-decoration: none;
 }
 
@@ -269,8 +269,8 @@
 .secondaryLink {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.42);
-  font-size: 14px;
+  color: var(--text-subtle);
+  font-size: var(--text-md);
   text-decoration: underline;
   cursor: pointer;
 }
@@ -280,7 +280,7 @@
   width: 100%;
   height: var(--panel-height);
   border-radius: var(--panel-radius);
-  background: #000;
+  background: var(--bg-surface);
   overflow: hidden;
 }
 
@@ -334,7 +334,7 @@
 
   .email,
   .password {
-    font-size: 16px;
+    font-size: var(--text-base);
   }
 
   .passwordStepActions {

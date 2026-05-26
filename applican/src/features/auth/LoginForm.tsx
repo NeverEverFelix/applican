@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import type { FormEvent } from "react";
 import type { UseLoginFlow } from "./useLoginFlow";
 import styles from "../../pages/LoginPage.module.css";
+import { Button, FormField, Input, Label } from "../../components/ui";
 
 type LoginFormProps = {
   flow: UseLoginFlow;
@@ -58,42 +59,40 @@ export default function LoginForm({
         </div>
 
         <div className={styles.main}>
-          <input
-            type={isPasswordStep ? "password" : "email"}
-            name={isPasswordStep ? "password" : "email"}
-            placeholder={isPasswordStep ? "Password" : "Email"}
-            className={inputClassName}
-            value={isPasswordStep ? flow.password : flow.email}
-            onChange={(event) => {
-              if (isPasswordStep) {
-                flow.onPasswordChange(event.target.value);
-                return;
-              }
-              flow.onEmailChange(event.target.value);
-            }}
-            autoComplete={isPasswordStep ? "current-password" : "email"}
-          />
-          <button
-            type="submit"
-            className={styles.continue}
-            disabled={!canSubmit || isSubmitting}
-          >
-            {isSubmitting ? "Continuing..." : "Continue"}
-          </button>
-          {authError ? <p className={styles.formMessageError}>{authError}</p> : null}
+          <FormField errorMessage={authError} errorClassName={styles.formMessageError}>
+            <Label htmlFor={isPasswordStep ? "login-password" : "login-email"} className="sr-only">
+              {isPasswordStep ? "Password" : "Email"}
+            </Label>
+            <Input
+              id={isPasswordStep ? "login-password" : "login-email"}
+              type={isPasswordStep ? "password" : "email"}
+              name={isPasswordStep ? "password" : "email"}
+              placeholder={isPasswordStep ? "Password" : "Email"}
+              className={inputClassName}
+              invalid={!isPasswordStep && flow.isEmailInvalid}
+              value={isPasswordStep ? flow.password : flow.email}
+              onChange={(event) => {
+                if (isPasswordStep) {
+                  flow.onPasswordChange(event.target.value);
+                  return;
+                }
+                flow.onEmailChange(event.target.value);
+              }}
+              autoComplete={isPasswordStep ? "current-password" : "email"}
+            />
+            <Button type="submit" className={styles.continue} disabled={!canSubmit || isSubmitting}>
+              {isSubmitting ? "Continuing..." : "Continue"}
+            </Button>
+          </FormField>
         </div>
 
         {!isPasswordStep && (
           <div className={styles.footer}>
             <p className={styles.orText}>OR</p>
-            <button
-              type="button"
-              className={styles.AltLogin}
-              onClick={() => onGoogleSignIn?.()}
-            >
+            <Button type="button" variant="secondary" className={styles.AltLogin} onClick={() => onGoogleSignIn?.()}>
               <img src={googleIconSrc} alt="Google" />
               <span>Sign in with Google</span>
-            </button>
+            </Button>
             <Link to="/forgot-password" className={styles.forgotPassword}>
               Forgot password?
             </Link>
@@ -103,13 +102,9 @@ export default function LoginForm({
 
       {isPasswordStep && (
         <div className={styles.passwordStepActions}>
-          <button
-            type="button"
-            className={styles.secondaryLink}
-            onClick={flow.goToEmailStep}
-          >
+          <Button type="button" variant="link" className={styles.secondaryLink} onClick={flow.goToEmailStep}>
             Change email
-          </button>
+          </Button>
         </div>
       )}
     </form>

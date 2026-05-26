@@ -5,6 +5,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import styles from "./UserMenu.module.css";
 import type { UserInfo } from "../types";
 import IlluminateText from "../../effects/illuminate-text";
+import { Button } from "../ui";
 
 type UserMenuProps = {
   user: UserInfo;
@@ -168,10 +169,10 @@ export default function UserMenu({
   return (
     <DropdownMenu.Root open={isMenuOpen} onOpenChange={handleOpenChange}>
       <DropdownMenu.Trigger asChild>
-        <button type="button" className={styles.triggerButton} aria-label="Open user menu">
+        <Button type="button" className={styles.triggerButton} aria-label="Open user menu">
           <span className={styles.initialBadge}>{initial}</span>
           <p className={styles.userName}>{user.name}</p>
-        </button>
+        </Button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content asChild sideOffset={-56} align="start" forceMount>
@@ -203,7 +204,7 @@ export default function UserMenu({
                           : undefined
                 }
               >
-                <button
+                <Button
                   type="button"
                   className={
                     item === "Sign out"
@@ -227,7 +228,7 @@ export default function UserMenu({
                   ) : (
                     item
                   )}
-                </button>
+                </Button>
               </DropdownMenu.Item>
             ))}
           </div>

@@ -9,6 +9,7 @@ import { normalizeEmail, validateEmail } from "../features/auth/validateEmail";
 import { useMinimumLoading } from "../features/auth/useMinimumLoading";
 import { useDocumentScrollLock } from "../hooks/useDocumentScrollLock";
 import { supabase } from "../lib/supabaseClient";
+import { Button, FormField, Input } from "../components/ui";
 
 const passwordResetRedirectUrl = `${window.location.origin}/change-password`;
 
@@ -72,20 +73,25 @@ export default function ForgotPassword() {
           </div>
 
           <div className={styles.main}>
-            <input
-              type="email"
-              name="email"
-              placeholder="Email"
-              className={inputClassName}
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              autoComplete="email"
-            />
-            <button type="submit" className={styles.continue} disabled={!canSubmit}>
-              {isSubmitting ? "Sending..." : "Continue"}
-            </button>
-            {statusMessage ? <p className={styles.formMessageSuccess}>{statusMessage}</p> : null}
-            {errorMessage ? <p className={styles.formMessageError}>{errorMessage}</p> : null}
+            <FormField
+              errorMessage={errorMessage}
+              errorClassName={styles.formMessageError}
+              successMessage={statusMessage}
+              successClassName={styles.formMessageSuccess}
+            >
+              <Input
+                type="email"
+                name="email"
+                placeholder="Email"
+                className={inputClassName}
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                autoComplete="email"
+              />
+              <Button type="submit" className={styles.continue} disabled={!canSubmit}>
+                {isSubmitting ? "Sending..." : "Continue"}
+              </Button>
+            </FormField>
           </div>
         </div>
 

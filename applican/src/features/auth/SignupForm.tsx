@@ -1,6 +1,7 @@
 import type { FormEvent } from "react";
 import type { UseSignupFlow } from "./useSignupFlow";
 import styles from "../../pages/SignupPage.module.css";
+import { Button, FormField, Input, Label } from "../../components/ui";
 
 type SignupFormProps = {
   flow: UseSignupFlow;
@@ -68,94 +69,121 @@ export default function SignupForm({
         <div className={styles.main}>
           {!isPasswordStep && (
             <div className={styles.inputGroup}>
-              <input
+              <Label htmlFor="signup-email" className="sr-only">
+                Email
+              </Label>
+              <Input
+                id="signup-email"
                 type="email"
                 name="email"
                 placeholder="Email"
                 autoComplete="email"
                 className={emailClassName}
+                invalid={flow.isEmailInvalid}
                 value={flow.email}
                 onChange={(event) => flow.onEmailChange(event.target.value)}
               />
 
-              <input
+              <Label htmlFor="signup-name" className="sr-only">
+                Full name
+              </Label>
+              <Input
+                id="signup-name"
                 type="text"
                 name="name"
                 placeholder="Full Name"
                 autoComplete="name"
                 className={nameClassName}
+                invalid={flow.isNameInvalid}
                 value={flow.name}
                 onChange={(event) => flow.onNameChange(event.target.value)}
                 onBlur={flow.onNameBlur}
               />
 
-              <input
+              <Label htmlFor="signup-jobrole" className="sr-only">
+                Job role
+              </Label>
+              <Input
+                id="signup-jobrole"
                 type="text"
                 name="jobrole"
                 placeholder="Job role"
                 autoComplete="organization-title"
                 className={jobRoleClassName}
+                invalid={flow.isJobRoleInvalid}
                 value={flow.jobRole}
                 onChange={(event) => flow.onJobRoleChange(event.target.value)}
               />
             </div>
           )}
 
-          {isPasswordStep && (
-            <input
-              type="password"
-              name="password"
-              placeholder="Password"
-              autoComplete="new-password"
-              className={inputClassName}
-              value={flow.password}
-              onChange={(event) => flow.onPasswordChange(event.target.value)}
-            />
-          )}
+          <FormField
+            errorMessage={authError}
+            errorClassName={styles.formMessageError}
+            successMessage={successMessage}
+            successClassName={styles.formMessageSuccess}
+          >
+            {isPasswordStep ? (
+              <>
+                <Label htmlFor="signup-password" className="sr-only">
+                  Password
+                </Label>
+                <Input
+                  id="signup-password"
+                  type="password"
+                  name="password"
+                  placeholder="Password"
+                  autoComplete="new-password"
+                  className={inputClassName}
+                  value={flow.password}
+                  onChange={(event) => flow.onPasswordChange(event.target.value)}
+                />
+              </>
+            ) : null}
 
-          {!isPasswordStep && (
-            <button
-              type="button"
-              className={styles.continue}
-              disabled={!canContinue || isSubmitting}
-              onClick={handleContinue}
-            >
-              Continue
-            </button>
-          )}
-          {isPasswordStep && (
-            <button
-              type="submit"
-              className={styles.continue}
-              disabled={!canSignUp || isSubmitting}
-            >
-              {isSubmitting ? "Signing up..." : "Sign Up"}
-            </button>
-          )}
-          {authError ? <p className={styles.formMessageError}>{authError}</p> : null}
-          {successMessage ? <p className={styles.formMessageSuccess}>{successMessage}</p> : null}
+            {!isPasswordStep ? (
+              <Button
+                type="button"
+                className={styles.continue}
+                disabled={!canContinue || isSubmitting}
+                onClick={handleContinue}
+              >
+                Continue
+              </Button>
+            ) : null}
+            {isPasswordStep ? (
+              <Button
+                type="submit"
+                className={styles.continue}
+                disabled={!canSignUp || isSubmitting}
+              >
+                {isSubmitting ? "Signing up..." : "Sign Up"}
+              </Button>
+            ) : null}
+          </FormField>
         </div>
 
         {!isPasswordStep && (
           <div className={styles.footer}>
             <p className={styles.orText}>OR</p>
-            <button type="button" className={styles.AltLogin} onClick={() => onGoogleSignIn?.()}>
+            <Button type="button" variant="secondary" className={styles.AltLogin} onClick={() => onGoogleSignIn?.()}>
               <img src={googleIconSrc} alt="Google" />
               <span>Continue with Google</span>
-            </button>
+            </Button>
           </div>
         )}
       </div>
 
       {isPasswordStep && (
         <div className={styles.passwordStepActions}>
-          <button
+          <Button
             type="button"
+            variant="link"
             className={styles.secondaryLink}
             onClick={flow.goToDetailsStep}
           >
             Change details
-          </button>
+          </Button>
         </div>
       )}
     </form>

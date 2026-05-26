@@ -1,0 +1,51 @@
+:root {
+  /* Color roles */
+  --bg-canvas: #151515;
+  --bg-surface: #000000;
+  --bg-elevated: #0d0d0d;
+  --bg-control: #151515;
+  --text-primary: #ffffff;
+  --text-muted: rgba(255, 255, 255, 0.5);
+  --text-subtle: rgba(255, 255, 255, 0.42);
+  --text-secondary: rgba(255, 255, 255, 0.6);
+  --text-on-action: #0d0d0d;
+  --text-link: #0068f4;
+  --text-neutral: #8c8c8c;
+  --text-input-email: rgba(0, 104, 244, 0.5);
+  --action-primary: #0068f4;
+  --action-primary-hover: #1a78f6;
+  --action-primary-active: #0058d2;
+  --border-subtle: rgba(255, 255, 255, 0.14);
+  --border-focus: #66a8ff;
+  --feedback-success: rgba(49, 197, 108, 0.85);
+  --feedback-success-strong: rgba(49, 197, 108, 0.9);
+  --feedback-danger: #ec2542;
+  --state-valid-bg: #022d28;
+  --state-valid-text: rgba(49, 197, 108, 0.75);
+  --state-invalid-bg: #4a0719;
+  --state-invalid-text: #ec2542;
+
+  /* Spacing scale */
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+
+  /* Radius scale */
+  --radius-md: 12px;
+
+  /* Typography scale */
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-base: 16px;
+  --text-hero: clamp(48px, 4.4vw, 64px);
+
+  /* Motion */
+  --motion-fast: 150ms;
+  --motion-base: 250ms;
+
+  /* Component states */
+  --state-disabled-opacity: 0.5;
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+}

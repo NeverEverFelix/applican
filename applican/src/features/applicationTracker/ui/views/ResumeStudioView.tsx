@@ -15,6 +15,7 @@ import WritingText from "../../../../effects/writing-text";
 import TypingText from "../../../../effects/typing-text";
 import ScrollSections from "../../../../effects/ScrollSections";
 import StatusNotice from "../../../../components/feedback/StatusNotice";
+import { Button, Input, Textarea } from "../../../../components/ui";
 import { useViewport } from "../../../../hooks/useViewport";
 import {
   extractResumeOptimizationPresentationSections,
@@ -119,7 +120,7 @@ function OptimizationSectionAccordion({
 
   return (
     <section className={styles.optimizationGroup}>
-      <button
+      <Button
         type="button"
         className={styles.optimizationAccordionButton}
         onClick={() =>
@@ -145,7 +146,7 @@ function OptimizationSectionAccordion({
         >
           +
         </span>
-      </button>
+      </Button>
 
       <div className={styles.optimizationAccordionBody} style={{ maxHeight: isOpen ? "2000px" : "0px" }}>
         <div className={styles.optimizationAccordionBodyInner}>
@@ -161,7 +162,7 @@ function OptimizationSectionAccordion({
                 <article key={bullet.id} className={styles.optimizationBulletItem}>
                   {hasDistinctOptimization ? (
                     <>
-                      <button
+                      <Button
                         type="button"
                         className={styles.optimizationBulletButton}
                         onClick={() =>
@@ -184,7 +185,7 @@ function OptimizationSectionAccordion({
                         >
                           +
                         </span>
-                      </button>
+                      </Button>
                       {isBulletOpen ? (
                         <div className={styles.optimizationBulletBody} style={{ maxHeight: "400px" }}>
                           <div className={styles.optimizationBulletBodyInner}>
@@ -197,7 +198,7 @@ function OptimizationSectionAccordion({
                               >
                                 {bullet.optimized}
                               </p>
-                              <button
+                              <Button
                                 type="button"
                                 className={styles.optimizationCopyButton}
                                 onClick={() => {
@@ -211,7 +212,7 @@ function OptimizationSectionAccordion({
                                 aria-label="Copy optimized bullet"
                               >
                                 {copiedBulletId === bullet.id ? "Copied" : "Copy"}
-                              </button>
+                              </Button>
                             </div>
                           </div>
                         </div>
@@ -1066,14 +1067,14 @@ export function ResumeStudioView() {
         </section>
       ) : isShowingGenerationErrorScreen ? (
         <section className={styles.generationErrorScreen}>
-          <button
+          <Button
             type="button"
             className={styles.generationErrorButtonContainer}
             onClick={() => void onCancelRun()}
             aria-label="Cancel and return to resume inputs"
           >
             <img src={errorScreenIcon} alt="" className={styles.generationErrorButtonImage} />
-          </button>
+          </Button>
           <div className={styles.generationErrorSubtextContainer}>
             <p
               className={
@@ -1092,21 +1093,21 @@ export function ResumeStudioView() {
                   : "We failed to generate resume improvements."}
             </p>
             {generationErrorFeedback.retryable ? (
-              <button
+              <Button
                 type="button"
                 className={styles.generationErrorRetryTextButton}
                 onClick={() => void onRetryGenerateResult()}
               >
                 TRY AGAIN
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button
                 type="button"
                 className={styles.generationErrorRetryTextButton}
                 onClick={onStartNewAnalysis}
               >
                 START NEW
-              </button>
+              </Button>
             )}
           </div>
         </section>
@@ -1114,8 +1115,7 @@ export function ResumeStudioView() {
         <>
           <div className={styles.jobInputWrapper}>
             <img src={jobDescriptionIcon} alt="" aria-hidden="true" className={styles.jobInputIcon} />
-            <input
-              type="text"
+            <Textarea
               className={[
                 styles.jobDescriptionInput,
                 shouldShowValidatedJobDescriptionStyle ? styles.jobDescriptionInputValidated : "",
@@ -1123,6 +1123,7 @@ export function ResumeStudioView() {
               ]
                 .filter(Boolean)
                 .join(" ")}
+              rows={4}
               placeholder={
                 shouldShowInvalidJobDescriptionStyle
                   ? JOB_DESCRIPTION_ERROR_TEXT
@@ -1135,7 +1136,7 @@ export function ResumeStudioView() {
             />
           </div>
 
-          <button
+          <Button
             type="button"
             className={[styles.uploadBox, uploadedFileName ? styles.fileUploaded : "", isDragging ? styles.dragging : ""]
               .filter(Boolean)
@@ -1164,16 +1165,16 @@ export function ResumeStudioView() {
                 </>
               )}
             </span>
-            <input
+            <Input
               ref={fileInputRef}
               type="file"
               hidden
               accept=".pdf,.doc,.docx"
               onChange={(event) => selectFile(event.target.files)}
             />
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="button"
             className={styles.generateResultButton}
             onClick={() => void onGenerateResult()}
@@ -1181,7 +1182,7 @@ export function ResumeStudioView() {
           >
             <img src={starIcon} alt="" aria-hidden="true" className={styles.generateResultButtonIcon} />
             <span>{isSubmitting ? "Generating..." : "Generate Result"}</span>
-          </button>
+          </Button>
           {progressMessage ? (
             <StatusNotice tone="success" message={progressMessage} className={styles.statusNotice} />
           ) : null}
@@ -1208,9 +1209,9 @@ export function ResumeStudioView() {
       ) : isMobile ? (
         <section className={styles.resumeAnalysisContainer}>
           <div className={styles.resumeAnalysisActions}>
-            <button type="button" className={styles.newAnalysisButton} onClick={onStartNewAnalysis}>
+            <Button type="button" className={styles.newAnalysisButton} onClick={onStartNewAnalysis}>
               New analysis
-            </button>
+            </Button>
           </div>
 
           <div
@@ -1317,7 +1318,7 @@ export function ResumeStudioView() {
             </div>
           </div>
           <div className={styles.mobileResultsPager} aria-label="Resume result panel selector">
-            <button
+            <Button
               type="button"
               className={[
                 styles.mobileResultsDot,
@@ -1328,7 +1329,7 @@ export function ResumeStudioView() {
               onClick={() => setMobileResultsPanel("analysis")}
               aria-label="Show resume analysis panel"
             />
-            <button
+            <Button
               type="button"
               className={[
                 styles.mobileResultsDot,
@@ -1344,9 +1345,9 @@ export function ResumeStudioView() {
       ) : useScrollSectionsFlow ? (
         <section className={styles.resumeAnalysisContainer}>
           <div className={styles.resumeAnalysisActions}>
-            <button type="button" className={styles.newAnalysisButton} onClick={onStartNewAnalysis}>
+            <Button type="button" className={styles.newAnalysisButton} onClick={onStartNewAnalysis}>
               New analysis
-            </button>
+            </Button>
           </div>
           <ScrollSections
             sections={[
@@ -1444,13 +1445,13 @@ export function ResumeStudioView() {
       ) : (
         <section className={styles.resumeAnalysisContainer}>
           <div className={styles.resumeAnalysisActions}>
-            <button type="button" className={styles.newAnalysisButton} onClick={onStartNewAnalysis}>
+            <Button type="button" className={styles.newAnalysisButton} onClick={onStartNewAnalysis}>
               New analysis
-            </button>
+            </Button>
           </div>
 
           {!isMobile ? (
-            <button
+            <Button
               type="button"
               className={styles.analysisCollapseButton}
               onClick={onToggleAnalysisCollapse}
@@ -1468,7 +1469,7 @@ export function ResumeStudioView() {
                   .filter(Boolean)
                   .join(" ")}
               />
-            </button>
+            </Button>
           ) : null}
 
           {!isAnalysisCollapsed || isMobile ? (

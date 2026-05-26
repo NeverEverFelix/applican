@@ -9,6 +9,7 @@ import { getAuthErrorMessage } from "../features/auth/auth";
 import { useMinimumLoading } from "../features/auth/useMinimumLoading";
 import { useDocumentScrollLock } from "../hooks/useDocumentScrollLock";
 import { supabase } from "../lib/supabaseClient";
+import { Button, FormField, Input } from "../components/ui";
 
 const SUCCESS_REDIRECT_DELAY_MS = 1500;
 
@@ -109,21 +110,26 @@ export default function ChangePassword() {
         </div>
 
         <div className={styles.main}>
-          <input
-            type="password"
-            name="password"
-            placeholder="Password"
-            className={styles.password}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            autoComplete="new-password"
-            disabled={isChecking || isSubmitting || !session}
-          />
-          <button type="submit" className={styles.continue} disabled={!canSubmit}>
-            {isSubmitting ? "Updating..." : "Continue"}
-          </button>
-          {statusMessage ? <p className={styles.formMessageSuccess}>{statusMessage}</p> : null}
-          {errorMessage ? <p className={styles.formMessageError}>{errorMessage}</p> : null}
+          <FormField
+            errorMessage={errorMessage}
+            errorClassName={styles.formMessageError}
+            successMessage={statusMessage}
+            successClassName={styles.formMessageSuccess}
+          >
+            <Input
+              type="password"
+              name="password"
+              placeholder="Password"
+              className={styles.password}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="new-password"
+              disabled={isChecking || isSubmitting || !session}
+            />
+            <Button type="submit" className={styles.continue} disabled={!canSubmit}>
+              {isSubmitting ? "Updating..." : "Continue"}
+            </Button>
+          </FormField>
         </div>
 
         <div className={styles.passwordStepActions}>

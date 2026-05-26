@@ -1,0 +1,16 @@
+.textarea {
+  transition:
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    outline-color var(--motion-fast) ease;
+}
+
+.textarea:focus-visible {
+  outline: var(--focus-ring-width) solid var(--border-focus);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.invalid {
+  box-shadow: inset 0 0 0 1px var(--feedback-danger);
+}
+

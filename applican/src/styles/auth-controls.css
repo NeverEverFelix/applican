@@ -1,0 +1,6 @@
+:root {
+  --auth-control-width: min(100%, 403px);
+  --auth-control-height: 48px;
+  --auth-control-radius: 12px;
+}
+

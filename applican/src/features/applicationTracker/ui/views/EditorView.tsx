@@ -23,6 +23,7 @@ import historyModeIcon from "../../../../assets/history.svg";
 import refreshHistoryIcon from "../../../../assets/refresh-history.svg";
 import previewErrorScreenIcon from "../../../../assets/preview-error-screen.svg";
 import previewFailedTextIcon from "../../../../assets/preview-failed-text.svg";
+import { Button } from "../../../../components/ui";
 
 const DEFAULT_LATEX = [
   "% Tailored resume output will appear here after compile.",
@@ -522,18 +523,18 @@ export function EditorView() {
         <div className={styles.editorDownloadActions} aria-label="Download resume files">
           <div className={styles.editorDownloadAction}>
             <img src={texFileIcon} alt=".tex" className={styles.editorDownloadFileTypeIcon} />
-            <button
+            <Button
               type="button"
               className={styles.editorDownloadIconButton}
               onClick={onDownloadTex}
               aria-label="Download .tex file"
             >
               <img src={downloadIcon} alt="" aria-hidden="true" className={styles.editorDownloadIcon} />
-            </button>
+            </Button>
           </div>
           <div className={styles.editorDownloadAction}>
             <img src={pdfFileIcon} alt=".pdf" className={styles.editorDownloadFileTypeIcon} />
-            <button
+            <Button
               type="button"
               className={styles.editorDownloadIconButton}
               onClick={onDownloadPdf}
@@ -541,10 +542,10 @@ export function EditorView() {
               aria-label={isPdfCompiling ? "Compiling PDF" : "Download .pdf file"}
             >
               <img src={downloadIcon} alt="" aria-hidden="true" className={styles.editorDownloadIcon} />
-            </button>
+            </Button>
           </div>
         </div>
-        <button
+        <Button
           type="button"
           className={styles.editorModeToggleButton}
           onClick={onToggleEditorMode}
@@ -555,8 +556,8 @@ export function EditorView() {
             alt={isEditorMode ? "History" : "Editor"}
             className={styles.editorModeToggleIcon}
           />
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           className={styles.editorModeToggleButton}
           onClick={() => void loadHistory(false, true)}
@@ -564,7 +565,7 @@ export function EditorView() {
           aria-label={isHistoryLoading ? "Refreshing history" : "Refresh history"}
         >
           <img src={refreshHistoryIcon} alt="Refresh History" className={styles.editorModeToggleIcon} />
-        </button>
+        </Button>
       </div>
 
       {errorMessage ? (
@@ -609,7 +610,7 @@ export function EditorView() {
               <StatusNotice tone="info" message="No generated resumes yet." className={styles.editorHistoryEmptyNotice} />
             ) : (
               generatedResumes.map((row) => (
-                <button
+                <Button
                   key={row.id}
                   type="button"
                   className={[
@@ -622,7 +623,7 @@ export function EditorView() {
                 >
                   <span className={styles.editorHistoryItemName}>{row.filename}</span>
                   <span className={styles.editorHistoryItemMeta}>{new Date(row.created_at).toLocaleString()}</span>
-                </button>
+                </Button>
               ))
             )}
           </div>
