@@ -23,7 +23,7 @@ export default function ForgotPassword() {
   const emailValidation = validateEmail(email);
   const isEmailInvalid =
     !emailValidation.isValid && (emailValidation.value.length > 0 || emailAttempted);
-  const inputClassName = `${styles.email} ${isEmailInvalid ? styles.emailInvalid : ""}`.trim();
+  const inputClassName = `${styles.email} ${styles.authControl} ${isEmailInvalid ? styles.emailInvalid : ""}`.trim();
   const canSubmit = emailValidation.isValid && !isSubmitting;
   const showLoading = useMinimumLoading(isSubmitting);
   useDocumentScrollLock();
@@ -74,6 +74,7 @@ export default function ForgotPassword() {
 
           <div className={styles.main}>
             <FormField
+              className={styles.formField}
               errorMessage={errorMessage}
               errorClassName={styles.formMessageError}
               successMessage={statusMessage}
@@ -88,7 +89,11 @@ export default function ForgotPassword() {
                 onChange={(event) => setEmail(event.target.value)}
                 autoComplete="email"
               />
-              <Button type="submit" className={styles.continue} disabled={!canSubmit}>
+              <Button
+                type="submit"
+                className={`${styles.continue} ${styles.authControl}`}
+                disabled={!canSubmit}
+              >
                 {isSubmitting ? "Sending..." : "Continue"}
               </Button>
             </FormField>

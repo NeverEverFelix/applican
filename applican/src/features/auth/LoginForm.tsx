@@ -45,7 +45,7 @@ export default function LoginForm({
   const emailClassName = `${styles.email} ${
     flow.isEmailValid ? styles.emailValidated : flow.isEmailInvalid ? styles.emailInvalid : ""
   }`;
-  const inputClassName = isPasswordStep ? styles.password : emailClassName;
+  const inputClassName = `${isPasswordStep ? styles.password : emailClassName} ${styles.authControl}`.trim();
 
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
@@ -59,7 +59,11 @@ export default function LoginForm({
         </div>
 
         <div className={styles.main}>
-          <FormField errorMessage={authError} errorClassName={styles.formMessageError}>
+          <FormField
+            className={styles.formField}
+            errorMessage={authError}
+            errorClassName={styles.formMessageError}
+          >
             <Label htmlFor={isPasswordStep ? "login-password" : "login-email"} className="sr-only">
               {isPasswordStep ? "Password" : "Email"}
             </Label>
@@ -80,7 +84,11 @@ export default function LoginForm({
               }}
               autoComplete={isPasswordStep ? "current-password" : "email"}
             />
-            <Button type="submit" className={styles.continue} disabled={!canSubmit || isSubmitting}>
+            <Button
+              type="submit"
+              className={`${styles.continue} ${styles.authControl}`}
+              disabled={!canSubmit || isSubmitting}
+            >
               {isSubmitting ? "Continuing..." : "Continue"}
             </Button>
           </FormField>
@@ -89,7 +97,12 @@ export default function LoginForm({
         {!isPasswordStep && (
           <div className={styles.footer}>
             <p className={styles.orText}>OR</p>
-            <Button type="button" variant="secondary" className={styles.AltLogin} onClick={() => onGoogleSignIn?.()}>
+            <Button
+              type="button"
+              variant="secondary"
+              className={styles.AltLogin}
+              onClick={() => onGoogleSignIn?.()}
+            >
               <img src={googleIconSrc} alt="Google" />
               <span>Sign in with Google</span>
             </Button>

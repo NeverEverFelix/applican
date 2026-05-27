@@ -2134,11 +2134,14 @@
   }
 
   .studioContainer {
+    width: 100%;
     height: auto;
     max-height: none;
     justify-self: stretch;
     min-height: calc(100dvh - 180px);
     padding: 88px 24px 24px;
+    margin: 0 auto;
+    overflow: visible;
   }
 
   .editorToolbar,
@@ -2319,6 +2322,7 @@
     padding: 40px 16px 24px;
     gap: 16px;
     margin: 0 auto;
+    overflow: visible;
   }
 
   .editorToolbar,

@@ -84,6 +84,10 @@
   gap: var(--main-gap);
 }
 
+.formField {
+  width: var(--form-control-width);
+}
+
 .footer {
   width: 100%;
   display: flex;
@@ -136,30 +140,41 @@
   text-decoration: underline;
 }
 
+.email,
+.name,
+.jobrole,
+.password,
+.continue,
+.AltLogin {
+  width: var(--form-control-width);
+  height: var(--auth-control-height);
+  border-radius: var(--auth-control-radius);
+  box-sizing: border-box;
+}
+
+.authControl {
+  width: 100% !important;
+  height: var(--auth-control-height) !important;
+  border-radius: var(--auth-control-radius) !important;
+  box-sizing: border-box !important;
+}
+
 /* =========================
    INPUTS
    ========================= */
 .email,
 .name,
 .jobrole {
-  width: var(--form-control-width);
-  height: var(--auth-control-height);
   padding: 0 var(--space-3);
-  border-radius: var(--auth-control-radius);
   background-color: var(--bg-canvas);
-  box-sizing: border-box;
   border: none;
   outline: none;
   box-shadow: none;
 }
 
 .password {
-  width: var(--form-control-width);
-  height: var(--auth-control-height);
   padding: 0 var(--space-3);
-  border-radius: var(--auth-control-radius);
   background-color: var(--bg-canvas);
-  box-sizing: border-box;
   border: none;
   outline: none;
   box-shadow: none;
@@ -232,12 +247,9 @@
    ========================= */
 .continue {
   margin-top: 0;
-  width: var(--form-control-width);
-  height: var(--auth-control-height);
   background: var(--action-primary);
   color: var(--text-on-action);
   border: none;
-  border-radius: var(--auth-control-radius);
 }
 
 .continue:disabled {
@@ -246,7 +258,7 @@
 }
 
 .formMessageError {
-  width: var(--form-control-width);
+  width: 100%;
   margin: calc(var(--feedback-gap) - var(--main-gap)) 0 0;
   color: var(--feedback-danger);
   font-size: var(--text-sm);
@@ -255,7 +267,7 @@
 }
 
 .formMessageSuccess {
-  width: var(--form-control-width);
+  width: 100%;
   margin: calc(var(--feedback-gap) - var(--main-gap)) 0 0;
   color: var(--feedback-success-strong);
   font-size: var(--text-sm);
@@ -272,11 +284,7 @@
 }
 
 .AltLogin {
-  width: var(--form-control-width);
-  height: var(--auth-control-height);
   background-color: var(--bg-canvas);
-  border-radius: var(--auth-control-radius);
-  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -323,7 +331,7 @@
   }
 
   .assetContainer {
-    min-height: 320px;
+    display: none;
   }
 }
 
@@ -343,10 +351,6 @@
     align-items: center;
     align-content: center;
     justify-items: center;
-  }
-
-  .assetContainer {
-    display: none;
   }
 
   .form {

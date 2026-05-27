@@ -57,6 +57,10 @@
   margin-top: var(--section-gap);
 }
 
+.formField {
+  width: var(--form-control-width);
+}
+
 .footer {
   width: 100%;
   display: flex;
@@ -95,14 +99,26 @@
   text-decoration: underline;
 }
 
-.email {
+.email,
+.password,
+.continue,
+.AltLogin {
   width: var(--form-control-width);
   height: var(--auth-control-height);
-  padding: 0 var(--space-3);
   border-radius: var(--auth-control-radius);
-  background-color: var(--bg-canvas);
   box-sizing: border-box;
+}
 
+.authControl {
+  width: 100% !important;
+  height: var(--auth-control-height) !important;
+  border-radius: var(--auth-control-radius) !important;
+  box-sizing: border-box !important;
+}
+
+.email {
+  padding: 0 var(--space-3);
+  background-color: var(--bg-canvas);
   border: none;
   color: var(--text-input-email);
   caret-color: var(--text-input-email);
@@ -166,13 +182,8 @@
   -webkit-text-fill-color: var(--feedback-danger);
 }
 .password{
-  width: var(--form-control-width);
-  height: var(--auth-control-height);
   padding: 0 var(--space-3);
-  border-radius: var(--auth-control-radius);
   background-color: var(--bg-canvas);
-  box-sizing: border-box;
-
   border: none;
   color: var(--text-muted);
   caret-color: var(--text-muted);
@@ -197,12 +208,9 @@
 }
 .continue {
   margin-top: var(--space-6);
-  width: var(--form-control-width);
-  height: var(--auth-control-height);
   background: var(--action-primary);
   color: var(--text-on-action);
   border: none;
-  border-radius: var(--auth-control-radius);
 }
 
 .continue:disabled {
@@ -211,7 +219,7 @@
 }
 
 .formMessageError {
-  width: var(--form-control-width);
+  width: 100%;
   margin: var(--space-3) 0 0;
   color: var(--feedback-danger);
   font-size: var(--text-sm);
@@ -228,12 +236,7 @@
 }
 
 .AltLogin {
-  width: var(--form-control-width);
-  height: var(--auth-control-height);
   background-color: var(--bg-canvas);
-  border-radius: var(--auth-control-radius);
-  box-sizing: border-box;
-
   margin-top: var(--space-6); /* replaces the 117px hack */
   display: flex;
   align-items: center;
@@ -297,7 +300,7 @@
   }
 
   .assetContainer {
-    min-height: 320px;
+    display: none;
   }
 }
 
@@ -316,10 +319,6 @@
     height: 100dvh;
     align-items: center;
     align-content: center;
-  }
-
-  .assetContainer {
-    display: none;
   }
 
   .form {

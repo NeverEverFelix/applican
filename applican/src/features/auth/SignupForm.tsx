@@ -29,16 +29,16 @@ export default function SignupForm({
     flow.isEmailValid && flow.name.trim().length > 0 && flow.jobRole.trim().length > 0;
   const canSignUp = flow.password.trim().length > 0;
 
-  const emailClassName = `${styles.email} ${
+  const emailClassName = `${styles.email} ${styles.authControl} ${
     flow.isEmailValid ? styles.emailValidated : flow.isEmailInvalid ? styles.emailInvalid : ""
   }`;
-  const nameClassName = `${styles.name} ${
+  const nameClassName = `${styles.name} ${styles.authControl} ${
     flow.isNameComplete ? styles.emailValidated : flow.isNameInvalid ? styles.emailInvalid : ""
   }`;
-  const jobRoleClassName = `${styles.jobrole} ${
+  const jobRoleClassName = `${styles.jobrole} ${styles.authControl} ${
     flow.isJobRoleComplete ? styles.emailValidated : flow.isJobRoleInvalid ? styles.emailInvalid : ""
   }`;
-  const inputClassName = isPasswordStep ? styles.password : undefined;
+  const inputClassName = isPasswordStep ? `${styles.password} ${styles.authControl}` : undefined;
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -118,6 +118,7 @@ export default function SignupForm({
           )}
 
           <FormField
+            className={styles.formField}
             errorMessage={authError}
             errorClassName={styles.formMessageError}
             successMessage={successMessage}
@@ -144,7 +145,7 @@ export default function SignupForm({
             {!isPasswordStep ? (
               <Button
                 type="button"
-                className={styles.continue}
+                className={`${styles.continue} ${styles.authControl}`}
                 disabled={!canContinue || isSubmitting}
                 onClick={handleContinue}
               >
@@ -154,7 +155,7 @@ export default function SignupForm({
             {isPasswordStep ? (
               <Button
                 type="submit"
-                className={styles.continue}
+                className={`${styles.continue} ${styles.authControl}`}
                 disabled={!canSignUp || isSubmitting}
               >
                 {isSubmitting ? "Signing up..." : "Sign Up"}
@@ -166,7 +167,12 @@ export default function SignupForm({
         {!isPasswordStep && (
           <div className={styles.footer}>
             <p className={styles.orText}>OR</p>
-            <Button type="button" variant="secondary" className={styles.AltLogin} onClick={() => onGoogleSignIn?.()}>
+            <Button
+              type="button"
+              variant="secondary"
+              className={styles.AltLogin}
+              onClick={() => onGoogleSignIn?.()}
+            >
               <img src={googleIconSrc} alt="Google" />
               <span>Continue with Google</span>
             </Button>
